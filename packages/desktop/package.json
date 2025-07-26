@@ -11,9 +11,9 @@
   "type": "module",
   "main": "dist/main/index.js",
   "scripts": {
-    "dev": "concurrently -k \"npm run dev:vite\" \"npm run dev:electron\"",
+    "dev": "npm run build:electron && concurrently -k \"npm run dev:vite\" \"npm run dev:electron\"",
     "dev:vite": "vite",
-    "dev:electron": "wait-on http://localhost:5173 && electron . --enable-logging",
+    "dev:electron": "wait-on http://localhost:5174 && electron . --enable-logging",
     "build": "npm run build:vite && npm run build:electron",
     "build:vite": "tsc && vite build",
     "build:electron": "tsc src/main/index.ts src/main/server-detector.ts src/preload/index.ts --outDir dist --module commonjs --target es2021 --esModuleInterop --skipLibCheck",

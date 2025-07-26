@@ -26,8 +26,8 @@ async function createWindow() {
   });
 
   if (isDevelopment) {
-    mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
+    mainWindow.loadURL('http://localhost:5174');
+    // mainWindow.webContents.openDevTools(); // Uncomment to show dev tools
   } else {
     mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'));
   }
