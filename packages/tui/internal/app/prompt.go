@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/sst/opencode-sdk-go"
+	opencode "github.com/sst/opencode-sdk-go"
 	"github.com/sst/opencode/internal/attachment"
 	"github.com/sst/opencode/internal/id"
 )

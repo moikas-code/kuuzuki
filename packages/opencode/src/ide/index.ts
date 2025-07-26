@@ -47,13 +47,13 @@ export namespace Ide {
     const cmd = (() => {
       switch (ide) {
         case "Windsurf":
-          return $`windsurf --install-extension sst-dev.opencode`
+          return $`windsurf --install-extension sst-dev.kuuzuki`
         case "Visual Studio Code":
-          return $`code --install-extension sst-dev.opencode`
+          return $`code --install-extension sst-dev.kuuzuki`
         case "Cursor":
-          return $`cursor --install-extension sst-dev.opencode`
+          return $`cursor --install-extension sst-dev.kuuzuki`
         case "VSCodium":
-          return $`codium --install-extension sst-dev.opencode`
+          return $`codium --install-extension sst-dev.kuuzuki`
         default:
           throw new Error(`Unknown IDE: ${ide}`)
       }

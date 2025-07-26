@@ -1,0 +1,21 @@
+[package]
+name = "kuuzuki-desktop"
+version = "0.1.0"
+description = "Kuuzuki Desktop App"
+authors = ["Your Name"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "1", features = [] }
+
+[dependencies]
+tauri = { version = "1", features = [ "fs-write-file", "fs-remove-file", "fs-exists", "fs-read-file", "fs-read-dir", "process-relaunch", "fs-remove-dir", "fs-create-dir", "process-exit", "shell-open"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.11", features = ["json"] }
+futures = "0.3"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

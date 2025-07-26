@@ -89,7 +89,7 @@ const AgentCreateCommand = cmd({
 
       const content = matter.stringify(generated.systemPrompt, frontmatter)
       const filePath = path.join(
-        scope === "global" ? Global.Path.config : path.join(app.path.root, ".opencode"),
+        scope === "global" ? Global.Path.config : path.join(app.path.root, ".kuuzuki"),
         `agent`,
         `${generated.identifier}.md`,
       )

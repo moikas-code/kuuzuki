@@ -2,3 +2,20 @@ research
 dist
 gen
 app.log
+
+# Compiled binaries
+*.compiled
+kuuzuki-cli
+kuuzuki-tui
+kuuzuki-tui-*
+packages/*/bin/
+packages/desktop/src-tauri/binaries/
+
+
+# More binary exclusions
+packages/opencode/binaries/
+packages/opencode/kuuzuki-cli
+packages/tui/kuuzuki-tui
+packages/tui/cmd/*/main
+packages/tui/cmd/opencode/opencode
+*.exe

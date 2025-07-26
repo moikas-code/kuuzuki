@@ -15,7 +15,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 
-	"github.com/sst/opencode-sdk-go"
+	opencode "github.com/sst/opencode-sdk-go"
 	"github.com/sst/opencode/internal/api"
 	"github.com/sst/opencode/internal/app"
 	"github.com/sst/opencode/internal/commands"
@@ -625,22 +625,14 @@ func (a Model) home() string {
 	effectiveWidth := a.width - 4
 	baseStyle := styles.NewStyle().Background(t.Background())
 	base := baseStyle.Render
-	muted := styles.NewStyle().Foreground(t.TextMuted()).Background(t.Background()).Render
 
-	open := `
-█▀▀█ █▀▀█ █▀▀ █▀▀▄ 
-█░░█ █░░█ █▀▀ █░░█ 
-▀▀▀▀ █▀▀▀ ▀▀▀ ▀  ▀ `
-	code := `
-█▀▀ █▀▀█ █▀▀▄ █▀▀
-█░░ █░░█ █░░█ █▀▀
-▀▀▀ ▀▀▀▀ ▀▀▀  ▀▀▀`
+	kuuzuki := `
+██  ██ ██  ██ ██  ██ ██████ ██  ██ ██  ██ ██
+████   ██░░██ ██░░██    ██  ██░░██ ████   ██
+██ ██  ██░░██ ██░░██  ██    ██░░██ ██ ██  ██
+██  ██  ████   ████  ██████  ████  ██  ██ ██`
 
-	logo := lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		muted(open),
-		base(code),
-	)
+	logo := base(kuuzuki)
 	// cwd := app.Info.Path.Cwd
 	// config := app.Info.Path.Config
 

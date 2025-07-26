@@ -116,7 +116,7 @@ export const AuthLoginCommand = cmd({
       provider = provider.replace(/^@ai-sdk\//, "")
       if (prompts.isCancel(provider)) throw new UI.CancelledError()
       prompts.log.warn(
-        `This only stores a credential for ${provider} - you will need configure it in opencode.json, check the docs for examples.`,
+        `This only stores a credential for ${provider} - you will need configure it in kuuzuki.json, check the docs for examples.`,
       )
     }
 

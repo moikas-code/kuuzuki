@@ -168,9 +168,9 @@ export interface ClientOptions {
 }
 
 /**
- * API Client for interfacing with the Opencode API.
+ * API Client for interfacing with the Kuuzuki API.
  */
-export class Opencode {
+export class Kuuzuki {
   baseURL: string;
   maxRetries: number;
   timeout: number;
@@ -184,7 +184,7 @@ export class Opencode {
   private _options: ClientOptions;
 
   /**
-   * API Client for interfacing with the Opencode API.
+   * API Client for interfacing with the Kuuzuki API.
    *
    * @param {string} [opts.baseURL=process.env['OPENCODE_BASE_URL'] ?? http://localhost:54321] - Override the default base URL for the API.
    * @param {number} [opts.timeout=1 minute] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out.
@@ -201,7 +201,7 @@ export class Opencode {
     };
 
     this.baseURL = options.baseURL!;
-    this.timeout = options.timeout ?? Opencode.DEFAULT_TIMEOUT /* 1 minute */;
+    this.timeout = options.timeout ?? Kuuzuki.DEFAULT_TIMEOUT /* 1 minute */;
     this.logger = options.logger ?? console;
     const defaultLogLevel = 'warn';
     // Set default logLevel early so that we can log a warning in parseLogLevel.
@@ -735,7 +735,7 @@ export class Opencode {
     }
   }
 
-  static Opencode = this;
+  static Kuuzuki = this;
   static DEFAULT_TIMEOUT = 60000; // 1 minute
 
   static OpencodeError = Errors.OpencodeError;
@@ -762,14 +762,14 @@ export class Opencode {
   session: API.SessionResource = new API.SessionResource(this);
   tui: API.Tui = new API.Tui(this);
 }
-Opencode.Event = Event;
-Opencode.AppResource = AppResource;
-Opencode.Find = Find;
-Opencode.FileResource = FileResource;
-Opencode.ConfigResource = ConfigResource;
-Opencode.SessionResource = SessionResource;
-Opencode.Tui = Tui;
-export declare namespace Opencode {
+Kuuzuki.Event = Event;
+Kuuzuki.AppResource = AppResource;
+Kuuzuki.Find = Find;
+Kuuzuki.FileResource = FileResource;
+Kuuzuki.ConfigResource = ConfigResource;
+Kuuzuki.SessionResource = SessionResource;
+Kuuzuki.Tui = Tui;
+export declare namespace Kuuzuki {
   export type RequestOptions = Opts.RequestOptions;
 
   export { Event as Event, type EventListResponse as EventListResponse };

@@ -1,5 +1,5 @@
-import { multipartFormRequestOptions, createForm } from '@opencode-ai/sdk/internal/uploads';
-import { toFile } from '@opencode-ai/sdk/core/uploads';
+import { multipartFormRequestOptions, createForm } from '@kuuzuki-ai/sdk/internal/uploads';
+import { toFile } from '@kuuzuki-ai/sdk/core/uploads';
 
 describe('form data validation', () => {
   test('valid values do not error', async () => {

@@ -16,7 +16,7 @@ export namespace Config {
 
   export const state = App.state("config", async (app) => {
     let result = await global()
-    for (const file of ["opencode.jsonc", "opencode.json"]) {
+    for (const file of ["kuuzuki.jsonc", "kuuzuki.json"]) {
       const found = await Filesystem.findUp(file, app.path.cwd, app.path.root)
       for (const resolved of found.toReversed()) {
         result = mergeDeep(result, await load(resolved))
@@ -26,7 +26,7 @@ export namespace Config {
     result.agent = result.agent || {}
     const markdownAgents = [
       ...(await Filesystem.globUp("agent/*.md", Global.Path.config, Global.Path.config)),
-      ...(await Filesystem.globUp(".opencode/agent/*.md", app.path.cwd, app.path.root)),
+      ...(await Filesystem.globUp(".kuuzuki/agent/*.md", app.path.cwd, app.path.root)),
     ]
     for (const item of markdownAgents) {
       const content = await Bun.file(item).text()
@@ -205,14 +205,14 @@ export namespace Config {
         })
         .catchall(Mode)
         .optional()
-        .describe("Modes configuration, see https://opencode.ai/docs/modes"),
+        .describe("Modes configuration, see https://kuuzuki.ai/docs/modes"),
       agent: z
         .object({
           general: Agent.optional(),
         })
         .catchall(Agent)
         .optional()
-        .describe("Modes configuration, see https://opencode.ai/docs/modes"),
+        .describe("Modes configuration, see https://kuuzuki.ai/docs/modes"),
       provider: z
         .record(
           ModelsDev.Provider.partial()
@@ -271,7 +271,7 @@ export namespace Config {
     let result = pipe(
       {},
       mergeDeep(await load(path.join(Global.Path.config, "config.json"))),
-      mergeDeep(await load(path.join(Global.Path.config, "opencode.json"))),
+      mergeDeep(await load(path.join(Global.Path.config, "kuuzuki.json"))),
     )
 
     await import(path.join(Global.Path.config, "config"), {
@@ -282,7 +282,7 @@ export namespace Config {
       .then(async (mod) => {
         const { provider, model, ...rest } = mod.default
         if (provider && model) result.model = `${provider}/${model}`
-        result["$schema"] = "https://opencode.ai/config.json"
+        result["$schema"] = "https://kuuzuki.ai/config.json"
         result = mergeDeep(result, rest)
         await Bun.write(path.join(Global.Path.config, "config.json"), JSON.stringify(result, null, 2))
         await fs.unlink(path.join(Global.Path.config, "config"))
@@ -326,7 +326,7 @@ export namespace Config {
     const parsed = Info.safeParse(data)
     if (parsed.success) {
       if (!parsed.data.$schema) {
-        parsed.data.$schema = "https://opencode.ai/config.json"
+        parsed.data.$schema = "https://kuuzuki.ai/config.json"
         await Bun.write(configPath, JSON.stringify(parsed.data, null, 2))
       }
       return parsed.data

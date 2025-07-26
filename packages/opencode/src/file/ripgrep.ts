@@ -249,7 +249,7 @@ export namespace Ripgrep {
       children: [],
     }
     for (const file of files) {
-      if (file.includes(".opencode")) continue
+      if (file.includes(".kuuzuki")) continue
       const parts = file.split(path.sep)
       getPath(root, parts, true)
     }

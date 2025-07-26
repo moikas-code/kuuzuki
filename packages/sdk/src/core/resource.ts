@@ -1,11 +1,11 @@
 // File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-import type { Opencode } from '../client';
+import type { Kuuzuki } from '../client';
 
 export abstract class APIResource {
-  protected _client: Opencode;
+  protected _client: Kuuzuki;
 
-  constructor(client: Opencode) {
+  constructor(client: Kuuzuki) {
     this._client = client;
   }
 }

@@ -1,6 +1,6 @@
 import assert from 'assert';
-import { _iterSSEMessages } from '@opencode-ai/sdk/core/streaming';
-import { ReadableStreamFrom } from '@opencode-ai/sdk/internal/shims';
+import { _iterSSEMessages } from '@kuuzuki-ai/sdk/core/streaming';
+import { ReadableStreamFrom } from '@kuuzuki-ai/sdk/internal/shims';
 
 describe('streaming decoding', () => {
   test('basic', async () => {

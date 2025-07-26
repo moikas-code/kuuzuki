@@ -1,0 +1,96 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  overflow: hidden;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background-color: #2d2d30;
+  border-bottom: 1px solid #3e3e42;
+  flex-shrink: 0;
+}
+
+.app-header h1 {
+  font-size: 16px;
+  font-weight: 400;
+  color: #cccccc;
+}
+
+.server-status {
+  font-size: 12px;
+  color: #608b4e;
+  background-color: rgba(96, 139, 78, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.app-main {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.terminal-container {
+  height: 100%;
+  padding: 10px;
+  background-color: #1e1e1e;
+}
+
+.app-footer {
+  display: flex;
+  align-items: center;
+  padding: 5px 20px;
+  background-color: #007ACC;
+  color: white;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* Terminal specific styles */
+.xterm {
+  height: 100%;
+}
+
+.xterm-viewport {
+  background-color: #1e1e1e !important;
+}
+
+/* Scrollbar styles */
+.xterm-viewport::-webkit-scrollbar {
+  width: 10px;
+}
+
+.xterm-viewport::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: #3e3e42;
+  border-radius: 5px;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: #4e4e52;
+}

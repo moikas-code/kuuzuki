@@ -188,8 +188,8 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://kuuzuki.ai/",
+            "X-Title": "kuuzuki",
           },
         },
       }

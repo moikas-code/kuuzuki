@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sst/opencode-sdk-go"
+	opencode "github.com/sst/opencode-sdk-go"
 	"github.com/sst/opencode-sdk-go/internal"
 	"github.com/sst/opencode-sdk-go/option"
 )

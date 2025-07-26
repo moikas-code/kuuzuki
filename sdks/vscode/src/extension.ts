@@ -4,10 +4,10 @@ export function deactivate() {}
 import * as vscode from "vscode"
 
 export function activate(context: vscode.ExtensionContext) {
-  const TERMINAL_NAME = "opencode"
+  const TERMINAL_NAME = "kuuzuki"
 
-  // Register command to open terminal in split screen and run opencode
-  let openTerminalDisposable = vscode.commands.registerCommand("opencode.openTerminal", async () => {
+  // Register command to open terminal in split screen and run kuuzuki
+  let openTerminalDisposable = vscode.commands.registerCommand("kuuzuki.openTerminal", async () => {
     // Create a new terminal in split screen
     const port = Math.floor(Math.random() * (65535 - 16384 + 1)) + 16384
     const terminal = vscode.window.createTerminal({
@@ -26,7 +26,7 @@ export function activate(context: vscode.ExtensionContext) {
     })
 
     terminal.show()
-    terminal.sendText(`OPENCODE_THEME=system OPENCODE_CALLER=vscode opencode --port ${port}`)
+    terminal.sendText(`OPENCODE_THEME=system OPENCODE_CALLER=vscode kuuzuki --port ${port}`)
 
     const fileRef = getActiveFile()
     if (!fileRef) return
@@ -53,7 +53,7 @@ export function activate(context: vscode.ExtensionContext) {
   })
 
   // Register command to add filepath to terminal
-  let addFilepathDisposable = vscode.commands.registerCommand("opencode.addFilepathToTerminal", async () => {
+  let addFilepathDisposable = vscode.commands.registerCommand("kuuzuki.addFilepathToTerminal", async () => {
     const fileRef = getActiveFile()
     if (!fileRef) return
 

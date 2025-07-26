@@ -1,4 +1,3 @@
-import { Global } from "../../global"
 import { Provider } from "../../provider/provider"
 import { Server } from "../../server/server"
 import { bootstrap } from "../bootstrap"
@@ -16,12 +15,12 @@ import { Ide } from "../../ide"
 
 export const TuiCommand = cmd({
   command: "$0 [project]",
-  describe: "start opencode tui",
+  describe: "start kuuzuki tui",
   builder: (yargs) =>
     yargs
       .positional("project", {
         type: "string",
-        describe: "path to start opencode in",
+        describe: "path to start kuuzuki in",
       })
       .option("model", {
         type: "string",
@@ -69,15 +68,30 @@ export const TuiCommand = cmd({
           hostname: args.hostname,
         })
 
-        let cmd = ["go", "run", "./main.go"]
-        let cwd = Bun.fileURLToPath(new URL("../../../../tui/cmd/opencode", import.meta.url))
+        // Write server info for auto-detection
+        await import("../../server/server-info").then(({ writeServerInfo }) =>
+          writeServerInfo({ port: server.port!, hostname: server.hostname || "127.0.0.1" })
+        )
+
+        let cmd: string[]
+        let cwd: string = process.cwd()
+
+        // Check for pre-built binary first
+        const prebuiltBinary = path.join(__dirname, "../../../binaries/kuuzuki-tui-linux")
+        if (await Bun.file(prebuiltBinary).exists()) {
+          cmd = [prebuiltBinary]
+        } else {
+          // Fallback to go run for development
+          cmd = ["go", "run", "./main.go"]
+          cwd = Bun.fileURLToPath(new URL("../../../../tui/cmd/opencode", import.meta.url))
+        }
         if (Bun.embeddedFiles.length > 0) {
           const blob = Bun.embeddedFiles[0] as File
           let binaryName = blob.name
           if (process.platform === "win32" && !binaryName.endsWith(".exe")) {
             binaryName += ".exe"
           }
-          const binary = path.join(Global.Path.cache, "tui", binaryName)
+          const binary = path.join(__dirname, "../../../binaries", binaryName)
           const file = Bun.file(binary)
           if (!(await file.exists())) {
             await Bun.write(file, blob, { mode: 0o755 })
@@ -163,9 +177,9 @@ export const TuiCommand = cmd({
 })
 
 /**
- * Get the correct command to run opencode CLI
- * In development: ["bun", "run", "packages/opencode/src/index.ts"]
- * In production: ["/path/to/opencode"]
+ * Get the correct command to run kuuzuki CLI
+ * In development: ["bun", "run", "packages/kuuzuki/src/index.ts"]
+ * In production: ["/path/to/kuuzuki"]
  */
 function getOpencodeCommand(): string[] {
   // Check if OPENCODE_BIN_PATH is set (used by shell wrapper scripts)

@@ -78,9 +78,9 @@ export namespace Server {
         openAPISpecs(app, {
           documentation: {
             info: {
-              title: "opencode",
+              title: "kuuzuki",
               version: "0.0.3",
-              description: "opencode api",
+              description: "kuuzuki api",
             },
             openapi: "3.0.0",
           },
@@ -807,6 +807,35 @@ export namespace Server {
         async (c) => c.json(await callTui(c)),
       )
       .route("/tui/control", TuiRoute)
+      .get(
+        "/health",
+        describeRoute({
+          description: "Health check endpoint",
+          responses: {
+            200: {
+              description: "Server is healthy",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.object({
+                      status: z.literal("ok"),
+                      timestamp: z.string(),
+                      version: z.string().optional(),
+                    })
+                  ),
+                },
+              },
+            },
+          },
+        }),
+        async (c) => {
+          return c.json({
+            status: "ok" as const,
+            timestamp: new Date().toISOString(),
+            version: process.env["OPENCODE_VERSION"] || "dev",
+          })
+        }
+      )
 
     return result
   }
@@ -816,9 +845,9 @@ export namespace Server {
     const result = await generateSpecs(a, {
       documentation: {
         info: {
-          title: "opencode",
+          title: "kuuzuki",
           version: "1.0.0",
-          description: "opencode api",
+          description: "kuuzuki api",
         },
         openapi: "3.0.0",
       },

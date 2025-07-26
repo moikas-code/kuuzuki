@@ -6,7 +6,7 @@ import { ReadableStreamToAsyncIterable } from '../internal/shims';
 import { isAbortError } from '../internal/errors';
 import { encodeUTF8 } from '../internal/utils/bytes';
 import { loggerFor } from '../internal/utils/log';
-import type { Opencode } from '../client';
+import type { Kuuzuki } from '../client';
 
 type Bytes = string | ArrayBuffer | Uint8Array | null | undefined;
 
@@ -18,12 +18,12 @@ export type ServerSentEvent = {
 
 export class Stream<Item> implements AsyncIterable<Item> {
   controller: AbortController;
-  #client: Opencode | undefined;
+  #client: Kuuzuki | undefined;
 
   constructor(
     private iterator: () => AsyncIterator<Item>,
     controller: AbortController,
-    client?: Opencode,
+    client?: Kuuzuki,
   ) {
     this.controller = controller;
     this.#client = client;
@@ -32,7 +32,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
   static fromSSEResponse<Item>(
     response: Response,
     controller: AbortController,
-    client?: Opencode,
+    client?: Kuuzuki,
   ): Stream<Item> {
     let consumed = false;
     const logger = client ? loggerFor(client) : console;
@@ -74,7 +74,7 @@ export class Stream<Item> implements AsyncIterable<Item> {
   static fromReadableStream<Item>(
     readableStream: ReadableStream,
     controller: AbortController,
-    client?: Opencode,
+    client?: Kuuzuki,
   ): Stream<Item> {
     let consumed = false;
 

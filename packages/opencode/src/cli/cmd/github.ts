@@ -123,7 +123,7 @@ type IssueQueryResponse = {
   }
 }
 
-const WORKFLOW_FILE = ".github/workflows/opencode.yml"
+const WORKFLOW_FILE = ".github/workflows/kuuzuki.yml"
 
 export const GithubCommand = cmd({
   command: "github",
@@ -170,7 +170,7 @@ export const GithubInstallCommand = cmd({
             "Next steps:",
             `    1. Commit "${WORKFLOW_FILE}" file and push`,
             `    2. ${step2}`,
-            "    3. Learn how to use the GitHub agent - https://docs.opencode.ai/docs/github/getting-started",
+            "    3. Learn how to use the GitHub agent - https://docs.kuuzuki.ai/docs/github/getting-started",
           ].join("\n"),
         )
       }
@@ -185,8 +185,8 @@ export const GithubInstallCommand = cmd({
         // Get repo info
         const info = await $`git remote get-url origin`.quiet().nothrow().text()
         // match https or git pattern
-        // ie. https://github.com/sst/opencode.git
-        // ie. git@github.com:sst/opencode.git
+        // ie. https://github.com/sst/kuuzuki.git
+        // ie. git@github.com:sst/kuuzuki.git
         const parsed = info.match(/git@github\.com:(.*)\.git/) ?? info.match(/github\.com\/(.*)\.git/)
         if (!parsed) {
           prompts.log.error(`Could not find git repository. Please run this command from a git repository.`)
@@ -256,7 +256,7 @@ export const GithubInstallCommand = cmd({
         if (installation) return s.stop("GitHub app already installed")
 
         // Open browser
-        const url = "https://github.com/apps/opencode-agent"
+        const url = "https://github.com/apps/kuuzuki-agent"
         const command =
           process.platform === "darwin"
             ? `open "${url}"`
@@ -292,7 +292,7 @@ export const GithubInstallCommand = cmd({
         s.stop("Installed GitHub app")
 
         async function getInstallation() {
-          return await fetch(`https://api.opencode.ai/get_github_app_installation?owner=${app.owner}&repo=${app.repo}`)
+          return await fetch(`https://api.kuuzuki.ai/get_github_app_installation?owner=${app.owner}&repo=${app.repo}`)
             .then((res) => res.json())
             .then((data) => data.installation)
         }
@@ -307,17 +307,17 @@ export const GithubInstallCommand = cmd({
         await Bun.write(
           path.join(app.root, WORKFLOW_FILE),
           `
-name: opencode
+name: kuuzuki
 
 on:
   issue_comment:
     types: [created]
 
 jobs:
-  opencode:
+  kuuzuki:
     if: |
       contains(github.event.comment.body, '/oc') ||
-      contains(github.event.comment.body, '/opencode')
+      contains(github.event.comment.body, '/kuuzuki')
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -327,8 +327,8 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Run opencode
-        uses: sst/opencode/github@latest${envStr}
+      - name: Run kuuzuki
+        uses: sst/kuuzuki/github@latest${envStr}
         with:
           model: ${provider}/${model}
 `.trim(),
@@ -371,7 +371,7 @@ export const GithubRunCommand = cmd({
       const actor = context.actor
       const issueId = payload.issue.number
       const runUrl = `/${owner}/${repo}/actions/runs/${runId}`
-      const shareBaseUrl = isMock ? "https://dev.opencode.ai" : "https://opencode.ai"
+      const shareBaseUrl = isMock ? "https://dev.kuuzuki.ai" : "https://kuuzuki.ai"
 
       let appToken: string
       let octoRest: Octokit
@@ -398,7 +398,7 @@ export const GithubRunCommand = cmd({
         const comment = await createComment()
         commentId = comment.data.id
 
-        // Setup opencode session
+        // Setup kuuzuki session
         const repoData = await fetchRepo()
         session = await Session.create()
         subscribeSessionEvents()
@@ -408,7 +408,7 @@ export const GithubRunCommand = cmd({
           await Session.share(session.id)
           return session.id.slice(-8)
         })()
-        console.log("opencode session", session.id)
+        console.log("kuuzuki session", session.id)
 
         // Handle 3 cases
         // 1. Issue
@@ -507,9 +507,9 @@ export const GithubRunCommand = cmd({
       async function getUserPrompt() {
         let prompt = (() => {
           const body = payload.comment.body.trim()
-          if (body === "/opencode" || body === "/oc") return "Summarize this thread"
-          if (body.includes("/opencode") || body.includes("/oc")) return body
-          throw new Error("Comments must mention `/opencode` or `/oc`")
+          if (body === "/kuuzuki" || body === "/oc") return "Summarize this thread"
+          if (body.includes("/kuuzuki") || body.includes("/oc")) return body
+          throw new Error("Comments must mention `/kuuzuki` or `/oc`")
         })()
 
         // Handle images
@@ -630,7 +630,7 @@ export const GithubRunCommand = cmd({
       }
 
       async function chat(message: string, files: PromptFiles = []) {
-        console.log("Sending message to opencode...")
+        console.log("Sending message to kuuzuki...")
 
         const result = await Session.chat({
           sessionID: session.id,
@@ -680,7 +680,7 @@ export const GithubRunCommand = cmd({
 
       async function getOidcToken() {
         try {
-          return await core.getIDToken("opencode-github-action")
+          return await core.getIDToken("kuuzuki-github-action")
         } catch (error) {
           console.error("Failed to get OIDC token:", error)
           throw new Error(
@@ -691,14 +691,14 @@ export const GithubRunCommand = cmd({
 
       async function exchangeForAppToken(token: string) {
         const response = token.startsWith("github_pat_")
-          ? await fetch("https://api.opencode.ai/exchange_github_app_token_with_pat", {
+          ? await fetch("https://api.kuuzuki.ai/exchange_github_app_token_with_pat", {
               method: "POST",
               headers: {
                 Authorization: `Bearer ${token}`,
               },
               body: JSON.stringify({ owner, repo }),
             })
-          : await fetch("https://api.opencode.ai/exchange_github_app_token", {
+          : await fetch("https://api.kuuzuki.ai/exchange_github_app_token", {
               method: "POST",
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -729,8 +729,8 @@ export const GithubRunCommand = cmd({
 
         await $`git config --local --unset-all ${config}`
         await $`git config --local ${config} "AUTHORIZATION: basic ${newCredentials}"`
-        await $`git config --global user.name "opencode-agent[bot]"`
-        await $`git config --global user.email "opencode-agent[bot]@users.noreply.github.com"`
+        await $`git config --global user.name "kuuzuki-agent[bot]"`
+        await $`git config --global user.email "kuuzuki-agent[bot]@users.noreply.github.com"`
       }
 
       async function restoreGitConfig() {
@@ -775,7 +775,7 @@ export const GithubRunCommand = cmd({
           .replace(/\.\d{3}Z/, "")
           .split("T")
           .join("")
-        return `opencode/${type}${issueId}-${timestamp}`
+        return `kuuzuki/${type}${issueId}-${timestamp}`
       }
 
       async function pushToNewBranch(summary: string, branch: string) {
@@ -878,9 +878,9 @@ Co-authored-by: ${actor} <${actor}@users.noreply.github.com>"`
           const titleAlt = encodeURIComponent(session.title.substring(0, 50))
           const title64 = Buffer.from(session.title.substring(0, 700), "utf8").toString("base64")
 
-          return `<a href="${shareBaseUrl}/s/${shareId}"><img width="200" alt="${titleAlt}" src="https://social-cards.sst.dev/opencode-share/${title64}.png?model=${providerID}/${modelID}&version=${session.version}&id=${shareId}" /></a>\n`
+          return `<a href="${shareBaseUrl}/s/${shareId}"><img width="200" alt="${titleAlt}" src="https://social-cards.sst.dev/kuuzuki-share/${title64}.png?model=${providerID}/${modelID}&version=${session.version}&id=${shareId}" /></a>\n`
         })()
-        const shareUrl = shareId ? `[opencode session](${shareBaseUrl}/s/${shareId})&nbsp;&nbsp;|&nbsp;&nbsp;` : ""
+        const shareUrl = shareId ? `[kuuzuki session](${shareBaseUrl}/s/${shareId})&nbsp;&nbsp;|&nbsp;&nbsp;` : ""
         return `\n\n${image}${shareUrl}[github run](${runUrl})`
       }
 

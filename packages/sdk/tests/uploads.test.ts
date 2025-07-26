@@ -1,6 +1,6 @@
 import fs from 'fs';
-import type { ResponseLike } from '@opencode-ai/sdk/internal/to-file';
-import { toFile } from '@opencode-ai/sdk/core/uploads';
+import type { ResponseLike } from '@kuuzuki-ai/sdk/internal/to-file';
+import { toFile } from '@kuuzuki-ai/sdk/core/uploads';
 import { File } from 'node:buffer';
 
 class MyClass {
@@ -97,7 +97,7 @@ describe('missing File error message', () => {
   });
 
   test('is thrown', async () => {
-    const uploads = await import('@opencode-ai/sdk/core/uploads');
+    const uploads = await import('@kuuzuki-ai/sdk/core/uploads');
     await expect(
       uploads.toFile(mockResponse({ url: 'https://example.com/my/audio.mp3' })),
     ).rejects.toMatchInlineSnapshot(

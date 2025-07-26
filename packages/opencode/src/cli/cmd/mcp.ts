@@ -43,7 +43,7 @@ export const McpAddCommand = cmd({
     if (type === "local") {
       const command = await prompts.text({
         message: "Enter command to run",
-        placeholder: "e.g., opencode x @modelcontextprotocol/server-filesystem",
+        placeholder: "e.g., kuuzuki x @modelcontextprotocol/server-filesystem",
         validate: (x) => (x.length > 0 ? undefined : "Required"),
       })
       if (prompts.isCancel(command)) throw new UI.CancelledError()
@@ -66,7 +66,7 @@ export const McpAddCommand = cmd({
       if (prompts.isCancel(url)) throw new UI.CancelledError()
 
       const client = new Client({
-        name: "opencode",
+        name: "kuuzuki",
         version: "1.0.0",
       })
       const transport = new StreamableHTTPClientTransport(new URL(url))

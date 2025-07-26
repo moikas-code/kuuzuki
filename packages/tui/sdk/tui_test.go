@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/sst/opencode-sdk-go"
+	opencode "github.com/sst/opencode-sdk-go"
 	"github.com/sst/opencode-sdk-go/internal/testutil"
 	"github.com/sst/opencode-sdk-go/option"
 )

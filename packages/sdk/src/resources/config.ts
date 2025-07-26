@@ -59,7 +59,7 @@ export interface Config {
   mcp?: { [key: string]: McpLocalConfig | McpRemoteConfig };
 
   /**
-   * Modes configuration, see https://opencode.ai/docs/modes
+   * Modes configuration, see https://kuuzuki.ai/docs/modes
    */
   mode?: Config.Mode;
 
@@ -124,7 +124,7 @@ export namespace Config {
   }
 
   /**
-   * Modes configuration, see https://opencode.ai/docs/modes
+   * Modes configuration, see https://kuuzuki.ai/docs/modes
    */
   export interface Mode {
     build?: ConfigAPI.ModeConfig;

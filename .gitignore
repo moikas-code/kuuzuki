@@ -6,3 +6,5 @@ node_modules
 .vscode
 openapi.json
 scratch
+
+packages/desktop/src-tauri/target/

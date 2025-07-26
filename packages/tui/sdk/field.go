@@ -1,8 +1,9 @@
 package opencode
 
 import (
-	"github.com/sst/opencode-sdk-go/internal/param"
 	"io"
+
+	"github.com/sst/opencode-sdk-go/internal/param"
 )
 
 // F is a param field helper used to initialize a [param.Field] generic struct.

@@ -8,7 +8,18 @@
     "dev": "bun run packages/opencode/src/index.ts",
     "typecheck": "bun run --filter='*' typecheck",
     "stainless": "./scripts/stainless",
-    "postinstall": "./scripts/hooks"
+    "postinstall": "./scripts/hooks",
+    "run": "./run.sh",
+    "build": "./run.sh build",
+    "build:all": "./run.sh build all",
+    "build:tui": "./run.sh build tui",
+    "build:server": "./run.sh build server",
+    "build:desktop": "./run.sh build desktop",
+    "dev:tui": "./run.sh dev tui",
+    "dev:server": "./run.sh dev server",
+    "dev:desktop": "./run.sh dev desktop",
+    "clean": "./run.sh clean",
+    "check": "./run.sh check"
   },
   "workspaces": {
     "packages": [

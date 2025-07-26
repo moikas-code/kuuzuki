@@ -26,7 +26,7 @@ const TOOL: Record<string, [string, string]> = {
 
 export const RunCommand = cmd({
   command: "run [message..]",
-  describe: "run opencode with a message",
+  describe: "run kuuzuki with a message",
   builder: (yargs: Argv) => {
     return yargs
       .positional("message", {
@@ -92,7 +92,7 @@ export const RunCommand = cmd({
       if (cfg.share === "auto" || Flag.OPENCODE_AUTO_SHARE || args.share) {
         try {
           await Session.share(session.id)
-          UI.println(UI.Style.TEXT_INFO_BOLD + "~  https://opencode.ai/s/" + session.id.slice(-8))
+          UI.println(UI.Style.TEXT_INFO_BOLD + "~  https://kuuzuki.ai/s/" + session.id.slice(-8))
         } catch (error) {
           if (error instanceof Error && error.message.includes("disabled")) {
             UI.println(UI.Style.TEXT_DANGER_BOLD + "!  " + error.message)
