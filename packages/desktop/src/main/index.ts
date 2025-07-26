@@ -3,9 +3,11 @@ import path from 'path';
 import { spawn, ChildProcess } from 'child_process';
 import fs from 'fs/promises';
 import { findKuuzukiServer } from './server-detector';
+import * as pty from 'node-pty';
 
 let mainWindow: BrowserWindow | null = null;
 let kuuzukiProcess: ChildProcess | null = null;
+let ptyProcess: pty.IPty | null = null;
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
@@ -144,6 +146,81 @@ ipcMain.handle('check-server-health', async (_, url: string) => {
   }
 });
 
+// Terminal PTY handlers
+ipcMain.handle('terminal-spawn', async () => {
+  if (ptyProcess) {
+    return { success: false, error: 'Terminal already running' };
+  }
+
+  try {
+    // Find kuuzuki binary
+    const possiblePaths = [
+      path.join(__dirname, '../../bin/kuuzuki'),
+      path.join(__dirname, '../../../opencode/kuuzuki-cli'),
+      path.join(process.resourcesPath, 'bin/kuuzuki'),
+      '/usr/local/bin/kuuzuki',
+      '/usr/bin/kuuzuki'
+    ];
+
+    let kuuzukiBinary = '';
+    for (const binPath of possiblePaths) {
+      try {
+        await fs.access(binPath, fs.constants.X_OK);
+        kuuzukiBinary = binPath;
+        break;
+      } catch {
+        // Continue searching
+      }
+    }
+
+    if (!kuuzukiBinary) {
+      throw new Error('Kuuzuki binary not found');
+    }
+
+    // Get current working directory
+    const cwd = process.cwd();
+
+    // Spawn PTY with kuuzuki TUI
+    ptyProcess = pty.spawn(kuuzukiBinary, ['tui'], {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 30,
+      cwd,
+      env: process.env
+    });
+
+    ptyProcess.onData((data) => {
+      mainWindow?.webContents.send('terminal-data', data);
+    });
+
+    ptyProcess.onExit(() => {
+      ptyProcess = null;
+      mainWindow?.webContents.send('terminal-exit');
+    });
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
+
+ipcMain.on('terminal-write', (_, data: string) => {
+  ptyProcess?.write(data);
+});
+
+ipcMain.handle('terminal-resize', async (_, cols: number, rows: number) => {
+  ptyProcess?.resize(cols, rows);
+  return { success: true };
+});
+
+ipcMain.handle('terminal-kill', async () => {
+  if (ptyProcess) {
+    ptyProcess.kill();
+    ptyProcess = null;
+  }
+  return { success: true };
+});
+
 // App event handlers
 app.whenReady().then(createWindow);
 
@@ -163,11 +240,17 @@ app.on('before-quit', () => {
   if (kuuzukiProcess) {
     kuuzukiProcess.kill();
   }
+  if (ptyProcess) {
+    ptyProcess.kill();
+  }
 });
 
 process.on('SIGINT', () => {
   if (kuuzukiProcess) {
     kuuzukiProcess.kill();
+  }
+  if (ptyProcess) {
+    ptyProcess.kill();
   }
   app.quit();
 });

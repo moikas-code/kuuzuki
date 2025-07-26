@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Terminal as XTerm } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import { WebLinksAddon } from 'xterm-addon-web-links'
-import { useKuuzukiServer } from '../hooks/useKuuzukiServer'
+// Removed useKuuzukiServer - Terminal now connects directly to PTY
 import 'xterm/css/xterm.css'
 
 interface TerminalProps {
@@ -15,7 +15,7 @@ export const Terminal: React.FC<TerminalProps> = ({ className, onReady }) => {
   const xtermRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
-  const { serverUrl, isConnected, error, reconnect } = useKuuzukiServer()
+  // Terminal now connects directly to PTY, no server connection needed
 
   // Initialize terminal
   useEffect(() => {
@@ -73,143 +73,95 @@ export const Terminal: React.FC<TerminalProps> = ({ className, onReady }) => {
     }
   }, [])
 
-  // Connect to server when ready
+  // Connect to PTY when ready
   useEffect(() => {
-    if (!isInitialized || !xtermRef.current || !isConnected || !serverUrl) return
+    if (!isInitialized || !xtermRef.current) return
 
     const term = xtermRef.current
 
-    // Clear terminal and show connection message
-    term.clear()
-    term.writeln(`\x1b[32m✓ Connected to Kuuzuki server at ${serverUrl}\x1b[0m`)
-    term.writeln('')
+    let dataListener: (() => void) | null = null
+    let exitListener: (() => void) | null = null
+    let ptyStarted = false
 
-    // For now, show server info and instructions
-    term.writeln('\x1b[36mKuuzuki Desktop Terminal\x1b[0m')
-    term.writeln('')
-    term.writeln('The Kuuzuki server is running in the background.')
-    term.writeln('')
-    term.writeln('Available endpoints:')
-    term.writeln(`  • API: ${serverUrl}`)
-    term.writeln(`  • Health: ${serverUrl}/health`)
-    term.writeln(`  • Docs: ${serverUrl}/doc`)
-    term.writeln('')
-    term.writeln('You can use the Kuuzuki API to:')
-    term.writeln('  • Create and manage sessions')
-    term.writeln('  • Send messages to AI providers')
-    term.writeln('  • Execute tools and commands')
-    term.writeln('')
+    const startPty = async () => {
+      // Clear terminal
+      term.clear()
+      term.writeln('\x1b[36mStarting Kuuzuki TUI...\x1b[0m')
+      
+      try {
+        // Spawn the PTY terminal
+        const result = await window.electronAPI.spawnTerminal()
+        
+        if (!result.success) {
+          term.writeln(`\x1b[31mError: ${result.error}\x1b[0m`)
+          return
+        }
 
-    // Set up a simple REPL for API testing
-    let currentLine = ''
+        ptyStarted = true
 
-    const disposable = term.onData(async (data) => {
-      if (data === '\r') { // Enter key
-        term.writeln('')
+        // Listen for data from PTY
+        dataListener = window.electronAPI.onTerminalData((data) => {
+          term.write(data)
+        })
 
-        if (currentLine.trim()) {
-          // Simple command parser
-          const [cmd] = currentLine.trim().split(' ')
+        // Listen for PTY exit
+        exitListener = window.electronAPI.onTerminalExit(() => {
+          ptyStarted = false
+          term.writeln('\r\n\x1b[33mTerminal exited. Press Enter to restart...\x1b[0m')
+        })
 
-          switch (cmd) {
-            case 'help':
-              term.writeln('Available commands:')
-              term.writeln('  help     - Show this help')
-              term.writeln('  status   - Check server status')
-              term.writeln('  providers - List available providers')
-              term.writeln('  clear    - Clear terminal')
-              break
+        // Send keystrokes to PTY
+        const disposable = term.onData((data) => {
+          if (ptyStarted) {
+            window.electronAPI.writeTerminal(data)
+          } else if (data === '\r') {
+            // Restart terminal on Enter when exited
+            startPty()
+          }
+        })
 
-            case 'status':
-              try {
-                const response = await fetch(`${serverUrl}/health`)
-                const data = await response.json()
-                term.writeln(`Server status: ${JSON.stringify(data, null, 2)}`)
-              } catch (error) {
-                term.writeln(`\x1b[31mError: ${error}\x1b[0m`)
-              }
-              break
-
-            case 'providers':
-              try {
-                const response = await fetch(`${serverUrl}/app/providers`)
-                const data = await response.json()
-                term.writeln(`Available providers: ${JSON.stringify(data, null, 2)}`)
-              } catch (error) {
-                term.writeln(`\x1b[31mError: ${error}\x1b[0m`)
-              }
-              break
-
-            case 'clear':
-              term.clear()
-              break
-
-            default:
-              term.writeln(`Unknown command: ${cmd}. Type 'help' for available commands.`)
+        // Handle resize
+        const handleResize = () => {
+          if (fitAddonRef.current && xtermRef.current) {
+            const { cols, rows } = xtermRef.current
+            window.electronAPI.resizeTerminal(cols, rows)
           }
         }
 
-        term.write('\r\n> ')
-        currentLine = ''
-      } else if (data === '\x7f') { // Backspace
-        if (currentLine.length > 0) {
-          currentLine = currentLine.slice(0, -1)
-          term.write('\b \b')
-        }
-      } else if (data >= ' ') { // Printable characters
-        currentLine += data
-        term.write(data)
-      }
-    })
+        // Initial resize
+        handleResize()
 
-    // Show initial prompt
-    term.write('> ')
-    onReady?.()
+        // Listen for terminal resize
+        term.onResize(({ cols, rows }) => {
+          window.electronAPI.resizeTerminal(cols, rows)
+        })
+
+        onReady?.()
+
+        return () => {
+          disposable.dispose()
+        }
+      } catch (error) {
+        term.writeln(`\x1b[31mError starting terminal: ${error}\x1b[0m`)
+      }
+    }
+
+    startPty()
 
     return () => {
-      disposable.dispose()
+      // Cleanup listeners
+      if (dataListener) dataListener()
+      if (exitListener) exitListener()
+      window.electronAPI.killTerminal()
     }
-  }, [isInitialized, isConnected, serverUrl, onReady])
+  }, [isInitialized, onReady])
 
-  // Show error state
-  useEffect(() => {
-    if (!error || !xtermRef.current) return
-
-    const term = xtermRef.current
-    term.writeln(`\x1b[31mError: ${error}\x1b[0m`)
-    term.writeln('\x1b[33mPress Enter to retry...\x1b[0m')
-
-    const disposable = term.onKey((e) => {
-      if (e.key === '\r') {
-        term.clear()
-        term.writeln('\x1b[36mReconnecting...\x1b[0m')
-        reconnect()
-        disposable.dispose()
-      }
-    })
-
-    return () => disposable.dispose()
-  }, [error, reconnect])
+  // Error handling is now done within the PTY connection logic
 
   return (
     <div className={className} style={{ height: '100%', position: 'relative' }}>
       <div ref={terminalRef} style={{ height: '100%' }} />
 
-      {!isConnected && !error && (
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          textAlign: 'center',
-          color: '#666'
-        }}>
-          <div>Connecting to Kuuzuki server...</div>
-          <div style={{ marginTop: '10px', fontSize: '12px' }}>
-            This may take a moment if the server is starting up
-          </div>
-        </div>
-      )}
     </div>
   )
 }

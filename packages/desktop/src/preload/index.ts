@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -7,21 +7,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   findServer: () => ipcRenderer.invoke('find-server'),
   checkServerHealth: (url: string) => ipcRenderer.invoke('check-server-health', url),
   
-  // Terminal-related APIs (to be implemented)
-  createTerminal: (id: string) => ipcRenderer.invoke('create-terminal', id),
-  writeToTerminal: (id: string, data: string) => ipcRenderer.invoke('write-terminal', id, data),
-  resizeTerminal: (id: string, cols: number, rows: number) => ipcRenderer.invoke('resize-terminal', id, cols, rows),
-  closeTerminal: (id: string) => ipcRenderer.invoke('close-terminal', id),
+  // Terminal PTY APIs
+  spawnTerminal: () => ipcRenderer.invoke('terminal-spawn'),
+  writeTerminal: (data: string) => ipcRenderer.send('terminal-write', data),
+  resizeTerminal: (cols: number, rows: number) => ipcRenderer.invoke('terminal-resize', cols, rows),
+  killTerminal: () => ipcRenderer.invoke('terminal-kill'),
   
   // Listen to terminal output
-  onTerminalData: (id: string, callback: (data: string) => void) => {
-    const channel = `terminal-data-${id}`;
-    const subscription = (_event: any, data: string) => callback(data);
-    ipcRenderer.on(channel, subscription);
-    
-    return () => {
-      ipcRenderer.removeListener(channel, subscription);
-    };
+  onTerminalData: (callback: (data: string) => void) => {
+    const listener = (_: IpcRendererEvent, data: string) => callback(data);
+    ipcRenderer.on('terminal-data', listener);
+    return () => ipcRenderer.removeListener('terminal-data', listener);
+  },
+  
+  // Listen to terminal exit
+  onTerminalExit: (callback: () => void) => {
+    const listener = () => callback();
+    ipcRenderer.on('terminal-exit', listener);
+    return () => ipcRenderer.removeListener('terminal-exit', listener);
   },
   
   // Listen to server events
@@ -40,11 +43,12 @@ export interface ElectronAPI {
   startServer: () => Promise<{ success: boolean; url?: string; error?: string }>;
   findServer: () => Promise<{ port: number; hostname: string; url: string; pid: number; startTime: string } | null>;
   checkServerHealth: (url: string) => Promise<boolean>;
-  createTerminal: (id: string) => Promise<void>;
-  writeToTerminal: (id: string, data: string) => Promise<void>;
-  resizeTerminal: (id: string, cols: number, rows: number) => Promise<void>;
-  closeTerminal: (id: string) => Promise<void>;
-  onTerminalData: (id: string, callback: (data: string) => void) => () => void;
+  spawnTerminal: () => Promise<{ success: boolean; error?: string }>;
+  writeTerminal: (data: string) => void;
+  resizeTerminal: (cols: number, rows: number) => Promise<{ success: boolean }>;
+  killTerminal: () => Promise<{ success: boolean }>;
+  onTerminalData: (callback: (data: string) => void) => () => void;
+  onTerminalExit: (callback: () => void) => () => void;
   onServerStarted: (callback: (url: string) => void) => () => void;
 }
 
