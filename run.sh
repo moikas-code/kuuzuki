@@ -48,25 +48,18 @@ check_dependencies() {
         print_success "Bun is installed ($(bun --version))"
     fi
 
-    # Check for Go (needed for TUI)
+    # Check for Go (needed for TUI/CLI)
     if ! command -v go &> /dev/null; then
         missing_deps+=("go")
     else
         print_success "Go is installed ($(go version | cut -d' ' -f3))"
     fi
 
-    # Check for Rust/Cargo (needed for Tauri)
-    if ! command -v cargo &> /dev/null; then
-        missing_deps+=("rust/cargo")
+    # Check for Node.js (needed for Electron desktop app)
+    if ! command -v node &> /dev/null; then
+        missing_deps+=("node")
     else
-        print_success "Rust/Cargo is installed ($(cargo --version | cut -d' ' -f2))"
-    fi
-
-    # Check for Tauri CLI
-    if ! command -v tauri &> /dev/null; then
-        print_info "Tauri CLI not found globally, will use local version"
-    else
-        print_success "Tauri CLI is installed"
+        print_success "Node.js is installed ($(node --version))"
     fi
 
     if [ ${#missing_deps[@]} -ne 0 ]; then
@@ -74,7 +67,7 @@ check_dependencies() {
         echo "Please install missing dependencies:"
         [[ " ${missing_deps[@]} " =~ " bun " ]] && echo "  - Bun: curl -fsSL https://bun.sh/install | bash"
         [[ " ${missing_deps[@]} " =~ " go " ]] && echo "  - Go: https://golang.org/dl/"
-        [[ " ${missing_deps[@]} " =~ " rust/cargo " ]] && echo "  - Rust: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+        [[ " ${missing_deps[@]} " =~ " node " ]] && echo "  - Node.js: https://nodejs.org/ or via your package manager"
         exit 1
     fi
 }
