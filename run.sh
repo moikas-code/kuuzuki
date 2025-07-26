@@ -126,21 +126,24 @@ build_server() {
 build_desktop() {
     print_header "Building Desktop App"
 
-    # First, build the kuuzuki binary for desktop
-    cd "$SCRIPT_DIR/packages/desktop"
-    print_info "Building kuuzuki binary for desktop..."
-    ./build-kuuzuki.sh
+    # First ensure we have the CLI binary built
+    if [ ! -f "$SCRIPT_DIR/packages/opencode/kuuzuki-cli" ]; then
+        print_info "Building kuuzuki CLI first..."
+        build_server
+    fi
 
-    # Build the frontend
-    print_info "Building desktop frontend..."
-    cd "$SCRIPT_DIR/packages/desktop"
-    npm run build
+    # Copy the binary to desktop resources
+    mkdir -p "$SCRIPT_DIR/packages/desktop/assets/bin"
+    cp "$SCRIPT_DIR/packages/opencode/kuuzuki-cli" "$SCRIPT_DIR/packages/desktop/assets/bin/kuuzuki"
+    chmod +x "$SCRIPT_DIR/packages/desktop/assets/bin/kuuzuki"
 
-    # Build with Tauri
-    print_info "Building with Tauri..."
-    npm run tauri:build
+    # Build with Electron
+    cd "$SCRIPT_DIR/packages/desktop"
+    print_info "Building Electron desktop app..."
+    npm run package
 
     print_success "Desktop app built successfully"
+    print_info "Build artifacts in: packages/desktop/dist-electron/"
     cd "$SCRIPT_DIR"
 }
 
@@ -162,7 +165,7 @@ run_dev() {
         "desktop")
             print_info "Starting desktop app in development mode..."
             cd "$SCRIPT_DIR/packages/desktop"
-            npm run tauri:dev
+            npm run dev
             ;;
         *)
             print_info "Starting kuuzuki (default: TUI mode)..."
@@ -187,7 +190,7 @@ run_prod() {
             ;;
         "desktop")
             print_info "Starting desktop app..."
-            local app_path="$SCRIPT_DIR/packages/desktop/src-tauri/target/release/kuuzuki-desktop"
+            local app_path="$SCRIPT_DIR/packages/desktop/dist-electron/Kuuzuki Desktop.AppImage"
             if [ -f "$app_path" ]; then
                 "$app_path"
             else
@@ -212,8 +215,8 @@ clean() {
     rm -rf "$SCRIPT_DIR/packages/opencode/kuuzuki-cli"
     rm -rf "$SCRIPT_DIR/packages/opencode/binaries"
     rm -rf "$SCRIPT_DIR/packages/desktop/dist"
-    rm -rf "$SCRIPT_DIR/packages/desktop/src-tauri/target"
-    rm -rf "$SCRIPT_DIR/packages/desktop/src-tauri/binaries/kuuzuki*"
+    rm -rf "$SCRIPT_DIR/packages/desktop/dist-electron"
+    rm -rf "$SCRIPT_DIR/packages/desktop/dist-electron"
 
     print_success "Clean complete"
 }

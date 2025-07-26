@@ -1,30 +1,68 @@
 {
-  "name": "@kuuzuki/desktop",
+  "name": "kuuzuki-desktop",
   "private": true,
   "version": "0.1.0",
+  "description": "Kuuzuki Desktop - AI Coding Assistant",
+  "author": {
+    "name": "Kuuzuki Team",
+    "email": "support@kuuzuki.dev"
+  },
+  "homepage": "https://github.com/moikas-code/kuucode",
   "type": "module",
+  "main": "dist/main/index.js",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "dev": "concurrently -k \"npm run dev:vite\" \"npm run dev:electron\"",
+    "dev:vite": "vite",
+    "dev:electron": "wait-on http://localhost:5173 && electron . --enable-logging",
+    "build": "npm run build:vite && npm run build:electron",
+    "build:vite": "tsc && vite build",
+    "build:electron": "tsc src/main/index.ts src/main/server-detector.ts src/preload/index.ts --outDir dist --module commonjs --target es2021 --esModuleInterop --skipLibCheck",
+    "package": "npm run build && electron-builder",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@tauri-apps/api": "^1.5.0",
+    "node-pty": "1.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "xterm": "^5.3.0",
-    "xterm-addon-fit": "^0.8.0",
-    "xterm-addon-web-links": "^0.9.0"
+    "xterm": "5.3.0",
+    "xterm-addon-fit": "0.8.0",
+    "xterm-addon-web-links": "0.9.0"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^1.5.0",
+    "@types/node": "24.1.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.0.0",
+    "concurrently": "9.2.0",
+    "electron": "37.2.4",
+    "electron-builder": "26.0.12",
     "typescript": "^5.0.0",
-    "vite": "^4.4.0"
+    "vite": "^4.4.0",
+    "wait-on": "8.0.4"
+  },
+  "build": {
+    "appId": "com.kuuzuki.desktop",
+    "productName": "Kuuzuki Desktop",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/bin/kuuzuki",
+        "to": "bin/kuuzuki"
+      }
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Development",
+      "icon": "assets/icon.png"
+    }
   }
 }

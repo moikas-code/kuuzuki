@@ -14,8 +14,8 @@ import { Mode } from "../../session/mode"
 import { Ide } from "../../ide"
 
 export const TuiCommand = cmd({
-  command: "$0 [project]",
-  describe: "start kuuzuki tui",
+  command: "tui [project]",
+  describe: "start kuuzuki in terminal UI mode",
   builder: (yargs) =>
     yargs
       .positional("project", {

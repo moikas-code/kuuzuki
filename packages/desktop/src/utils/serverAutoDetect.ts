@@ -40,6 +40,13 @@ async function checkHealth(url: string): Promise<boolean> {
  * Try to find a running kuuzuki server
  */
 export async function findServer(): Promise<string | null> {
+  // Use Electron API if available
+  if (window.electronAPI) {
+    const serverInfo = await window.electronAPI.findServer()
+    return serverInfo?.url || null
+  }
+
+  // Fallback to direct port scanning
   // Check last known port from localStorage
   const lastPort = localStorage.getItem('kuuzuki-server-port')
   if (lastPort) {
@@ -113,6 +120,14 @@ export class AutoDetectClient {
   async connect(): Promise<void> {
     this.serverUrl = await findServer()
     if (!this.serverUrl) {
+      // Try to start the server using Electron API
+      if (window.electronAPI) {
+        const result = await window.electronAPI.startServer()
+        if (result.success && result.url) {
+          this.serverUrl = result.url
+          return
+        }
+      }
       throw new Error('No server found. Please start kuuzuki first.')
     }
   }

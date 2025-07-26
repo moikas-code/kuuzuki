@@ -14,6 +14,7 @@ import { NamedError } from "./util/error"
 import { FormatError } from "./cli/error"
 import { ServeCommand } from "./cli/cmd/serve"
 import { TuiCommand } from "./cli/cmd/tui"
+import { DesktopCommand } from "./cli/cmd/desktop"
 import { DebugCommand } from "./cli/cmd/debug"
 import { StatsCommand } from "./cli/cmd/stats"
 import { McpCommand } from "./cli/cmd/mcp"
@@ -67,6 +68,7 @@ const cli = yargs(hideBin(process.argv))
     })
   })
   .usage("\n" + UI.logo())
+  .command(DesktopCommand)
   .command(McpCommand)
   .command(TuiCommand)
   .command(RunCommand)
