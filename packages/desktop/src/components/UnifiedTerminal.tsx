@@ -4,11 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 
-interface UnifiedTerminalProps {
-  onReady?: () => void;
-}
-
-export const UnifiedTerminal: React.FC<UnifiedTerminalProps> = ({ onReady }) => {
+export const UnifiedTerminal: React.FC = () => {
   const bashContainerRef = useRef<HTMLDivElement>(null);
   const kuuzukiContainerRef = useRef<HTMLDivElement>(null);
   const bashTermRef = useRef<XTerm | null>(null);
@@ -49,47 +45,72 @@ export const UnifiedTerminal: React.FC<UnifiedTerminalProps> = ({ onReady }) => 
   // Initialize terminals
   useEffect(() => {
     if (!bashContainerRef.current) return;
+    if (bashTermRef.current) return; // Already initialized
 
-    // Initialize bash terminal
-    const bashTerm = new XTerm({
-      cursorBlink: true,
-      fontSize: 14,
-      fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace',
-      theme: terminalTheme,
-      allowProposedApi: true,
-      scrollback: 10000,
-      convertEol: true,
-    });
-
-    const bashFit = new FitAddon();
-    const bashLinks = new WebLinksAddon();
-    bashTerm.loadAddon(bashFit);
-    bashTerm.loadAddon(bashLinks);
-
-    bashTerm.open(bashContainerRef.current);
-    bashFit.fit();
-
-    bashTermRef.current = bashTerm;
-    bashFitRef.current = bashFit;
-
-    // Initialize terminal manager
-    initializeTerminals();
-
-    // Handle window resize
-    const handleResize = () => {
-      if (bashFitRef.current && bashTermRef.current) {
-        bashFitRef.current.fit();
+    console.log('Setting up bash terminal');
+    
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      if (!bashContainerRef.current) {
+        console.error('Bash container ref not available after timeout');
+        return;
       }
-      if (isSplit && kuuzukiFitRef.current && kuuzukiTermRef.current) {
-        kuuzukiFitRef.current.fit();
-      }
-    };
 
-    window.addEventListener('resize', handleResize);
+      try {
+        // Initialize bash terminal
+        const bashTerm = new XTerm({
+          cursorBlink: true,
+          fontSize: 14,
+          fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace',
+          theme: terminalTheme,
+          allowProposedApi: true,
+          scrollback: 10000,
+          convertEol: true,
+        });
+
+        const bashFit = new FitAddon();
+        const bashLinks = new WebLinksAddon();
+        bashTerm.loadAddon(bashFit);
+        bashTerm.loadAddon(bashLinks);
+
+        console.log('Opening bash terminal in container');
+        bashTerm.open(bashContainerRef.current);
+        bashFit.fit();
+
+        bashTermRef.current = bashTerm;
+        bashFitRef.current = bashFit;
+
+        console.log('Bash terminal opened, initializing IPC connection');
+        // Initialize terminal manager
+        initializeTerminals();
+
+        // Handle window resize
+        const handleResize = () => {
+          if (bashFitRef.current && bashTermRef.current) {
+            bashFitRef.current.fit();
+          }
+          if (isSplit && kuuzukiFitRef.current && kuuzukiTermRef.current) {
+            kuuzukiFitRef.current.fit();
+          }
+        };
+
+        window.addEventListener('resize', handleResize);
+        
+        // Store cleanup function
+        const cleanup = () => {
+          window.removeEventListener('resize', handleResize);
+          bashTerm.dispose();
+        };
+        
+        // Return cleanup
+        return cleanup;
+      } catch (error) {
+        console.error('Error initializing bash terminal:', error);
+      }
+    }, 100);
 
     return () => {
-      window.addEventListener('resize', handleResize);
-      bashTerm.dispose();
+      clearTimeout(timer);
     };
   }, []);
 
@@ -123,11 +144,14 @@ export const UnifiedTerminal: React.FC<UnifiedTerminalProps> = ({ onReady }) => 
   }, [isSplit]);
 
   const initializeTerminals = async () => {
+    console.log('Initializing terminals from React component');
     try {
-      await window.electronAPI.initUnifiedTerminal();
+      const result = await window.electronAPI.initUnifiedTerminal();
+      console.log('Terminal init result:', result);
       
       // Set up bash handlers
       const bashDataUnsub = window.electronAPI.onBashData((data) => {
+        console.log('Received bash data:', data.length, 'bytes');
         bashTermRef.current?.write(data);
       });
 
@@ -181,7 +205,6 @@ export const UnifiedTerminal: React.FC<UnifiedTerminalProps> = ({ onReady }) => 
         window.electronAPI.resizeBash(cols, rows);
       });
 
-      if (onReady) onReady();
 
       return () => {
         bashDataUnsub();
@@ -198,11 +221,11 @@ export const UnifiedTerminal: React.FC<UnifiedTerminalProps> = ({ onReady }) => 
   const setupKuuzukiHandlers = () => {
     if (!kuuzukiTermRef.current) return;
 
-    const kuuzukiDataUnsub = window.electronAPI.onKuuzukiData((data) => {
+    window.electronAPI.onKuuzukiData((data) => {
       kuuzukiTermRef.current?.write(data);
     });
 
-    const kuuzukiExitUnsub = window.electronAPI.onKuuzukiExit(() => {
+    window.electronAPI.onKuuzukiExit(() => {
       kuuzukiTermRef.current?.writeln('\r\n\x1b[33mKuuzuki exited. Press Enter to restart...\x1b[0m');
       setKuuzukiNeedsRestart(true);
     });
@@ -239,6 +262,8 @@ export const UnifiedTerminal: React.FC<UnifiedTerminalProps> = ({ onReady }) => 
     });
   };
 
+  console.log('UnifiedTerminal rendering, isSplit:', isSplit);
+  
   return (
     <div className="unified-terminal-container">
       <div className="terminal-header">

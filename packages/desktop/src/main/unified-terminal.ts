@@ -1,14 +1,26 @@
 import { EventEmitter } from 'events';
-import * as pty from 'node-pty-prebuilt-multiarch';
-import { IPty } from 'node-pty-prebuilt-multiarch';
 import * as path from 'path';
 import * as os from 'os';
+import { spawn } from 'child_process';
+
+// Try to load node-pty, but fallback to child_process if it fails
+let pty: any;
+let usePty = false;
+
+try {
+  pty = require('node-pty-prebuilt-multiarch');
+  console.log('Using node-pty for terminal emulation');
+  usePty = true;
+} catch (error) {
+  console.warn('node-pty not available, falling back to child_process');
+  usePty = false;
+}
 
 export type TerminalMode = 'single' | 'split';
 
 export class UnifiedTerminalManager extends EventEmitter {
-  private bashPty: IPty | null = null;
-  private kuuzukiPty: IPty | null = null;
+  private bashPty: any = null;
+  private kuuzukiPty: any = null;
   private currentMode: TerminalMode = 'single';
   private currentDirectory: string = process.cwd();
   private kuuzukiBinary: string = '';
@@ -17,6 +29,7 @@ export class UnifiedTerminalManager extends EventEmitter {
   async initialize(kuuzukiBinary: string) {
     this.kuuzukiBinary = kuuzukiBinary;
     console.log('Initializing unified terminal with binary:', kuuzukiBinary);
+    console.log('Using PTY:', usePty);
     
     // Initialize bash terminal
     await this.startBashTerminal();
@@ -27,7 +40,11 @@ export class UnifiedTerminalManager extends EventEmitter {
 
   private async startBashTerminal() {
     if (this.bashPty) {
-      this.bashPty.kill();
+      try {
+        this.bashPty.kill();
+      } catch (e) {
+        console.error('Error killing existing bash process:', e);
+      }
     }
 
     const shell = process.env.SHELL || '/bin/bash';
@@ -40,32 +57,66 @@ export class UnifiedTerminalManager extends EventEmitter {
       PS1: '\\[\\033[01;32m\\]\\u@\\h\\[\\033[00m\\]:\\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$ '
     };
 
-    this.bashPty = pty.spawn(shell, ['--login'], {
-      name: 'xterm-256color',
-      cols: 80,
-      rows: 30,
-      cwd: this.currentDirectory,
-      env: env as any,
-    });
+    if (usePty) {
+      try {
+        this.bashPty = pty.spawn(shell, ['--login'], {
+          name: 'xterm-256color',
+          cols: 80,
+          rows: 30,
+          cwd: this.currentDirectory,
+          env: env as any,
+        });
 
-    this.bashPty.onData((data: string) => {
-      this.emit('bash-data', data);
-      
-      // Track directory changes
-      this.checkDirectoryChange(data);
-    });
+        this.bashPty.onData((data: string) => {
+          this.emit('bash-data', data);
+          // Track directory changes
+          this.checkDirectoryChange(data);
+        });
 
-    this.bashPty.onExit(() => {
-      this.emit('bash-exit');
-    });
+        this.bashPty.onExit(() => {
+          this.emit('bash-exit');
+        });
 
-    // Send initial clear command to clean up
-    this.bashPty.write('clear\r');
+        // Send initial clear command to clean up
+        this.bashPty.write('clear\r');
+      } catch (error) {
+        console.error('Failed to spawn PTY, falling back to child_process:', error);
+        usePty = false;
+        await this.startBashTerminal(); // Retry with child_process
+      }
+    } else {
+      // Fallback to child_process
+      this.bashPty = spawn(shell, ['-i', '-l'], {
+        cwd: this.currentDirectory,
+        env: env,
+        stdio: 'pipe'
+      });
+
+      this.bashPty.stdout?.on('data', (data: Buffer) => {
+        this.emit('bash-data', data.toString());
+        this.checkDirectoryChange(data.toString());
+      });
+
+      this.bashPty.stderr?.on('data', (data: Buffer) => {
+        this.emit('bash-data', data.toString());
+      });
+
+      this.bashPty.on('exit', () => {
+        this.emit('bash-exit');
+      });
+
+      // Send initial clear command
+      this.bashPty.stdin?.write('clear\r');
+    }
   }
 
   private async startKuuzukiTerminal() {
     if (this.kuuzukiPty) {
-      this.kuuzukiPty.kill();
+      try {
+        this.kuuzukiPty.kill();
+      } catch (e) {
+        console.error('Error killing existing kuuzuki process:', e);
+      }
     }
 
     const env = {
@@ -77,21 +128,64 @@ export class UnifiedTerminalManager extends EventEmitter {
       FORCE_COLOR: '1'
     };
 
-    this.kuuzukiPty = pty.spawn(this.kuuzukiBinary, ['tui'], {
-      name: 'xterm-256color',
-      cols: 80,
-      rows: 30,
-      cwd: this.currentDirectory,
-      env: env as any,
-    });
+    if (usePty) {
+      try {
+        this.kuuzukiPty = pty.spawn(this.kuuzukiBinary, ['tui'], {
+          name: 'xterm-256color',
+          cols: 80,
+          rows: 30,
+          cwd: this.currentDirectory,
+          env: env as any,
+        });
 
-    this.kuuzukiPty.onData((data: string) => {
-      this.emit('kuuzuki-data', data);
-    });
+        this.kuuzukiPty.onData((data: string) => {
+          this.emit('kuuzuki-data', data);
+        });
 
-    this.kuuzukiPty.onExit(() => {
-      this.emit('kuuzuki-exit');
-    });
+        this.kuuzukiPty.onExit(() => {
+          this.emit('kuuzuki-exit');
+        });
+      } catch (error) {
+        console.error('Failed to spawn kuuzuki PTY, using child_process:', error);
+        // Fallback to child_process for kuuzuki
+        this.kuuzukiPty = spawn(this.kuuzukiBinary, ['tui'], {
+          cwd: this.currentDirectory,
+          env: env,
+          stdio: 'pipe'
+        });
+
+        this.kuuzukiPty.stdout?.on('data', (data: Buffer) => {
+          this.emit('kuuzuki-data', data.toString());
+        });
+
+        this.kuuzukiPty.stderr?.on('data', (data: Buffer) => {
+          this.emit('kuuzuki-data', data.toString());
+        });
+
+        this.kuuzukiPty.on('exit', () => {
+          this.emit('kuuzuki-exit');
+        });
+      }
+    } else {
+      // Use child_process
+      this.kuuzukiPty = spawn(this.kuuzukiBinary, ['tui'], {
+        cwd: this.currentDirectory,
+        env: env,
+        stdio: 'pipe'
+      });
+
+      this.kuuzukiPty.stdout?.on('data', (data: Buffer) => {
+        this.emit('kuuzuki-data', data.toString());
+      });
+
+      this.kuuzukiPty.stderr?.on('data', (data: Buffer) => {
+        this.emit('kuuzuki-data', data.toString());
+      });
+
+      this.kuuzukiPty.on('exit', () => {
+        this.emit('kuuzuki-exit');
+      });
+    }
   }
 
   private checkDirectoryChange(data: string) {
@@ -150,25 +244,41 @@ export class UnifiedTerminalManager extends EventEmitter {
 
   writeToBash(data: string) {
     if (this.bashPty) {
-      this.bashPty.write(data);
+      if (usePty) {
+        this.bashPty.write(data);
+      } else {
+        this.bashPty.stdin?.write(data);
+      }
     }
   }
 
   writeToKuuzuki(data: string) {
     if (this.kuuzukiPty) {
-      this.kuuzukiPty.write(data);
+      if (usePty) {
+        this.kuuzukiPty.write(data);
+      } else {
+        this.kuuzukiPty.stdin?.write(data);
+      }
     }
   }
 
   resizeBash(cols: number, rows: number) {
-    if (this.bashPty) {
-      this.bashPty.resize(cols, rows);
+    if (this.bashPty && usePty) {
+      try {
+        this.bashPty.resize(cols, rows);
+      } catch (e) {
+        console.error('Error resizing bash terminal:', e);
+      }
     }
   }
 
   resizeKuuzuki(cols: number, rows: number) {
-    if (this.kuuzukiPty) {
-      this.kuuzukiPty.resize(cols, rows);
+    if (this.kuuzukiPty && usePty) {
+      try {
+        this.kuuzukiPty.resize(cols, rows);
+      } catch (e) {
+        console.error('Error resizing kuuzuki terminal:', e);
+      }
     }
   }
 

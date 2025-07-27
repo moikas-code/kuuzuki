@@ -240,6 +240,7 @@ body {
   flex: 1;
   display: flex;
   overflow: hidden;
+  min-height: 0; /* Important for flexbox */
 }
 
 .terminal-content.single {
@@ -258,6 +259,11 @@ body {
   width: 1px;
   background: #333;
   cursor: col-resize;
+}
+
+.terminal-pane {
+  position: relative;
+  min-height: 200px;
 }
 
 .terminal-container {

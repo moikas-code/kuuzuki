@@ -32,7 +32,7 @@ fi
 
 # Compile TypeScript files for main process
 echo "📄 Compiling main process..."
-npx tsc src/main/index.ts src/main/terminal-manager.ts src/main/plugin-loader.ts src/main/server-detector.ts src/preload/index.ts --outDir dist --module commonjs --target es2021 --esModuleInterop --skipLibCheck
+npx tsc src/main/index.ts src/main/unified-terminal.ts src/main/plugin-loader.ts src/main/server-detector.ts src/preload/index.ts --outDir dist --module commonjs --target es2021 --esModuleInterop --skipLibCheck
 
 # Start both Vite and Electron
 echo ""

@@ -180,11 +180,19 @@ ipcMain.handle('check-server-health', async (_event, url) => {
   }
 });
 
+// Track if terminal is already initialized
+let terminalInitialized = false;
+
 // Unified terminal IPC handlers
 ipcMain.handle('unified-terminal-init', async () => {
+    if (terminalInitialized) {
+        return { success: true, alreadyInitialized: true };
+    }
+    
     try {
         const kuuzukiBinary = await findKuuzukiBinary();
         await unifiedTerminal.initialize(kuuzukiBinary);
+        terminalInitialized = true;
         
         // Set up event forwarding to renderer only once
         if (!terminalListenersSetup) {
@@ -373,6 +381,7 @@ async function cleanupAndQuit() {
   // Destroy unified terminal
   unifiedTerminal.destroy();
   terminalListenersSetup = false;
+  terminalInitialized = false;
   
   // Remove all IPC handlers
   ipcMain.removeAllListeners();
@@ -401,9 +410,23 @@ app.on('before-quit', (event) => {
 });
 
 process.on('SIGINT', () => {
+  console.log('\nReceived SIGINT, shutting down gracefully...');
   cleanupAndQuit();
+  
+  // Force exit after 3 seconds if cleanup doesn't complete
+  setTimeout(() => {
+    console.log('Force exiting...');
+    process.exit(0);
+  }, 3000);
 });
 
 process.on('SIGTERM', () => {
+  console.log('\nReceived SIGTERM, shutting down gracefully...');
   cleanupAndQuit();
+  
+  // Force exit after 3 seconds if cleanup doesn't complete
+  setTimeout(() => {
+    console.log('Force exiting...');
+    process.exit(0);
+  }, 3000);
 });

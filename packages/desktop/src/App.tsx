@@ -7,8 +7,6 @@ import './App.css'
 const DEBUG_MODE = false;
 
 function App() {
-  const [isReady, setIsReady] = useState(false)
-
   // Show debug terminal if in debug mode
   if (DEBUG_MODE) {
     return <TerminalDebug />;
@@ -16,7 +14,7 @@ function App() {
 
   return (
     <div className="app">
-      <UnifiedTerminal onReady={() => setIsReady(true)} />
+      <UnifiedTerminal />
     </div>
   )
 }
