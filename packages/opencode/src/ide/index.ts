@@ -44,6 +44,7 @@ export namespace Ide {
   }
 
   export async function install(ide: Ide) {
+    return
     const cmd = (() => {
       switch (ide) {
         case "Windsurf":

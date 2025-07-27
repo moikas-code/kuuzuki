@@ -124,7 +124,7 @@ export const Terminal: React.FC<TerminalProps> = ({ className, onReady }) => {
         const handleResize = () => {
           if (fitAddonRef.current && xtermRef.current) {
             const { cols, rows } = xtermRef.current
-            window.electronAPI.resizeTerminal(cols, rows)
+            window.electronAPI.resizeTerminal('terminal', cols, rows)
           }
         }
 
@@ -133,7 +133,7 @@ export const Terminal: React.FC<TerminalProps> = ({ className, onReady }) => {
 
         // Listen for terminal resize
         term.onResize(({ cols, rows }) => {
-          window.electronAPI.resizeTerminal(cols, rows)
+          window.electronAPI.resizeTerminal('terminal', cols, rows)
         })
 
         onReady?.()

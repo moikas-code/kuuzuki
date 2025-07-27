@@ -3,18 +3,13 @@ import path from 'path';
 import { spawn, ChildProcess } from 'child_process';
 import fs from 'fs/promises';
 import { findKuuzukiServer } from './server-detector';
-import { terminalManager, TerminalMode } from './terminal-manager';
-// Conditionally import node-pty with error handling
-let pty: typeof import('node-pty') | null = null;
-try {
-  pty = require('node-pty');
-} catch (error) {
-  console.warn('node-pty not available, PTY features will be disabled:', error);
-}
+import { unifiedTerminal } from './unified-terminal';
+import { pluginLoader } from './plugin-loader';
 
 let mainWindow: BrowserWindow | null = null;
 let kuuzukiProcess: ChildProcess | null = null;
-let ptyProcess: any | null = null; // Type will be IPty when available
+let isQuitting = false;
+let terminalListenersSetup = false;
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
@@ -39,18 +34,25 @@ async function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'));
   }
 
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      cleanupAndQuit();
+    }
+  });
+  
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
 
   // Handle external links
-  mainWindow.webContents.setWindowOpenHandler(({ url }: { url: string }) => {
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
   });
 }
 
-async function startKuuzukiServer(): Promise<string> {
+async function startKuuzukiServer() {
   // Check if server is already running
   const existingServer = await findKuuzukiServer();
   if (existingServer) {
@@ -68,7 +70,7 @@ async function startKuuzukiServer(): Promise<string> {
 
   let kuuzukiBinary = '';
   for (const binPath of possiblePaths) {
-      console.log("Checking binary:", binPath);
+    console.log("Checking binary:", binPath);
     try {
       await fs.access(binPath, fs.constants.X_OK);
       kuuzukiBinary = binPath;
@@ -78,13 +80,13 @@ async function startKuuzukiServer(): Promise<string> {
     }
   }
 
-    console.log("Found kuuzuki binary:", kuuzukiBinary);
+  console.log("Found kuuzuki binary:", kuuzukiBinary);
   if (!kuuzukiBinary) {
     throw new Error('Kuuzuki binary not found');
   }
 
   // Start kuuzuki in headless mode with dynamic port
-  return new Promise((resolve, reject) => {
+  return new Promise<string>((resolve, reject) => {
     kuuzukiProcess = spawn(kuuzukiBinary, ['serve', '--port', '0'], {
       env: {
         ...process.env,
@@ -131,7 +133,30 @@ async function startKuuzukiServer(): Promise<string> {
   });
 }
 
-// IPC Handlers
+// Find kuuzuki binary helper
+async function findKuuzukiBinary(): Promise<string> {
+    const possiblePaths = [
+        path.join(__dirname, '../../assets/bin/kuuzuki'),
+        path.join(__dirname, '../../../opencode/kuuzuki-cli'),
+        path.join((process as any).resourcesPath, 'bin/kuuzuki'),
+        '/usr/local/bin/kuuzuki',
+        '/usr/bin/kuuzuki'
+    ];
+    
+    for (const binPath of possiblePaths) {
+        console.log("Checking binary:", binPath);
+        try {
+            await fs.access(binPath, fs.constants.X_OK);
+            return binPath;
+        } catch {
+            // Continue searching
+        }
+    }
+    
+    throw new Error('Kuuzuki binary not found');
+}
+
+// Server-related IPC Handlers
 ipcMain.handle('start-server', async () => {
   try {
     const url = await startKuuzukiServer();
@@ -146,7 +171,7 @@ ipcMain.handle('find-server', async () => {
   return server;
 });
 
-ipcMain.handle('check-server-health', async (_event, url: string) => {
+ipcMain.handle('check-server-health', async (_event, url) => {
   try {
     const response = await fetch(`${url}/health`);
     return response.ok;
@@ -155,129 +180,210 @@ ipcMain.handle('check-server-health', async (_event, url: string) => {
   }
 });
 
-// Terminal PTY handlers
-ipcMain.handle('terminal-spawn', async () => {
-  console.log("Terminal spawn requested");
-  if (ptyProcess || kuuzukiProcess) {
-    return { success: false, error: 'Terminal already running' };
-  }
-
-  try {
-    // Find kuuzuki binary
-    const possiblePaths = [
-      path.join(__dirname, '../../assets/bin/kuuzuki'),
-      path.join(__dirname, '../../../opencode/kuuzuki-cli'),
-      path.join((process as any).resourcesPath, 'bin/kuuzuki'),
-      '/usr/local/bin/kuuzuki',
-      '/usr/bin/kuuzuki'
-    ];
-
-    let kuuzukiBinary = '';
-    for (const binPath of possiblePaths) {
-      console.log("Checking binary:", binPath);
-      try {
-        await fs.access(binPath, fs.constants.X_OK);
-        kuuzukiBinary = binPath;
-        break;
-      } catch {
-        // Continue searching
-      }
+// Unified terminal IPC handlers
+ipcMain.handle('unified-terminal-init', async () => {
+    try {
+        const kuuzukiBinary = await findKuuzukiBinary();
+        await unifiedTerminal.initialize(kuuzukiBinary);
+        
+        // Set up event forwarding to renderer only once
+        if (!terminalListenersSetup) {
+            terminalListenersSetup = true;
+            
+            unifiedTerminal.on('bash-data', (data) => {
+                mainWindow?.webContents.send('bash-data', data);
+            });
+            
+            unifiedTerminal.on('kuuzuki-data', (data) => {
+                mainWindow?.webContents.send('kuuzuki-data', data);
+            });
+            
+            unifiedTerminal.on('bash-exit', () => {
+                mainWindow?.webContents.send('bash-exit');
+            });
+            
+            unifiedTerminal.on('kuuzuki-exit', () => {
+                mainWindow?.webContents.send('kuuzuki-exit');
+            });
+            
+            unifiedTerminal.on('mode-changed', (mode) => {
+                mainWindow?.webContents.send('mode-changed', mode);
+            });
+            
+            unifiedTerminal.on('directory-changed', (dir) => {
+                mainWindow?.webContents.send('directory-changed', dir);
+            });
+        }
+        
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
+});
 
-    console.log("Found kuuzuki binary:", kuuzukiBinary);
-    if (!kuuzukiBinary) {
-      throw new Error('Kuuzuki binary not found');
-    }
+ipcMain.handle('unified-terminal-toggle-split', async () => {
+    const mode = unifiedTerminal.toggleSplitMode();
+    return { success: true, mode };
+});
 
-    // Get current working directory
-    // const cwd = process.cwd();
+ipcMain.on('unified-terminal-write-bash', (_event, data: string) => {
+    unifiedTerminal.writeToBash(data);
+});
 
-    // Check if PTY is available
-    if (!pty) {
-      console.warn('PTY not available, using fallback terminal');
-      // Fallback: spawn regular process
-      kuuzukiProcess = spawn(kuuzukiBinary, ['tui'], {
-        cwd: process.cwd(),
-        env: process.env,
-        stdio: 'pipe'
-      });
-      
-      kuuzukiProcess.stdout?.on('data', (data) => {
-        mainWindow?.webContents.send('terminal-data', data.toString());
-      });
-      
-      kuuzukiProcess.stderr?.on('data', (data) => {
-        mainWindow?.webContents.send('terminal-data', data.toString());
-      });
-      
-      kuuzukiProcess.on('exit', () => {
-        kuuzukiProcess = null;
-        mainWindow?.webContents.send('terminal-exit');
-      });
-      
-      return { success: true };
-    }
-    
-    // Spawn PTY with kuuzuki TUI
-    const cwd = process.cwd();
-    
-    ptyProcess = pty.spawn(kuuzukiBinary, ["tui"], {
-      name: "xterm-256color",
-      cols: 80,
-      rows: 30,
-      cwd,
-      env: process.env
-    });
-    
-    ptyProcess.onData((data: string) => {
-      mainWindow?.webContents.send("terminal-data", data);
-    });
-    
-    ptyProcess.onExit(() => {
-      ptyProcess = null;
-      mainWindow?.webContents.send("terminal-exit");
-    });
-    
+ipcMain.on('unified-terminal-write-kuuzuki', (_event, data: string) => {
+    unifiedTerminal.writeToKuuzuki(data);
+});
+
+ipcMain.handle('unified-terminal-resize-bash', async (_event, cols: number, rows: number) => {
+    unifiedTerminal.resizeBash(cols, rows);
     return { success: true };
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) };
-  }
 });
 
-ipcMain.on('terminal-write', (_event, data: string) => {
-  if (ptyProcess && pty) {
-    ptyProcess.write(data);
-  } else if (kuuzukiProcess && kuuzukiProcess.stdin) {
-    kuuzukiProcess.stdin.write(data);
-  }
+ipcMain.handle('unified-terminal-resize-kuuzuki', async (_event, cols: number, rows: number) => {
+    unifiedTerminal.resizeKuuzuki(cols, rows);
+    return { success: true };
 });
 
-ipcMain.handle('terminal-resize', async (_event, cols: number, rows: number) => {
-  if (ptyProcess && pty) {
-    ptyProcess.resize(cols, rows);
-  }
-  // Regular process doesn't support resize
-  return { success: true };
+ipcMain.handle('unified-terminal-restart-bash', async () => {
+    try {
+        await unifiedTerminal.restartBash();
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
 });
 
-ipcMain.handle('terminal-kill', async () => {
-  if (ptyProcess) {
-    ptyProcess.kill();
-    ptyProcess = null;
-  }
-  if (kuuzukiProcess) {
-    kuuzukiProcess.kill();
-    kuuzukiProcess = null;
-  }
-  return { success: true };
+ipcMain.handle('unified-terminal-restart-kuuzuki', async () => {
+    try {
+        await unifiedTerminal.restartKuuzuki();
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+});
+
+ipcMain.handle('unified-terminal-destroy', async () => {
+    unifiedTerminal.destroy();
+    return { success: true };
+});
+
+// Initialize plugin system
+async function initializePlugins() {
+    // Load plugins
+    await pluginLoader.loadPlugins();
+    
+    // Set up plugin event handlers
+    pluginLoader.on('terminal-write', (data: string) => {
+        unifiedTerminal.writeToBash(data);
+    });
+    
+    pluginLoader.on('terminal-execute', async (command: string, callback: (result: string) => void) => {
+        // Execute command and return result
+        unifiedTerminal.writeToBash(command + '\r');
+        // In real implementation, would capture output
+        callback('Command executed');
+    });
+    
+    pluginLoader.on('terminal-get-directory', async (callback: (dir: string) => void) => {
+        const dir = unifiedTerminal.getCurrentDirectory();
+        callback(dir);
+    });
+    
+    pluginLoader.on('ui-show-message', (message: string, type: string) => {
+        mainWindow?.webContents.send('plugin-message', { message, type });
+    });
+    
+    pluginLoader.on('ui-show-input', (options: any, callback: (result?: string) => void) => {
+        mainWindow?.webContents.send('plugin-input-request', options, callback);
+    });
+    
+    // Activate startup plugins
+    const plugins = pluginLoader.getLoadedPlugins();
+    for (const plugin of plugins) {
+        if (plugin.manifest.activationEvents?.includes('onStartup')) {
+            await pluginLoader.activatePlugin(plugin.manifest.id);
+        }
+    }
+}
+
+// Plugin IPC handlers
+ipcMain.handle('plugin-list', async () => {
+    const plugins = pluginLoader.getLoadedPlugins();
+    return plugins.map(p => ({
+        id: p.manifest.id,
+        name: p.manifest.name,
+        version: p.manifest.version,
+        description: p.manifest.description,
+        isActive: p.isActive
+    }));
+});
+
+ipcMain.handle('plugin-activate', async (_event, pluginId: string) => {
+    try {
+        await pluginLoader.activatePlugin(pluginId);
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+});
+
+ipcMain.handle('plugin-deactivate', async (_event, pluginId: string) => {
+    try {
+        await pluginLoader.deactivatePlugin(pluginId);
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
 });
 
 // App event handlers
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+    await createWindow();
+    await initializePlugins();
+});
+
+// Cleanup function to ensure all resources are properly released
+async function cleanupAndQuit() {
+  if (isQuitting) return;
+  isQuitting = true;
+  
+  console.log('Cleaning up before quit...');
+  
+  // Close all windows
+  BrowserWindow.getAllWindows().forEach(window => {
+    window.removeAllListeners();
+    window.close();
+  });
+  
+  // Kill kuuzuki process
+  if (kuuzukiProcess) {
+    try {
+      kuuzukiProcess.kill('SIGTERM');
+      // Wait a bit for graceful shutdown
+      await new Promise(resolve => setTimeout(resolve, 500));
+      if (kuuzukiProcess.exitCode === null) {
+        kuuzukiProcess.kill('SIGKILL');
+      }
+    } catch (error) {
+      console.error('Error killing kuuzuki process:', error);
+    }
+    kuuzukiProcess = null;
+  }
+  
+  // Destroy unified terminal
+  unifiedTerminal.destroy();
+  terminalListenersSetup = false;
+  
+  // Remove all IPC handlers
+  ipcMain.removeAllListeners();
+  
+  // Quit the app
+  app.quit();
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    app.quit();
+    cleanupAndQuit();
   }
 });
 
@@ -287,21 +393,17 @@ app.on('activate', () => {
   }
 });
 
-app.on('before-quit', () => {
-  if (kuuzukiProcess) {
-    kuuzukiProcess.kill();
-  }
-  if (ptyProcess) {
-    ptyProcess.kill();
+app.on('before-quit', (event) => {
+  if (!isQuitting) {
+    event.preventDefault();
+    cleanupAndQuit();
   }
 });
 
 process.on('SIGINT', () => {
-  if (kuuzukiProcess) {
-    kuuzukiProcess.kill();
-  }
-  if (ptyProcess) {
-    ptyProcess.kill();
-  }
-  app.quit();
+  cleanupAndQuit();
+});
+
+process.on('SIGTERM', () => {
+  cleanupAndQuit();
 });

@@ -4,6 +4,7 @@ export function deactivate() {}
 import * as vscode from "vscode"
 
 export function activate(context: vscode.ExtensionContext) {
+  return
   const TERMINAL_NAME = "kuuzuki"
 
   // Register command to open terminal in split screen and run kuuzuki

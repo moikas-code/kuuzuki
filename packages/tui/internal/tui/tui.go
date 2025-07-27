@@ -657,12 +657,12 @@ func (a Model) home() string {
 		limit = 4
 	}
 
-	showVscode := util.IsVSCode()
+	// showVscode := util.IsVSCode()
 	commandsView := cmdcomp.New(
 		a.app,
 		cmdcomp.WithBackground(t.Background()),
 		cmdcomp.WithLimit(limit),
-		cmdcomp.WithVscode(showVscode),
+		// cmdcomp.WithVscode(showVscode),
 	)
 	cmds := lipgloss.PlaceHorizontal(
 		effectiveWidth,

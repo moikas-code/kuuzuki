@@ -1,31 +1,22 @@
 import { useState } from "react"
-import { Terminal } from './components/Terminal'
+import { UnifiedTerminal } from './components/UnifiedTerminal'
+import { TerminalDebug } from './components/TerminalDebug'
 import './App.css'
+
+// Temporarily show debug terminal
+const DEBUG_MODE = false;
 
 function App() {
   const [isReady, setIsReady] = useState(false)
 
+  // Show debug terminal if in debug mode
+  if (DEBUG_MODE) {
+    return <TerminalDebug />;
+  }
+
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>Kuuzuki Desktop</h1>
-        {isReady && (
-          <span className="server-status">
-            Terminal Ready
-          </span>
-        )}
-      </header>
-
-      <main className="app-main">
-        <Terminal
-          className="terminal-container"
-          onReady={() => setIsReady(true)}
-        />
-      </main>
-
-      <footer className="app-footer">
-        Press Ctrl+C to exit terminal
-      </footer>
+      <UnifiedTerminal onReady={() => setIsReady(true)} />
     </div>
   )
 }

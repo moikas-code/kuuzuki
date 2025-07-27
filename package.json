@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "opencode",
+  "name": "kuuzuki",
   "private": true,
   "type": "module",
   "packageManager": "bun@1.2.14",
@@ -17,7 +17,9 @@
     "build:desktop": "./run.sh build desktop",
     "dev:tui": "./run.sh dev tui",
     "dev:server": "./run.sh dev server",
-    "dev:desktop": "./run.sh dev desktop",
+    "dev:desktop": "./dev-desktop.sh",
+    "run:desktop": "./run-desktop.sh",
+    "start:desktop": "./run-desktop.sh",
     "clean": "./run.sh clean",
     "check": "./run.sh check"
   },
@@ -38,7 +40,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/sst/opencode"
+    "url": "https://github.com/moikas-code/kuuzuki"
   },
   "license": "MIT",
   "prettier": {
@@ -55,3 +57,4 @@
     "electron": "37.2.4"
   }
 }
+
