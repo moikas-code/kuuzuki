@@ -59,7 +59,7 @@ export const DesktopCommand = cmd({
       
       if (!binaryPath) {
         UI.error("Desktop app not found. Please build it first with: ./run.sh build desktop")
-        UI.hint("Or run in terminal mode with: kuuzuki tui")
+        UI.info("Or run in terminal mode with: kuuzuki tui")
         return
       }
       
@@ -82,7 +82,7 @@ export const DesktopCommand = cmd({
       
     } catch (error) {
       UI.error("Failed to launch desktop app: " + (error instanceof Error ? error.message : String(error)))
-      UI.hint("Run in terminal mode with: kuuzuki tui")
+      UI.info("Run in terminal mode with: kuuzuki tui")
     }
   }
 })

@@ -1,0 +1,21 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <linearGradient id="kzGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+    <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+  </linearGradient>
+  <filter id="kzGlow">
+    <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+    <feMerge>
+      <feMergeNode in="coloredBlur" />
+      <feMergeNode in="SourceGraphic" />
+    </feMerge>
+  </filter>
+</defs>
+<rect x="0" y="0" width="128" height="128" rx="24" fill="#1e1e1e" />
+<g filter="url(#kzGlow)">
+  <path d="M 35 35 L 35 93 L 45 93 L 45 68 L 60 93 L 72 93 L 54 64 L 70 35 L 58 35 L 45 58 L 45 35 Z" fill="url(#kzGradient)" />
+  <path d="M 75 35 L 75 44 L 93 44 L 75 84 L 75 93 L 103 93 L 103 84 L 85 84 L 103 44 L 103 35 Z" fill="url(#kzGradient)" />
+</g>
+<circle cx="110" cy="110" r="12" fill="none" stroke="url(#kzGradient)" stroke-width="2" opacity="0.5" />
+</svg>

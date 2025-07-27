@@ -1,5 +1,10 @@
-<svg width="600" height="600" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="600" height="600" fill="black"/>
-<path fill-rule="evenodd" clip-rule="evenodd" d="M115 180H300V420H115V180ZM253.75 229.044H161.25V370.405H253.75V229.044Z" fill="white"/>
-<path d="M346.25 180H485V229.044H392.5V370.405H485V419.449H346.25V180Z" fill="white"/>
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <linearGradient id="faviconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+    <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+  </linearGradient>
+</defs>
+<path d="M 16 6 L 10 12 L 10 20 L 16 26 L 22 20 L 22 12 Z" fill="none" stroke="url(#faviconGradient)" stroke-width="2" stroke-linejoin="round" />
+<path d="M 10 12 L 16 18 L 22 12 M 16 18 L 16 26" fill="none" stroke="url(#faviconGradient)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
 </svg>

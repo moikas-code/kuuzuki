@@ -1,0 +1,14 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <linearGradient id="vscodeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+    <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+  </linearGradient>
+</defs>
+<rect x="0" y="0" width="128" height="128" rx="16" fill="#1e1e1e" />
+<path d="M 64 24 L 40 48 L 40 80 L 64 104 L 88 80 L 88 48 Z" fill="none" stroke="url(#vscodeGradient)" stroke-width="6" stroke-linejoin="round" />
+<path d="M 40 48 L 64 72 L 88 48 M 64 72 L 64 104" fill="none" stroke="url(#vscodeGradient)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+<circle cx="64" cy="48" r="4" fill="#6366f1" />
+<circle cx="40" cy="48" r="3" fill="#8b5cf6" />
+<circle cx="88" cy="48" r="3" fill="#8b5cf6" />
+</svg>

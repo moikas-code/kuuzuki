@@ -3,18 +3,11 @@ import path from 'path';
 import { spawn, ChildProcess } from 'child_process';
 import fs from 'fs/promises';
 import { findKuuzukiServer } from './server-detector';
-import { terminalManager, TerminalMode } from './terminal-manager';
-// Conditionally import node-pty with error handling
-let pty: typeof import('node-pty') | null = null;
-try {
-  pty = require('node-pty');
-} catch (error) {
-  console.warn('node-pty not available, PTY features will be disabled:', error);
-}
+// import * as pty from 'node-pty';
 
 let mainWindow: BrowserWindow | null = null;
 let kuuzukiProcess: ChildProcess | null = null;
-let ptyProcess: any | null = null; // Type will be IPty when available
+let ptyProcess: any | null = null; // Temporarily disabled PTY
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
@@ -59,7 +52,7 @@ async function startKuuzukiServer(): Promise<string> {
 
   // Find kuuzuki binary
   const possiblePaths = [
-    path.join(__dirname, '../../assets/bin/kuuzuki'),
+    path.join(__dirname, '../../bin/kuuzuki'),
     path.join(__dirname, '../../../opencode/kuuzuki-cli'),
     path.join((process as any).resourcesPath, 'bin/kuuzuki'),
     '/usr/local/bin/kuuzuki',
@@ -68,7 +61,6 @@ async function startKuuzukiServer(): Promise<string> {
 
   let kuuzukiBinary = '';
   for (const binPath of possiblePaths) {
-      console.log("Checking binary:", binPath);
     try {
       await fs.access(binPath, fs.constants.X_OK);
       kuuzukiBinary = binPath;
@@ -78,7 +70,6 @@ async function startKuuzukiServer(): Promise<string> {
     }
   }
 
-    console.log("Found kuuzuki binary:", kuuzukiBinary);
   if (!kuuzukiBinary) {
     throw new Error('Kuuzuki binary not found');
   }
@@ -157,15 +148,14 @@ ipcMain.handle('check-server-health', async (_event, url: string) => {
 
 // Terminal PTY handlers
 ipcMain.handle('terminal-spawn', async () => {
-  console.log("Terminal spawn requested");
-  if (ptyProcess || kuuzukiProcess) {
+  if (ptyProcess) {
     return { success: false, error: 'Terminal already running' };
   }
 
   try {
     // Find kuuzuki binary
     const possiblePaths = [
-      path.join(__dirname, '../../assets/bin/kuuzuki'),
+      path.join(__dirname, '../../bin/kuuzuki'),
       path.join(__dirname, '../../../opencode/kuuzuki-cli'),
       path.join((process as any).resourcesPath, 'bin/kuuzuki'),
       '/usr/local/bin/kuuzuki',
@@ -174,7 +164,6 @@ ipcMain.handle('terminal-spawn', async () => {
 
     let kuuzukiBinary = '';
     for (const binPath of possiblePaths) {
-      console.log("Checking binary:", binPath);
       try {
         await fs.access(binPath, fs.constants.X_OK);
         kuuzukiBinary = binPath;
@@ -184,7 +173,6 @@ ipcMain.handle('terminal-spawn', async () => {
       }
     }
 
-    console.log("Found kuuzuki binary:", kuuzukiBinary);
     if (!kuuzukiBinary) {
       throw new Error('Kuuzuki binary not found');
     }
@@ -192,83 +180,48 @@ ipcMain.handle('terminal-spawn', async () => {
     // Get current working directory
     // const cwd = process.cwd();
 
-    // Check if PTY is available
-    if (!pty) {
-      console.warn('PTY not available, using fallback terminal');
-      // Fallback: spawn regular process
-      kuuzukiProcess = spawn(kuuzukiBinary, ['tui'], {
-        cwd: process.cwd(),
-        env: process.env,
-        stdio: 'pipe'
-      });
-      
-      kuuzukiProcess.stdout?.on('data', (data) => {
-        mainWindow?.webContents.send('terminal-data', data.toString());
-      });
-      
-      kuuzukiProcess.stderr?.on('data', (data) => {
-        mainWindow?.webContents.send('terminal-data', data.toString());
-      });
-      
-      kuuzukiProcess.on('exit', () => {
-        kuuzukiProcess = null;
-        mainWindow?.webContents.send('terminal-exit');
-      });
-      
-      return { success: true };
-    }
-    
     // Spawn PTY with kuuzuki TUI
-    const cwd = process.cwd();
-    
-    ptyProcess = pty.spawn(kuuzukiBinary, ["tui"], {
-      name: "xterm-256color",
+    // Temporarily disable PTY - just return success
+    return { success: true };
+    /*
+    ptyProcess = pty.spawn(kuuzukiBinary, ['tui'], {
+      name: 'xterm-256color',
       cols: 80,
       rows: 30,
       cwd,
       env: process.env
     });
-    
-    ptyProcess.onData((data: string) => {
-      mainWindow?.webContents.send("terminal-data", data);
+
+    ptyProcess.onData((data) => {
+      mainWindow?.webContents.send('terminal-data', data);
     });
-    
+
     ptyProcess.onExit(() => {
       ptyProcess = null;
-      mainWindow?.webContents.send("terminal-exit");
+      mainWindow?.webContents.send('terminal-exit');
     });
-    
+
     return { success: true };
+    */
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 });
 
-ipcMain.on('terminal-write', (_event, data: string) => {
-  if (ptyProcess && pty) {
-    ptyProcess.write(data);
-  } else if (kuuzukiProcess && kuuzukiProcess.stdin) {
-    kuuzukiProcess.stdin.write(data);
-  }
+ipcMain.on('terminal-write', (_event, _data: string) => {
+  // ptyProcess?.write(data);
 });
 
-ipcMain.handle('terminal-resize', async (_event, cols: number, rows: number) => {
-  if (ptyProcess && pty) {
-    ptyProcess.resize(cols, rows);
-  }
-  // Regular process doesn't support resize
+ipcMain.handle('terminal-resize', async (_event, _cols: number, _rows: number) => {
+  // ptyProcess?.resize(cols, rows);
   return { success: true };
 });
 
 ipcMain.handle('terminal-kill', async () => {
-  if (ptyProcess) {
-    ptyProcess.kill();
-    ptyProcess = null;
-  }
-  if (kuuzukiProcess) {
-    kuuzukiProcess.kill();
-    kuuzukiProcess = null;
-  }
+  // if (ptyProcess) {
+  //   ptyProcess.kill();
+  //   ptyProcess = null;
+  // }
   return { success: true };
 });
 

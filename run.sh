@@ -153,7 +153,7 @@ run_dev() {
         "tui")
             print_info "Starting kuuzuki TUI..."
             cd "$SCRIPT_DIR/packages/opencode"
-            bun run src/index.ts
+            bun run src/index.ts tui
             ;;
         "desktop")
             print_info "Starting desktop app in development mode..."
@@ -163,7 +163,7 @@ run_dev() {
         *)
             print_info "Starting kuuzuki (default: TUI mode)..."
             cd "$SCRIPT_DIR/packages/opencode"
-            bun run src/index.ts
+            bun run src/index.ts tui
             ;;
     esac
 }
@@ -183,7 +183,7 @@ run_prod() {
             ;;
         "desktop")
             print_info "Starting desktop app..."
-            local app_path="$SCRIPT_DIR/packages/desktop/dist-electron/Kuuzuki Desktop.AppImage"
+            local app_path="$SCRIPT_DIR/packages/desktop/dist-electron/Kuuzuki Desktop-0.1.0.AppImage"
             if [ -f "$app_path" ]; then
                 "$app_path"
             else
