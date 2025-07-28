@@ -14,7 +14,7 @@ This extension requires [kuuzuki](https://www.npmjs.com/package/kuuzuki) to be i
 
 ## Support
 
-This is an early release. If you encounter issues or have feedback, please create an issue at https://github.com/kuucode/kuuzuki/issues.
+This is an early release. If you encounter issues or have feedback, please create an issue at https://github.com/kuuzuki/kuuzuki/issues.
 
 ## Development
 

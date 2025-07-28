@@ -57,7 +57,7 @@ kuuzuki --version
 
 ```bash
 # Clone the repository
-git clone https://github.com/kuucode/kuuzuki.git
+git clone https://github.com/kuuzuki/kuuzuki.git
 cd kuuzuki
 
 # Install dependencies

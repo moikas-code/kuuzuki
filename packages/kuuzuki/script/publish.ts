@@ -37,10 +37,10 @@ const npmPackage = {
   version: version,
   description: "AI-powered terminal assistant",
   keywords: ["ai", "terminal", "cli", "assistant", "claude"],
-  homepage: "https://github.com/kuucode/kuuzuki",
+  homepage: "https://github.com/kuuzuki/kuuzuki",
   repository: {
     type: "git",
-    url: "https://github.com/kuucode/kuuzuki.git"
+    url: "https://github.com/kuuzuki/kuuzuki.git"
   },
   license: "MIT",
   bin: {

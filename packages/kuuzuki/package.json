@@ -5,13 +5,13 @@
   "type": "module",
   "description": "AI-powered terminal assistant",
   "keywords": ["ai", "terminal", "cli", "assistant", "claude"],
-  "homepage": "https://github.com/kuucode/kuuzuki",
+  "homepage": "https://github.com/kuuzuki/kuuzuki",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kuucode/kuuzuki.git"
+    "url": "https://github.com/kuuzuki/kuuzuki.git"
   },
   "bugs": {
-    "url": "https://github.com/kuucode/kuuzuki/issues"
+    "url": "https://github.com/kuuzuki/kuuzuki/issues"
   },
   "author": "Kuuzuki Team",
   "license": "MIT",

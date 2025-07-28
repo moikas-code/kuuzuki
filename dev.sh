@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Quick development runner for kuucode
+# Quick development runner for kuuzuki
 # Usage: ./dev.sh [tui|server|watch]
 
 set -e
