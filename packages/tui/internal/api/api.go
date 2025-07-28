@@ -6,7 +6,7 @@ import (
 	"log"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
-	opencode "github.com/sst/opencode-sdk-go"
+	opencode "github.com/kuucode/kuuzuki-sdk-go"
 )
 
 type Request struct {

@@ -7,10 +7,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/lipgloss/v2/compat"
-	"github.com/sst/opencode/internal/app"
-	"github.com/sst/opencode/internal/commands"
-	"github.com/sst/opencode/internal/styles"
-	"github.com/sst/opencode/internal/theme"
+	"github.com/kuucode/kuuzuki/internal/app"
+	"github.com/kuucode/kuuzuki/internal/commands"
+	"github.com/kuucode/kuuzuki/internal/styles"
+	"github.com/kuucode/kuuzuki/internal/theme"
 )
 
 type StatusComponent interface {
@@ -46,13 +46,13 @@ func (m statusComponent) logo() string {
 		Bold(true).
 		Render
 
-	open := base("open")
-	code := emphasis("code ")
+	kuu := base("kuu")
+	zuki := emphasis("zuki ")
 	version := base(m.app.Version)
 	return styles.NewStyle().
 		Background(t.BackgroundElement()).
 		Padding(0, 1).
-		Render(open + code + version)
+		Render(kuu + zuki + version)
 }
 
 func (m statusComponent) View() string {

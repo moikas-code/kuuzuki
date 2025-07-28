@@ -8,9 +8,9 @@ import (
 	"os"
 	"testing"
 
-	opencode "github.com/sst/opencode-sdk-go"
-	"github.com/sst/opencode-sdk-go/internal/testutil"
-	"github.com/sst/opencode-sdk-go/option"
+	opencode "github.com/kuucode/kuuzuki-sdk-go"
+	"github.com/kuucode/kuuzuki-sdk-go/internal/testutil"
+	"github.com/kuucode/kuuzuki-sdk-go/option"
 )
 
 func TestFileRead(t *testing.T) {

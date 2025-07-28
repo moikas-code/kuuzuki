@@ -75,11 +75,15 @@ build_server() {
     
     print_info "Building kuuzuki CLI..."
     
+    # Get version from package.json
+    VERSION=$(jq -r .version package.json)
+    
     # Use bun's bundler to create a self-contained binary
     bun build src/index.ts \
         --compile \
         --target=bun \
-        --outfile=kuuzuki-cli
+        --outfile=kuuzuki-cli \
+        --define KUUZUKI_VERSION="'$VERSION'"
     
     chmod +x kuuzuki-cli
     print_success "Server/CLI built successfully"

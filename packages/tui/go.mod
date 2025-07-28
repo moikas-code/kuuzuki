@@ -1,23 +1,22 @@
-module github.com/sst/opencode
+module github.com/kuucode/kuuzuki
 
 go 1.24.0
 
 require (
 	github.com/BurntSushi/toml v1.5.0
 	github.com/alecthomas/chroma/v2 v2.18.0
-	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbles/v2 v2.0.0-beta.1
 	github.com/charmbracelet/bubbletea/v2 v2.0.0-beta.4
 	github.com/charmbracelet/glamour v0.10.0
 	github.com/charmbracelet/lipgloss/v2 v2.0.0-beta.3
 	github.com/charmbracelet/x/ansi v0.9.3
 	github.com/google/uuid v1.6.0
+	github.com/kuucode/kuuzuki-sdk-go v0.0.0-00010101000000-000000000000
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6
 	github.com/muesli/reflow v0.3.0
 	github.com/muesli/termenv v0.16.0
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3
-	github.com/sst/opencode-sdk-go v0.1.0-alpha.8
 	golang.org/x/image v0.28.0
 	rsc.io/qr v0.2.0
 )
@@ -98,3 +97,5 @@ tool (
 	github.com/atombender/go-jsonschema
 	github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
 )
+
+replace github.com/kuucode/kuuzuki-sdk-go => ./sdk

@@ -18,11 +18,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sst/opencode-sdk-go/internal"
-	"github.com/sst/opencode-sdk-go/internal/apierror"
-	"github.com/sst/opencode-sdk-go/internal/apiform"
-	"github.com/sst/opencode-sdk-go/internal/apiquery"
-	"github.com/sst/opencode-sdk-go/internal/param"
+	"github.com/kuucode/kuuzuki-sdk-go/internal"
+	"github.com/kuucode/kuuzuki-sdk-go/internal/apierror"
+	"github.com/kuucode/kuuzuki-sdk-go/internal/apiform"
+	"github.com/kuucode/kuuzuki-sdk-go/internal/apiquery"
+	"github.com/kuucode/kuuzuki-sdk-go/internal/param"
 )
 
 func getDefaultHeaders() map[string]string {

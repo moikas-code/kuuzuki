@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/sst/opencode-sdk-go/internal/apijson"
-	"github.com/sst/opencode-sdk-go/internal/requestconfig"
-	"github.com/sst/opencode-sdk-go/option"
+	"github.com/kuucode/kuuzuki-sdk-go/internal/apijson"
+	"github.com/kuucode/kuuzuki-sdk-go/internal/requestconfig"
+	"github.com/kuucode/kuuzuki-sdk-go/option"
 	"github.com/tidwall/gjson"
 )
 

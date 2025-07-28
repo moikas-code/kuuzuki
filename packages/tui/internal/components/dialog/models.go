@@ -9,14 +9,14 @@ import (
 	"github.com/charmbracelet/bubbles/v2/key"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/lithammer/fuzzysearch/fuzzy"
-	opencode "github.com/sst/opencode-sdk-go"
-	"github.com/sst/opencode/internal/app"
-	"github.com/sst/opencode/internal/components/list"
-	"github.com/sst/opencode/internal/components/modal"
-	"github.com/sst/opencode/internal/layout"
-	"github.com/sst/opencode/internal/styles"
-	"github.com/sst/opencode/internal/theme"
-	"github.com/sst/opencode/internal/util"
+	opencode "github.com/kuucode/kuuzuki-sdk-go"
+	"github.com/kuucode/kuuzuki/internal/app"
+	"github.com/kuucode/kuuzuki/internal/components/list"
+	"github.com/kuucode/kuuzuki/internal/components/modal"
+	"github.com/kuucode/kuuzuki/internal/layout"
+	"github.com/kuucode/kuuzuki/internal/styles"
+	"github.com/kuucode/kuuzuki/internal/theme"
+	"github.com/kuucode/kuuzuki/internal/util"
 )
 
 const (

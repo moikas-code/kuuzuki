@@ -12,13 +12,13 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 	flag "github.com/spf13/pflag"
-	opencode "github.com/sst/opencode-sdk-go"
-	"github.com/sst/opencode-sdk-go/option"
-	"github.com/sst/opencode/internal/api"
-	"github.com/sst/opencode/internal/app"
-	"github.com/sst/opencode/internal/clipboard"
-	"github.com/sst/opencode/internal/tui"
-	"github.com/sst/opencode/internal/util"
+	opencode "github.com/kuucode/kuuzuki-sdk-go"
+	"github.com/kuucode/kuuzuki-sdk-go/option"
+	"github.com/kuucode/kuuzuki/internal/api"
+	"github.com/kuucode/kuuzuki/internal/app"
+	"github.com/kuucode/kuuzuki/internal/clipboard"
+	"github.com/kuucode/kuuzuki/internal/tui"
+	"github.com/kuucode/kuuzuki/internal/util"
 )
 
 var Version = "dev"
