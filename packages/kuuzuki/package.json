@@ -3,7 +3,25 @@
   "version": "0.1.0",
   "name": "kuuzuki",
   "type": "module",
-  "private": true,
+  "description": "AI-powered terminal assistant",
+  "keywords": ["ai", "terminal", "cli", "assistant", "claude"],
+  "homepage": "https://github.com/kuucode/kuuzuki",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kuucode/kuuzuki.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kuucode/kuuzuki/issues"
+  },
+  "author": "Kuuzuki Team",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "dev": "bun run ./src/index.ts"

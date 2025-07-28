@@ -1,5 +1,5 @@
 {
-  "name": "@opencode/function",
+  "name": "@moikas/function",
   "version": "0.0.1",
   "$schema": "https://json.schemastore.org/package.json",
   "private": true,

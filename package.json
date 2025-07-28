@@ -31,8 +31,7 @@
     }
   },
   "devDependencies": {
-    "prettier": "3.5.3",
-    "sst": "3.17.8"
+    "prettier": "3.5.3"
   },
   "repository": {
     "type": "git",
