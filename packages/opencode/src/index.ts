@@ -14,7 +14,6 @@ import { NamedError } from "./util/error"
 import { FormatError } from "./cli/error"
 import { ServeCommand } from "./cli/cmd/serve"
 import { TuiCommand } from "./cli/cmd/tui"
-import { DesktopCommand } from "./cli/cmd/desktop"
 import { DebugCommand } from "./cli/cmd/debug"
 import { StatsCommand } from "./cli/cmd/stats"
 import { McpCommand } from "./cli/cmd/mcp"
@@ -68,7 +67,6 @@ const cli = yargs(hideBin(process.argv))
     })
   })
   .usage("\n" + UI.logo())
-  .command(DesktopCommand)
   .command(McpCommand)
   .command(TuiCommand)
   .command(RunCommand)
@@ -89,7 +87,13 @@ const cli = yargs(hideBin(process.argv))
   .strict()
 
 try {
-  await cli.parse()
+  // If no command is provided, default to TUI
+  const args = process.argv.slice(2)
+  if (args.length === 0 || (args.length === 1 && args[0].startsWith('-'))) {
+    await cli.parse(['tui', ...args])
+  } else {
+    await cli.parse()
+  }
 } catch (e) {
   let data: Record<string, any> = {}
   if (e instanceof NamedError) {

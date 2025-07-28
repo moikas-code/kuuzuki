@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "bun@1.2.14",
   "scripts": {
-    "dev": "bun run packages/opencode/src/index.ts tui",
+    "dev": "bun run packages/opencode/src/index.ts",
     "typecheck": "bun run --filter='*' typecheck",
     "stainless": "./scripts/stainless",
     "postinstall": "./scripts/hooks",
@@ -14,12 +14,8 @@
     "build:all": "./run.sh build all",
     "build:tui": "./run.sh build tui",
     "build:server": "./run.sh build server",
-    "build:desktop": "./run.sh build desktop",
     "dev:tui": "./run.sh dev tui",
     "dev:server": "./run.sh dev server",
-    "dev:desktop": "./dev-desktop.sh",
-    "run:desktop": "./run-desktop.sh",
-    "start:desktop": "./run-desktop.sh",
     "clean": "./run.sh clean",
     "check": "./run.sh check"
   },
