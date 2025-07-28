@@ -78,7 +78,8 @@ func PlaceOverlay(
 		}
 	} else {
 		if fgWidth >= bgWidth && fgHeight >= bgHeight {
-			// FIXME: return fg or bg?
+			// If foreground completely covers background, just return foreground
+			// since the background would be entirely hidden anyway
 			return fg
 		}
 		// TODO: allow placement outside of the bg box?

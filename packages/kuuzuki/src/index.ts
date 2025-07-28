@@ -3,6 +3,7 @@ import yargs from "yargs"
 import { hideBin } from "yargs/helpers"
 import { RunCommand } from "./cli/cmd/run"
 import { GenerateCommand } from "./cli/cmd/generate"
+import { SchemaCommand } from "./cli/cmd/schema"
 import { Log } from "./util/log"
 import { AuthCommand } from "./cli/cmd/auth"
 import { BillingCommand } from "./cli/cmd/billing"
@@ -72,6 +73,7 @@ const cli = yargs(hideBin(process.argv))
   .command(TuiCommand)
   .command(RunCommand)
   .command(GenerateCommand)
+  .command(SchemaCommand)
   .command(DebugCommand)
   .command(AuthCommand)
   .command(BillingCommand)

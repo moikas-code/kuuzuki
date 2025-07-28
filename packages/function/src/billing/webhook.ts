@@ -1,9 +1,11 @@
 import Stripe from "stripe"
 import { createLicenseKey, storeLicense, getLicenseByCustomerId, updateLicenseStatus } from "./license"
+import { sendLicenseEmail } from "./email"
 
 export async function handleStripeWebhook(
   event: Stripe.Event,
-  kv: KVNamespace
+  kv: KVNamespace,
+  env?: { EMAIL_API_URL?: string; EMAIL_API_KEY?: string }
 ): Promise<void> {
   switch (event.type) {
     case "checkout.session.completed": {
@@ -41,7 +43,13 @@ export async function handleStripeWebhook(
       })
 
       console.log("Created license", licenseKey, "for", email)
-      // TODO: Send email with license key
+      
+      // Send license key via email
+      await sendLicenseEmail({
+        email,
+        licenseKey,
+        customerId,
+      }, env)
       break
     }
 

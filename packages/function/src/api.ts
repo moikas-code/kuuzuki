@@ -458,7 +458,10 @@ export default {
           env.STRIPE_WEBHOOK_SECRET
         )
         
-        await handleStripeWebhook(event, env.LICENSES)
+        await handleStripeWebhook(event, env.LICENSES, {
+          EMAIL_API_URL: env.EMAIL_API_URL,
+          EMAIL_API_KEY: env.EMAIL_API_KEY,
+        })
         
         return new Response(JSON.stringify({ received: true }), {
           headers: { "Content-Type": "application/json" },

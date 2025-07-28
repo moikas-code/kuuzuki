@@ -45,6 +45,14 @@ export namespace Ide {
 
   export async function install(ide: Ide) {
     return
+    
+    // Check if kuuzuki is already being called from VS Code/IDE
+    // If KUUZUKI_CALLER is set, the extension is likely already installed
+    if (alreadyInstalled()) {
+      log.info("extension already installed", { caller: process.env["KUUZUKI_CALLER"] })
+      throw new AlreadyInstalledError({})
+    }
+    
     const cmd = (() => {
       switch (ide) {
         case "Windsurf":
@@ -59,7 +67,6 @@ export namespace Ide {
           throw new Error(`Unknown IDE: ${ide}`)
       }
     })()
-    // TODO: check KUUZUKI_CALLER
     const result = await cmd.quiet().throws(false)
     log.info("installed", {
       ide,

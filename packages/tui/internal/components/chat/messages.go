@@ -884,7 +884,17 @@ func (m *messagesComponent) UndoLastMessage() (tea.Model, tea.Cmd) {
 						after = casted.Time.Start
 					}
 				case opencode.ToolPart:
-					// TODO: handle tool parts
+					if casted.ID == m.app.Session.Revert.PartID {
+						// Extract start time based on tool part state
+						switch timeData := casted.State.Time.(type) {
+						case opencode.ToolStateRunningTime:
+							after = timeData.Start
+						case opencode.ToolStateCompletedTime:
+							after = timeData.Start
+						case opencode.ToolStateErrorTime:
+							after = timeData.Start
+						}
+					}
 				}
 			}
 		}
@@ -957,7 +967,17 @@ func (m *messagesComponent) RedoLastMessage() (tea.Model, tea.Cmd) {
 						before = casted.Time.Start
 					}
 				case opencode.ToolPart:
-					// TODO: handle tool parts
+					if casted.ID == m.app.Session.Revert.PartID {
+						// Extract start time based on tool part state
+						switch timeData := casted.State.Time.(type) {
+						case opencode.ToolStateRunningTime:
+							before = timeData.Start
+						case opencode.ToolStateCompletedTime:
+							before = timeData.Start
+						case opencode.ToolStateErrorTime:
+							before = timeData.Start
+						}
+					}
 				}
 			}
 		}
