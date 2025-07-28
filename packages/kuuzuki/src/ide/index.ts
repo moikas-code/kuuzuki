@@ -40,7 +40,7 @@ export namespace Ide {
   }
 
   export function alreadyInstalled() {
-    return process.env["OPENCODE_CALLER"] === "vscode"
+    return process.env["KUUZUKI_CALLER"] === "vscode"
   }
 
   export async function install(ide: Ide) {
@@ -59,7 +59,7 @@ export namespace Ide {
           throw new Error(`Unknown IDE: ${ide}`)
       }
     })()
-    // TODO: check OPENCODE_CALLER
+    // TODO: check KUUZUKI_CALLER
     const result = await cmd.quiet().throws(false)
     log.info("installed", {
       ide,

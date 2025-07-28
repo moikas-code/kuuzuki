@@ -46,7 +46,7 @@ export namespace FileWatcher {
   )
 
   export function init() {
-    if (Flag.OPENCODE_DISABLE_WATCHER || true) return
+    if (Flag.KUUZUKI_DISABLE_WATCHER || true) return
     state()
   }
 }

@@ -45,7 +45,7 @@ for (const [os, arch] of targets) {
   await $`CGO_ENABLED=0 GOOS=${os} GOARCH=${GOARCH[arch]} go build -ldflags="-s -w -X main.Version=${version}" -o ../kuuzuki/dist/${name}/bin/tui ../tui/cmd/kuuzuki/main.go`.cwd(
     "../tui",
   )
-  await $`bun build --define OPENCODE_VERSION="'${version}'" --compile --minify --target=bun-${os}-${arch} --outfile=dist/${name}/bin/kuuzuki ./src/index.ts ./dist/${name}/bin/tui`
+  await $`bun build --define KUUZUKI_VERSION="'${version}'" --compile --minify --target=bun-${os}-${arch} --outfile=dist/${name}/bin/kuuzuki ./src/index.ts ./dist/${name}/bin/tui`
   await $`rm -rf ./dist/${name}/bin/tui`
   await Bun.file(`dist/${name}/package.json`).write(
     JSON.stringify(

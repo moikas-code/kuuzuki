@@ -10,7 +10,7 @@ for arg in "$@"; do
     fi
 done
 
-bun run ./packages/opencode/src/index.ts generate > openapi.json
+bun run ./packages/kuuzuki/src/index.ts generate > openapi.json
 
 echo "Running stl builds create..."
 stl builds create --branch dev --pull --allow-empty --+target go --+target typescript

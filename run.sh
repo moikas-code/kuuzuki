@@ -71,7 +71,7 @@ build_tui() {
 # Function to build server
 build_server() {
     print_header "Building Server/CLI"
-    cd "$SCRIPT_DIR/packages/opencode"
+    cd "$SCRIPT_DIR/packages/kuuzuki"
     
     print_info "Building kuuzuki CLI..."
     
@@ -93,17 +93,17 @@ run_dev() {
     case "$1" in
         "server")
             print_info "Starting kuuzuki server..."
-            cd "$SCRIPT_DIR/packages/opencode"
+            cd "$SCRIPT_DIR/packages/kuuzuki"
             bun run src/index.ts serve --port ${2:-4096}
             ;;
         "tui")
             print_info "Starting kuuzuki TUI..."
-            cd "$SCRIPT_DIR/packages/opencode"
+            cd "$SCRIPT_DIR/packages/kuuzuki"
             bun run src/index.ts tui
             ;;
         *)
             print_info "Starting kuuzuki (default: TUI mode)..."
-            cd "$SCRIPT_DIR/packages/opencode"
+            cd "$SCRIPT_DIR/packages/kuuzuki"
             bun run src/index.ts tui
             ;;
     esac
@@ -116,15 +116,15 @@ run_prod() {
     case "$1" in
         "server")
             print_info "Starting kuuzuki server..."
-            "$SCRIPT_DIR/packages/opencode/kuuzuki-cli" serve --port ${2:-4096}
+            "$SCRIPT_DIR/packages/kuuzuki/kuuzuki-cli" serve --port ${2:-4096}
             ;;
         "tui")
             print_info "Starting kuuzuki TUI..."
-            "$SCRIPT_DIR/packages/opencode/kuuzuki-cli"
+            "$SCRIPT_DIR/packages/kuuzuki/kuuzuki-cli"
             ;;
         *)
             print_info "Starting kuuzuki (default: TUI mode)..."
-            "$SCRIPT_DIR/packages/opencode/kuuzuki-cli"
+            "$SCRIPT_DIR/packages/kuuzuki/kuuzuki-cli"
             ;;
     esac
 }
@@ -133,8 +133,8 @@ run_prod() {
 run_tests() {
     print_header "Running Tests"
     
-    print_info "Running OpenCode tests..."
-    cd "$SCRIPT_DIR/packages/opencode"
+    print_info "Running Kuuzuki tests..."
+    cd "$SCRIPT_DIR/packages/kuuzuki"
     bun test
     
     print_success "All tests passed"
@@ -145,8 +145,8 @@ clean() {
     print_header "Cleaning Build Artifacts"
     
     rm -rf "$SCRIPT_DIR/packages/tui/kuuzuki-tui"
-    rm -rf "$SCRIPT_DIR/packages/opencode/kuuzuki-cli"
-    rm -rf "$SCRIPT_DIR/packages/opencode/binaries"
+    rm -rf "$SCRIPT_DIR/packages/kuuzuki/kuuzuki-cli"
+    rm -rf "$SCRIPT_DIR/packages/kuuzuki/binaries"
     
     print_success "Clean complete"
 }

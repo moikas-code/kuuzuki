@@ -832,7 +832,7 @@ export namespace Server {
           return c.json({
             status: "ok" as const,
             timestamp: new Date().toISOString(),
-            version: process.env["OPENCODE_VERSION"] || "dev",
+            version: process.env["KUUZUKI_VERSION"] || "dev",
           })
         }
       )

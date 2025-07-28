@@ -117,9 +117,9 @@ export const TuiCommand = cmd({
           env: {
             ...process.env,
             CGO_ENABLED: "0",
-            OPENCODE_SERVER: server.url.toString(),
-            OPENCODE_APP_INFO: JSON.stringify(app),
-            OPENCODE_MODES: JSON.stringify(await Mode.list()),
+            KUUZUKI_SERVER: server.url.toString(),
+            KUUZUKI_APP_INFO: JSON.stringify(app),
+            KUUZUKI_MODES: JSON.stringify(await Mode.list()),
           },
           onExit: () => {
             server.stop()
@@ -184,9 +184,9 @@ export const TuiCommand = cmd({
  * In production: ["/path/to/kuuzuki"]
  */
 function getOpencodeCommand(): string[] {
-  // Check if OPENCODE_BIN_PATH is set (used by shell wrapper scripts)
-  if (process.env["OPENCODE_BIN_PATH"]) {
-    return [process.env["OPENCODE_BIN_PATH"]]
+  // Check if KUUZUKI_BIN_PATH is set (used by shell wrapper scripts)
+  if (process.env["KUUZUKI_BIN_PATH"]) {
+    return [process.env["KUUZUKI_BIN_PATH"]]
   }
 
   const execPath = process.execPath.toLowerCase()

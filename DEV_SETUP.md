@@ -16,17 +16,17 @@ bun dev
 
 ## Setting up Bun Link for Global Access
 
-### 1. Link the OpenCode Package
+### 1. Link the Kuuzuki Package
 ```bash
-# From the opencode package directory
-cd packages/opencode
+# From the kuuzuki package directory
+cd packages/kuuzuki
 bun link
 
 # This creates a global symlink to the package
 ```
 
 ### 2. Create a Kuuzuki Alias
-To use `kuuzuki` command globally, add this to the opencode package.json:
+To use `kuuzuki` command globally, add this to the kuuzuki package.json:
 
 ```json
 "bin": {
@@ -59,7 +59,7 @@ kuuzuki tui
 1. **From project root:**
    ```bash
    # Direct execution (fastest for development) - TUI is default
-   bun run packages/opencode/src/index.ts
+   bun run packages/kuuzuki/src/index.ts
    
    # Or use npm script
    bun dev
@@ -68,7 +68,7 @@ kuuzuki tui
 2. **With hot reload:**
    ```bash
    # Use bun's --watch flag
-   bun --watch packages/opencode/src/index.ts tui
+   bun --watch packages/kuuzuki/src/index.ts tui
    ```
 
 ### For Testing CLI Commands
@@ -79,7 +79,7 @@ kuuzuki tui
 
 2. **Link for testing:**
    ```bash
-   cd packages/opencode
+   cd packages/kuuzuki
    bun link
    ```
 
@@ -116,7 +116,7 @@ Create `.vscode/launch.json`:
       "request": "launch",
       "name": "Debug TUI",
       "runtimeExecutable": "bun",
-      "program": "${workspaceFolder}/packages/opencode/src/index.ts",
+      "program": "${workspaceFolder}/packages/kuuzuki/src/index.ts",
       "args": ["tui"],
       "cwd": "${workspaceFolder}",
       "env": {
@@ -128,7 +128,7 @@ Create `.vscode/launch.json`:
       "request": "launch",
       "name": "Debug Server",
       "runtimeExecutable": "bun",
-      "program": "${workspaceFolder}/packages/opencode/src/index.ts",
+      "program": "${workspaceFolder}/packages/kuuzuki/src/index.ts",
       "args": ["serve", "--port", "8080"],
       "cwd": "${workspaceFolder}"
     }
@@ -164,7 +164,7 @@ ANTHROPIC_API_KEY=your_key_here
 bun pm ls -g
 
 # Re-link if needed
-cd packages/opencode
+cd packages/kuuzuki
 bun unlink
 bun link
 ```
@@ -172,5 +172,5 @@ bun link
 ### Permission Issues
 ```bash
 # Make sure bin scripts are executable
-chmod +x packages/opencode/bin/opencode
+chmod +x packages/kuuzuki/bin/kuuzuki
 ```

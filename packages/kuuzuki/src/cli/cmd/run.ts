@@ -89,7 +89,7 @@ export const RunCommand = cmd({
       UI.empty()
 
       const cfg = await Config.get()
-      if (cfg.share === "auto" || Flag.OPENCODE_AUTO_SHARE || args.share) {
+      if (cfg.share === "auto" || Flag.KUUZUKI_AUTO_SHARE || args.share) {
         try {
           await Session.share(session.id)
           UI.println(UI.Style.TEXT_INFO_BOLD + "~  https://kuuzuki.ai/s/" + session.id.slice(-8))

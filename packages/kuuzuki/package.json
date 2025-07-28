@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "version": "0.0.5",
-  "name": "opencode",
+  "name": "kuuzuki",
   "type": "module",
   "private": true,
   "scripts": {
@@ -9,8 +9,8 @@
     "dev": "bun run ./src/index.ts"
   },
   "bin": {
-    "opencode": "./bin/opencode",
-    "kuuzuki": "./bin/opencode"
+    "opencode": "./bin/kuuzuki",
+    "kuuzuki": "./bin/kuuzuki"
   },
   "exports": {
     "./*": "./src/*.ts"

@@ -34,9 +34,9 @@ func main() {
 	var mode *string = flag.String("mode", "", "mode to begin with")
 	flag.Parse()
 
-	url := os.Getenv("OPENCODE_SERVER")
+	url := os.Getenv("KUUZUKI_SERVER")
 
-	appInfoStr := os.Getenv("OPENCODE_APP_INFO")
+	appInfoStr := os.Getenv("KUUZUKI_APP_INFO")
 	var appInfo opencode.App
 	err := json.Unmarshal([]byte(appInfoStr), &appInfo)
 	if err != nil {
@@ -44,7 +44,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	modesStr := os.Getenv("OPENCODE_MODES")
+	modesStr := os.Getenv("KUUZUKI_MODES")
 	var modes []opencode.Mode
 	err = json.Unmarshal([]byte(modesStr), &modes)
 	if err != nil {

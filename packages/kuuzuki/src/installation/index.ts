@@ -6,7 +6,7 @@ import { Bus } from "../bus"
 import { Log } from "../util/log"
 
 declare global {
-  const OPENCODE_VERSION: string
+  const KUUZUKI_VERSION: string
 }
 
 export namespace Installation {
@@ -135,7 +135,7 @@ export namespace Installation {
       })
   }
 
-  export const VERSION = typeof OPENCODE_VERSION === "string" ? OPENCODE_VERSION : "dev"
+  export const VERSION = typeof KUUZUKI_VERSION === "string" ? KUUZUKI_VERSION : "dev"
 
   export async function latest() {
     return fetch("https://api.github.com/repos/sst/kuuzuki/releases/latest")

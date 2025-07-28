@@ -10,27 +10,27 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 case "$1" in
     "server")
         echo "Starting server on port ${2:-8080}..."
-        bun run packages/opencode/src/index.ts serve --port ${2:-8080}
+        bun run packages/kuuzuki/src/index.ts serve --port ${2:-8080}
         ;;
     "watch")
         echo "Starting TUI with hot reload..."
-        bun --watch packages/opencode/src/index.ts tui
+        bun --watch packages/kuuzuki/src/index.ts tui
         ;;
     "link")
         echo "Setting up global commands..."
-        cd "$SCRIPT_DIR/packages/opencode"
+        cd "$SCRIPT_DIR/packages/kuuzuki"
         bun link
         echo "✓ Linked! You can now use 'kuuzuki' or 'opencode' globally"
         ;;
     "unlink")
         echo "Removing global commands..."
-        cd "$SCRIPT_DIR/packages/opencode"
+        cd "$SCRIPT_DIR/packages/kuuzuki"
         bun unlink
         echo "✓ Unlinked!"
         ;;
     "tui"|"")
         echo "Starting TUI..."
-        bun run packages/opencode/src/index.ts
+        bun run packages/kuuzuki/src/index.ts
         ;;
     *)
         echo "Usage: ./dev.sh [command]"
