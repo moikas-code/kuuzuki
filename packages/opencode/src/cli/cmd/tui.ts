@@ -142,16 +142,18 @@ export const TuiCommand = cmd({
             })
             .catch(() => {})
         })()
-        ;(async () => {
-          if (Ide.alreadyInstalled()) return
-          const ide = await Ide.ide()
-          if (ide === "unknown") return
-          await Ide.install(ide)
-            .then(() => {
-              Bus.publish(Ide.Event.Installed, { ide })
-            })
-            .catch(() => {})
-        })()
+        // Disabled: VS Code extension auto-installation
+        // Reserved for future custom kuuzuki extension
+        //         ;(async () => {
+        //           if (Ide.alreadyInstalled()) return
+        //           const ide = await Ide.ide()
+        //           if (ide === "unknown") return
+        //           await Ide.install(ide)
+        //             .then(() => {
+        //               Bus.publish(Ide.Event.Installed, { ide })
+        //             })
+        //             .catch(() => {})
+        //         })()
 
         await proc.exited
         server.stop()
