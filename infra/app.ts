@@ -6,7 +6,11 @@ export const domain = (() => {
 
 const GITHUB_APP_ID = new sst.Secret("GITHUB_APP_ID")
 const GITHUB_APP_PRIVATE_KEY = new sst.Secret("GITHUB_APP_PRIVATE_KEY")
+const STRIPE_SECRET_KEY = new sst.Secret("STRIPE_SECRET_KEY")
+const STRIPE_WEBHOOK_SECRET = new sst.Secret("STRIPE_WEBHOOK_SECRET")
+const STRIPE_PRICE_ID = new sst.Secret("STRIPE_PRICE_ID")
 const bucket = new sst.cloudflare.Bucket("Bucket")
+const licenses = new sst.cloudflare.KV("Licenses")
 
 export const api = new sst.cloudflare.Worker("Api", {
   domain: `api.${domain}`,
@@ -15,7 +19,7 @@ export const api = new sst.cloudflare.Worker("Api", {
     WEB_DOMAIN: domain,
   },
   url: true,
-  link: [bucket, GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY],
+  link: [bucket, licenses, GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID],
   transform: {
     worker: (args) => {
       args.logpush = true

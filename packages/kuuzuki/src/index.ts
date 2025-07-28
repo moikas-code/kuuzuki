@@ -5,6 +5,7 @@ import { RunCommand } from "./cli/cmd/run"
 import { GenerateCommand } from "./cli/cmd/generate"
 import { Log } from "./util/log"
 import { AuthCommand } from "./cli/cmd/auth"
+import { BillingCommand } from "./cli/cmd/billing"
 import { AgentCommand } from "./cli/cmd/agent"
 import { UpgradeCommand } from "./cli/cmd/upgrade"
 import { ModelsCommand } from "./cli/cmd/models"
@@ -73,6 +74,7 @@ const cli = yargs(hideBin(process.argv))
   .command(GenerateCommand)
   .command(DebugCommand)
   .command(AuthCommand)
+  .command(BillingCommand)
   .command(AgentCommand)
   .command(UpgradeCommand)
   .command(ServeCommand)

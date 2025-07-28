@@ -181,6 +181,14 @@ export namespace Config {
         .describe(
           "Control sharing behavior:'manual' allows manual sharing via commands, 'auto' enables automatic sharing, 'disabled' disables all sharing",
         ),
+      subscriptionRequired: z
+        .boolean()
+        .optional()
+        .describe("Require subscription for share features (default: true)"),
+      apiUrl: z
+        .string()
+        .optional()
+        .describe("Custom API URL for self-hosted instances"),
       autoshare: z
         .boolean()
         .optional()

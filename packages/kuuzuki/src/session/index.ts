@@ -21,6 +21,7 @@ import PROMPT_PLAN from "../session/prompt/plan.txt"
 import { App } from "../app/app"
 import { Bus } from "../bus"
 import { Config } from "../config/config"
+import { checkSubscription, showSubscriptionPrompt } from "../auth/subscription"
 import { Flag } from "../flag/flag"
 import { Identifier } from "../id/id"
 import { Installation } from "../installation"
@@ -193,6 +194,13 @@ export namespace Session {
     const cfg = await Config.get()
     if (cfg.share === "disabled") {
       throw new Error("Sharing is disabled in configuration")
+    }
+
+    // Check subscription status
+    const subscription = await checkSubscription()
+    if (!subscription.hasSubscription) {
+      showSubscriptionPrompt()
+      throw new Error(subscription.message || "Kuuzuki Pro subscription required for sharing")
     }
 
     const session = await get(id)

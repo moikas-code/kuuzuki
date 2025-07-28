@@ -12,6 +12,8 @@
   "dependencies": {
     "@octokit/auth-app": "8.0.1",
     "@octokit/rest": "22.0.0",
-    "jose": "6.0.11"
+    "jose": "6.0.11",
+    "nanoid": "5.1.5",
+    "stripe": "18.3.0"
   }
 }
