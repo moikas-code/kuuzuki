@@ -20,7 +20,7 @@ case "$1" in
         echo "Setting up global commands..."
         cd "$SCRIPT_DIR/packages/kuuzuki"
         bun link
-        echo "✓ Linked! You can now use 'kuuzuki' or 'opencode' globally"
+        echo "✓ Linked! You can now use 'kuuzuki' globally"
         ;;
     "unlink")
         echo "Removing global commands..."

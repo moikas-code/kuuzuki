@@ -1,20 +1,20 @@
-# opencode VS Code Extension
+# kuuzuki VS Code Extension
 
-A VS Code extension that integrates [opencode](https://opencode.ai) directly into your development environment.
+A VS Code extension that integrates [kuuzuki](https://kuuzuki.ai) directly into your development environment.
 
 ## Prerequisites
 
-This extension requires [opencode](https://opencode.ai) to be installed on your system. Visit [opencode.ai](https://opencode.ai) for installation instructions.
+This extension requires [kuuzuki](https://www.npmjs.com/package/kuuzuki) to be installed on your system. Install via `npm install -g kuuzuki`.
 
 ## Features
 
-- **Cmd+Escape**: Launch opencode in a split terminal view
-- **Alt+Cmd+K**: Send selected code to opencode's prompt
-- **Tab awareness**: opencode automatically detects which files you have open
+- **Cmd+Escape**: Launch kuuzuki in a split terminal view
+- **Alt+Cmd+K**: Send selected code to kuuzuki's prompt
+- **Tab awareness**: kuuzuki automatically detects which files you have open
 
 ## Support
 
-This is an early release. If you encounter issues or have feedback, please create an issue at https://github.com/sst/opencode/issues.
+This is an early release. If you encounter issues or have feedback, please create an issue at https://github.com/kuucode/kuuzuki/issues.
 
 ## Development
 

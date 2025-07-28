@@ -1,12 +1,12 @@
 {
-  "name": "opencode",
-  "displayName": "opencode",
-  "description": "opencode for VS Code",
+  "name": "kuuzuki",
+  "displayName": "kuuzuki",
+  "description": "kuuzuki for VS Code",
   "version": "0.0.0",
-  "publisher": "sst-dev",
+  "publisher": "kuuzuki-community",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sst/opencode"
+    "url": "https://github.com/kuucode/kuuzuki"
   },
   "license": "MIT",
   "icon": "images/icon.png",
@@ -25,22 +25,22 @@
   "contributes": {
     "commands": [
       {
-        "command": "opencode.openTerminal",
-        "title": "Open Terminal with Opencode",
+        "command": "kuuzuki.openTerminal",
+        "title": "Open Terminal with Kuuzuki",
         "icon": {
           "light": "images/button-dark.svg",
           "dark": "images/button-light.svg"
         }
       },
       {
-        "command": "opencode.addFilepathToTerminal",
+        "command": "kuuzuki.addFilepathToTerminal",
         "title": "Add Filepath to Terminal"
       }
     ],
     "menus": {
       "editor/title": [
         {
-          "command": "opencode.openTerminal",
+          "command": "kuuzuki.openTerminal",
           "when": "editorTextFocus",
           "group": "navigation"
         }
@@ -48,16 +48,16 @@
     },
     "keybindings": [
       {
-        "command": "opencode.openTerminal",
-        "title": "Run opencode",
+        "command": "kuuzuki.openTerminal",
+        "title": "Run kuuzuki",
         "key": "cmd+escape",
         "mac": "cmd+escape",
         "win": "ctrl+escape",
         "linux": "ctrl+escape"
       },
       {
-        "command": "opencode.addFilepathToTerminal",
-        "title": "opencode: Insert At-Mentioned",
+        "command": "kuuzuki.addFilepathToTerminal",
+        "title": "kuuzuki: Insert At-Mentioned",
         "key": "cmd+alt+k",
         "mac": "cmd+alt+k",
         "win": "ctrl+alt+K",
