@@ -47,9 +47,6 @@
     "protobufjs",
     "sharp"
   ],
-  "patchedDependencies": {},
-  "dependencies": {
-    "electron": "37.2.4"
-  }
+  "patchedDependencies": {}
 }
 

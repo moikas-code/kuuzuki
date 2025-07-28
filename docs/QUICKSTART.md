@@ -7,7 +7,6 @@ Welcome to Kuuzuki! This guide will get you up and running in minutes.
 Make sure you have these installed:
 - **Bun** - [Install](https://bun.sh/docs/installation)
 - **Go** - [Install](https://golang.org/dl/) (for TUI)
-- **Rust** - [Install](https://rustup.rs/) (for desktop app)
 
 ## 🎯 Quick Start
 

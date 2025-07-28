@@ -1,21 +1,21 @@
-# opencode GitHub Action
+# kuuzuki GitHub Action
 
-A GitHub Action that integrates [opencode](https://opencode.ai) directly into your GitHub workflow.
+A GitHub Action that integrates [kuuzuki](https://kuuzuki.ai) directly into your GitHub workflow.
 
-Mention `/opencode` in your comment, and opencode will execute tasks within your GitHub Actions runner.
+Mention `/kuuzuki` in your comment, and kuuzuki will execute tasks within your GitHub Actions runner.
 
 ## Features
 
 #### Triage and explain issues
 
 ```bash
-/opencode explain this issue
+/kuuzuki explain this issue
 ```
 
 #### Fix or implement issues - opencode will create a PR with the changes.
 
 ```bash
-/opencode fix this
+/kuuzuki fix this
 ```
 
 #### Review PRs and make changes
