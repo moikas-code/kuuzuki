@@ -60,3 +60,8 @@ scratch/
 research/
 gen/
 app.log
+
+# SST
+.sst/
+sst-env.d.ts
+.env
