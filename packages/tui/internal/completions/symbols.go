@@ -6,10 +6,10 @@ import (
 	"log/slog"
 	"strings"
 
-	opencode "github.com/kuucode/kuuzuki-sdk-go"
-	"github.com/kuucode/kuuzuki/internal/app"
-	"github.com/kuucode/kuuzuki/internal/styles"
-	"github.com/kuucode/kuuzuki/internal/theme"
+	opencode "github.com/sst/opencode-sdk-go"
+	"github.com/sst/opencode/internal/app"
+	"github.com/sst/opencode/internal/styles"
+	"github.com/sst/opencode/internal/theme"
 )
 
 type symbolsContextGroup struct {

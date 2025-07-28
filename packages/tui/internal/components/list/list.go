@@ -7,8 +7,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/muesli/reflow/truncate"
-	"github.com/kuucode/kuuzuki/internal/styles"
-	"github.com/kuucode/kuuzuki/internal/theme"
+	"github.com/sst/opencode/internal/styles"
+	"github.com/sst/opencode/internal/theme"
 )
 
 // Item interface that all list items must implement

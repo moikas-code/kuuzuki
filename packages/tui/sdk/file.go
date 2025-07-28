@@ -7,11 +7,11 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/kuucode/kuuzuki-sdk-go/internal/apijson"
-	"github.com/kuucode/kuuzuki-sdk-go/internal/apiquery"
-	"github.com/kuucode/kuuzuki-sdk-go/internal/param"
-	"github.com/kuucode/kuuzuki-sdk-go/internal/requestconfig"
-	"github.com/kuucode/kuuzuki-sdk-go/option"
+	"github.com/sst/opencode-sdk-go/internal/apijson"
+	"github.com/sst/opencode-sdk-go/internal/apiquery"
+	"github.com/sst/opencode-sdk-go/internal/param"
+	"github.com/sst/opencode-sdk-go/internal/requestconfig"
+	"github.com/sst/opencode-sdk-go/option"
 )
 
 // FileService contains methods and other services that help with interacting with

@@ -10,14 +10,14 @@ import (
 	"log/slog"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
-	opencode "github.com/kuucode/kuuzuki-sdk-go"
-	"github.com/kuucode/kuuzuki/internal/clipboard"
-	"github.com/kuucode/kuuzuki/internal/commands"
-	"github.com/kuucode/kuuzuki/internal/components/toast"
-	"github.com/kuucode/kuuzuki/internal/id"
-	"github.com/kuucode/kuuzuki/internal/styles"
-	"github.com/kuucode/kuuzuki/internal/theme"
-	"github.com/kuucode/kuuzuki/internal/util"
+	opencode "github.com/sst/opencode-sdk-go"
+	"github.com/sst/opencode/internal/clipboard"
+	"github.com/sst/opencode/internal/commands"
+	"github.com/sst/opencode/internal/components/toast"
+	"github.com/sst/opencode/internal/id"
+	"github.com/sst/opencode/internal/styles"
+	"github.com/sst/opencode/internal/theme"
+	"github.com/sst/opencode/internal/util"
 )
 
 type Message struct {

@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/lipgloss/v2/compat"
 	"github.com/lucasb-eyer/go-colorful"
-	"github.com/kuucode/kuuzuki/internal/theme"
+	"github.com/sst/opencode/internal/theme"
 )
 
 const defaultMargin = 1

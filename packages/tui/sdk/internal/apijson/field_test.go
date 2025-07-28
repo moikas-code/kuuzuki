@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kuucode/kuuzuki-sdk-go/internal/param"
+	"github.com/sst/opencode-sdk-go/internal/param"
 )
 
 type Struct struct {

@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	opencode "github.com/kuucode/kuuzuki-sdk-go"
-	"github.com/kuucode/kuuzuki-sdk-go/internal"
-	"github.com/kuucode/kuuzuki-sdk-go/option"
+	opencode "github.com/sst/opencode-sdk-go"
+	"github.com/sst/opencode-sdk-go/internal"
+	"github.com/sst/opencode-sdk-go/option"
 )
 
 type closureTransport struct {

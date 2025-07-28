@@ -1,6 +1,6 @@
 package completions
 
-import "github.com/kuucode/kuuzuki/internal/styles"
+import "github.com/sst/opencode/internal/styles"
 
 // CompletionSuggestion represents a data-only completion suggestion
 // with no styling or rendering logic

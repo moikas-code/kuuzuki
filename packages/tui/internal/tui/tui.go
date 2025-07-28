@@ -15,22 +15,22 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 
-	opencode "github.com/kuucode/kuuzuki-sdk-go"
-	"github.com/kuucode/kuuzuki/internal/api"
-	"github.com/kuucode/kuuzuki/internal/app"
-	"github.com/kuucode/kuuzuki/internal/commands"
-	"github.com/kuucode/kuuzuki/internal/completions"
-	"github.com/kuucode/kuuzuki/internal/components/chat"
-	cmdcomp "github.com/kuucode/kuuzuki/internal/components/commands"
-	"github.com/kuucode/kuuzuki/internal/components/dialog"
-	"github.com/kuucode/kuuzuki/internal/components/fileviewer"
-	"github.com/kuucode/kuuzuki/internal/components/modal"
-	"github.com/kuucode/kuuzuki/internal/components/status"
-	"github.com/kuucode/kuuzuki/internal/components/toast"
-	"github.com/kuucode/kuuzuki/internal/layout"
-	"github.com/kuucode/kuuzuki/internal/styles"
-	"github.com/kuucode/kuuzuki/internal/theme"
-	"github.com/kuucode/kuuzuki/internal/util"
+	opencode "github.com/sst/opencode-sdk-go"
+	"github.com/sst/opencode/internal/api"
+	"github.com/sst/opencode/internal/app"
+	"github.com/sst/opencode/internal/commands"
+	"github.com/sst/opencode/internal/completions"
+	"github.com/sst/opencode/internal/components/chat"
+	cmdcomp "github.com/sst/opencode/internal/components/commands"
+	"github.com/sst/opencode/internal/components/dialog"
+	"github.com/sst/opencode/internal/components/fileviewer"
+	"github.com/sst/opencode/internal/components/modal"
+	"github.com/sst/opencode/internal/components/status"
+	"github.com/sst/opencode/internal/components/toast"
+	"github.com/sst/opencode/internal/layout"
+	"github.com/sst/opencode/internal/styles"
+	"github.com/sst/opencode/internal/theme"
+	"github.com/sst/opencode/internal/util"
 )
 
 // InterruptDebounceTimeoutMsg is sent when the interrupt key debounce timeout expires
@@ -82,7 +82,7 @@ type Model struct {
 func (a Model) Init() tea.Cmd {
 	var cmds []tea.Cmd
 	// https://github.com/charmbracelet/bubbletea/issues/1440
-	// https://github.com/kuucode/kuuzuki/issues/127
+	// https://github.com/sst/opencode/issues/127
 	if !util.IsWsl() {
 		cmds = append(cmds, tea.RequestBackgroundColor)
 	}

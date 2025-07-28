@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/kuucode/kuuzuki-sdk-go/internal/apijson"
-	"github.com/kuucode/kuuzuki-sdk-go/internal/param"
-	"github.com/kuucode/kuuzuki-sdk-go/internal/requestconfig"
-	"github.com/kuucode/kuuzuki-sdk-go/option"
-	"github.com/kuucode/kuuzuki-sdk-go/shared"
+	"github.com/sst/opencode-sdk-go/internal/apijson"
+	"github.com/sst/opencode-sdk-go/internal/param"
+	"github.com/sst/opencode-sdk-go/internal/requestconfig"
+	"github.com/sst/opencode-sdk-go/option"
+	"github.com/sst/opencode-sdk-go/shared"
 	"github.com/tidwall/gjson"
 )
 

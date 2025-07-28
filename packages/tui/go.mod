@@ -1,4 +1,4 @@
-module github.com/kuucode/kuuzuki
+module github.com/sst/opencode
 
 go 1.24.0
 
@@ -11,20 +11,17 @@ require (
 	github.com/charmbracelet/lipgloss/v2 v2.0.0-beta.3
 	github.com/charmbracelet/x/ansi v0.9.3
 	github.com/google/uuid v1.6.0
-	github.com/kuucode/kuuzuki-sdk-go v0.0.0-00010101000000-000000000000
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6
 	github.com/muesli/reflow v0.3.0
 	github.com/muesli/termenv v0.16.0
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3
+	github.com/sst/opencode-sdk-go v0.0.0-00010101000000-000000000000
 	golang.org/x/image v0.28.0
 	rsc.io/qr v0.2.0
 )
 
-replace (
-	github.com/charmbracelet/x/input => ./input
-	github.com/sst/opencode-sdk-go => ./sdk
-)
+replace github.com/charmbracelet/x/input => ./input
 
 require golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
 
@@ -98,4 +95,4 @@ tool (
 	github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
 )
 
-replace github.com/kuucode/kuuzuki-sdk-go => ./sdk
+replace github.com/sst/opencode-sdk-go => ./sdk

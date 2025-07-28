@@ -12,7 +12,7 @@ import (
 	"github.com/muesli/ansi"
 	"github.com/muesli/reflow/truncate"
 	"github.com/muesli/termenv"
-	"github.com/kuucode/kuuzuki/internal/util"
+	"github.com/sst/opencode/internal/util"
 )
 
 var (

@@ -7,9 +7,9 @@ import (
 	"os"
 	"testing"
 
-	opencode "github.com/kuucode/kuuzuki-sdk-go"
-	"github.com/kuucode/kuuzuki-sdk-go/internal/testutil"
-	"github.com/kuucode/kuuzuki-sdk-go/option"
+	opencode "github.com/sst/opencode-sdk-go"
+	"github.com/sst/opencode-sdk-go/internal/testutil"
+	"github.com/sst/opencode-sdk-go/option"
 )
 
 func TestUsage(t *testing.T) {

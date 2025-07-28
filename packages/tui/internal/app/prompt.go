@@ -4,9 +4,9 @@ import (
 	"errors"
 	"time"
 
-	opencode "github.com/kuucode/kuuzuki-sdk-go"
-	"github.com/kuucode/kuuzuki/internal/attachment"
-	"github.com/kuucode/kuuzuki/internal/id"
+	opencode "github.com/sst/opencode-sdk-go"
+	"github.com/sst/opencode/internal/attachment"
+	"github.com/sst/opencode/internal/id"
 )
 
 type Prompt struct {
