@@ -1,38 +1,41 @@
-# Kuuzuki Desktop - Next-Gen Terminal Development Guide
+# Kuuzuki - Community Fork Development Guide
 
 ## Project Overview
 
-Kuuzuki Desktop is a revolutionary terminal application that combines traditional command-line interfaces with built-in AI assistance. It's built on Electron with React and features a sophisticated plugin system.
+Kuuzuki is a community-driven fork of OpenCode, focused on providing an npm-installable AI-powered terminal assistant. This project emphasizes terminal/CLI usage as the primary interface while maintaining compatibility with the original OpenCode.
+
+### Fork Information
+- **Original Project**: [OpenCode](https://github.com/sst/opencode) by SST
+- **Fork Purpose**: Community-driven development and npm distribution
+- **Primary Focus**: Terminal/CLI interface with AI assistance
+- **Distribution**: NPM package for easy installation
 
 ## Architecture
 
 ### Main Components
 
-1. **Terminal Manager** (`packages/desktop/src/main/terminal-manager.ts`)
-   - Manages two PTY instances: one for bash/zsh, one for Kuuzuki AI
-   - Handles mode switching between Terminal, Kuuzuki, and Split modes
-   - Provides context sharing (directory sync, command history, environment)
-   - Graceful fallback when node-pty is unavailable
+1. **CLI Interface** (`packages/kuuzuki/src/index.ts`)
+   - Main entry point for the kuuzuki command
+   - Handles command routing (tui, run, serve, etc.)
+   - Version management and configuration
 
-2. **Multi-Terminal UI** (`packages/desktop/src/components/MultiTerminal.tsx`)
-   - React component managing two xterm.js instances
-   - Three view modes with smooth transitions
-   - Focus management for split mode
-   - Real-time terminal data routing
+2. **Terminal UI** (`packages/tui/`)
+   - Go-based terminal UI for interactive sessions
+   - Keyboard-driven interface with vim-like bindings
+   - Real-time streaming with the backend server
 
-3. **Plugin System** (`packages/desktop/src/main/plugin-loader.ts`)
-   - Sandboxed plugin execution using VM2
-   - Permission-based security model
-   - Rich API for terminal, AI, UI, and workspace access
-   - Plugin manifest validation and lifecycle management
+3. **Server Component** (`packages/kuuzuki/src/server/`)
+   - HTTP server for handling AI requests
+   - Session management and context tracking
+   - Tool execution and file system operations
 
 ### Key Features
 
-- **Multi-Mode Terminal**: Terminal-only, Kuuzuki-only, or split view
-- **Context Sharing**: Automatic directory sync, shared command history
-- **Plugin Architecture**: Extensible with JavaScript/TypeScript plugins
-- **Keyboard Shortcuts**: Cmd+1/2/3 for mode switching, Cmd+/ for toggle
-- **macOS-like UI**: Clean, minimal design with VS Code aesthetics
+- **NPM Distribution**: Install globally with `npm install -g kuuzuki`
+- **AI Integration**: Built-in Claude support via API keys
+- **Multiple Modes**: TUI, CLI commands, and server mode
+- **Community Focus**: Open to contributions and enhancements
+- **Cross-Platform**: Works on macOS, Linux, and Windows
 
 ## Development Workflow
 
@@ -40,135 +43,156 @@ Kuuzuki Desktop is a revolutionary terminal application that combines traditiona
 
 ```bash
 # From root directory
-npm run dev:desktop
+bun dev
 
-# Or using the run script
-./run.sh dev desktop
+# Or run specific modes
+./run.sh dev tui     # Terminal UI
+./run.sh dev server  # Server mode
 ```
 
 ### Building
 
 ```bash
-# Build desktop app
-npm run build:desktop
-
 # Build all components
 ./run.sh build all
+
+# Build specific components
+./run.sh build tui     # Build Go TUI
+./run.sh build server  # Build CLI/server
 ```
 
 ### Testing
 
-When testing the desktop app:
-1. Check all three modes work (Terminal, Kuuzuki, Split)
-2. Verify keyboard shortcuts
-3. Test terminal output and input
-4. Ensure directory sync works in split mode
-5. Verify plugins load correctly
+When testing kuuzuki:
+1. Verify TUI starts correctly
+2. Test CLI commands (run, serve, etc.)
+3. Ensure AI integration works with API keys
+4. Test file operations and tool execution
+5. Verify npm installation works properly
 
 ## Important Code Patterns
 
-### IPC Communication
+### Command Registration
 
-Main process exposes APIs through preload script:
+Commands are registered using yargs:
 ```typescript
-// Main process
-ipcMain.handle('terminal-init', async () => {
-    const kuuzukiBinary = await findKuuzukiBinary();
-    await terminalManager.initialize(kuuzukiBinary);
-    return { success: true };
-});
-
-// Renderer process
-await window.electronAPI.initTerminal();
+// In src/cli/cmd/tui.ts
+export const TuiCommand = cmd({
+  command: "tui [project]",
+  describe: "start kuuzuki in terminal UI mode",
+  handler: async (args) => {
+    // Command implementation
+  }
+})
 ```
 
-### Plugin Development
+### Tool Development
 
-Plugins follow a specific structure:
-```javascript
-module.exports = {
-    activate(context) {
-        // Plugin initialization
-        context.terminal.writeLine('Plugin activated!');
-    },
-    deactivate() {
-        // Cleanup
-    }
-};
+Tools are implemented with schema validation:
+```typescript
+// In src/tool/mytool.ts
+export const MyTool: Tool = {
+  name: "my_tool",
+  description: "Tool description",
+  parameters: z.object({
+    // Zod schema
+  }),
+  execute: async (args) => {
+    // Tool implementation
+  }
+}
 ```
 
-### Terminal Data Flow
+### Request Flow
 
-1. User types in xterm.js terminal
-2. Data sent via IPC to main process
-3. Terminal manager routes to appropriate PTY
-4. PTY output sent back via IPC
-5. Rendered in xterm.js
+1. User input in TUI or CLI
+2. Request sent to server via HTTP
+3. Server processes with AI/tools
+4. Response streamed back to client
+5. Display in terminal interface
 
 ## Common Issues & Solutions
 
-### Port Already in Use
+### API Key Not Working
 
-The app includes automatic port cleanup:
-- `scripts/kill-port.js` - Kills processes on port 5174
-- `scripts/cleanup-dev.sh` - Comprehensive cleanup script
-- Run `npm run cleanup` if ports are stuck
+1. Ensure ANTHROPIC_API_KEY is set in environment
+2. Check key validity and permissions
+3. Verify network connectivity
 
-### Electron Not Launching
+### TUI Not Starting
 
-1. Check Electron is properly installed: `ls node_modules/.bin/electron`
-2. Try system Electron: `npm run dev:system`
-3. Rebuild native modules: `npm run rebuild:dev`
+1. Ensure Go binary is built: `./run.sh build tui`
+2. Check terminal compatibility
+3. Try with different terminal emulators
 
-### PTY Module Issues
+### NPM Installation Issues
 
-The app gracefully falls back to child_process if node-pty fails:
-- Check for MODULE_VERSION mismatch errors
-- Run `electron-rebuild -f -w node-pty`
-- App will still work without PTY, just with limited features
+1. Clear npm cache: `npm cache clean --force`
+2. Use specific version: `npm install -g kuuzuki@0.1.0`
+3. Check Node.js version (>=18.0.0 required)
 
 ## Key Files to Know
 
-- `src/main/index.ts` - Main Electron process
-- `src/main/terminal-manager.ts` - Terminal PTY management
-- `src/App.tsx` - Main React app with mode switching
-- `src/components/MultiTerminal.tsx` - Terminal rendering component
-- `src/main/plugin-loader.ts` - Plugin system implementation
-- `src/preload/index.ts` - IPC bridge between main and renderer
+- `packages/kuuzuki/src/index.ts` - Main CLI entry point
+- `packages/kuuzuki/src/cli/cmd/` - Command implementations
+- `packages/kuuzuki/src/server/server.ts` - HTTP server
+- `packages/kuuzuki/src/tool/` - Tool implementations
+- `packages/tui/cmd/kuuzuki/main.go` - TUI entry point
+- `packages/kuuzuki/script/publish.ts` - NPM publishing script
 
-## Future Enhancements
+## Community Contributions
 
-1. **Plugin Marketplace**: Central repository for community plugins
-2. **Cloud Sync**: Settings and plugin sync across devices
-3. **Collaborative Sessions**: Share terminal sessions with team
-4. **Voice Commands**: Natural language terminal control
-5. **Mobile App**: Companion app for remote access
+As a community fork, we welcome:
+
+1. **Feature Additions**: New tools and capabilities
+2. **Platform Support**: Better Windows/Linux support
+3. **Integration**: IDE plugins, shell integrations
+4. **Documentation**: Tutorials, guides, examples
+5. **Translations**: Multi-language support
+
+## Publishing Process
+
+1. Update version in `package.json`
+2. Create git tag: `git tag v0.1.0`
+3. Push tag: `git push origin v0.1.0`
+4. GitHub Actions will publish to npm
 
 ## Testing Checklist
 
 When making changes, ensure:
-- [ ] All three modes work correctly
-- [ ] Keyboard shortcuts function
-- [ ] Terminal input/output works
-- [ ] Directory sync in split mode
-- [ ] Plugins load without errors
+- [ ] TUI starts and responds correctly
+- [ ] CLI commands execute properly
+- [ ] Server mode handles requests
+- [ ] AI integration works with API key
+- [ ] NPM package installs correctly
 - [ ] Build completes successfully
-- [ ] No TypeScript errors
-- [ ] Port cleanup works
+- [ ] No TypeScript/Go errors
+- [ ] Tests pass
 
 ## Commands Reference
 
 ```bash
 # Development
-npm run dev:desktop      # Run in dev mode
-npm run dev:clean       # Clean start with port cleanup
-npm run cleanup         # Manual cleanup
+bun dev                 # Run TUI in dev mode
+./run.sh dev server     # Run server mode
+./dev.sh watch         # Run with hot reload
 
 # Building
-npm run build:desktop   # Build desktop app
-npm run package        # Create distributable
+./run.sh build all     # Build everything
+./run.sh build tui     # Build Go TUI only
+./run.sh build server  # Build CLI/server only
 
 # Testing
-npm run typecheck      # Check TypeScript
-npm run lint          # Run linter
+bun test              # Run tests
+bun typecheck         # Check TypeScript
+
+# Publishing
+bun run script/publish.ts --dry-run  # Test publish
+bun run script/publish.ts            # Publish to npm
 ```
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
