@@ -5,6 +5,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 
+	"github.com/sst/opencode/internal/components/modal"
+	"github.com/sst/opencode/internal/layout"
 	"github.com/sst/opencode/internal/styles"
 	"github.com/sst/opencode/internal/theme"
 	"github.com/sst/opencode/internal/util"
@@ -15,14 +17,20 @@ type InitDialogCmp struct {
 	width, height int
 	selected      int
 	keys          initDialogKeyMap
+	modal         *modal.Modal
 }
 
 // NewInitDialogCmp creates a new InitDialogCmp.
-func NewInitDialogCmp() InitDialogCmp {
-	return InitDialogCmp{
+func NewInitDialogCmp() InitDialog {
+	return &InitDialogCmp{
 		selected: 0,
 		keys:     initDialogKeyMap{},
+		modal:    modal.New(),
 	}
+}
+
+type InitDialog interface {
+	layout.Modal
 }
 
 type initDialogKeyMap struct {
@@ -165,6 +173,16 @@ func (m InitDialogCmp) View() string {
 		BorderForeground(t.TextMuted()).
 		Width(lipgloss.Width(content) + 4).
 		Render(content)
+}
+
+// Render implements layout.Modal.
+func (m *InitDialogCmp) Render(background string) string {
+	return m.modal.Render(m.View(), background)
+}
+
+// Close implements layout.Modal.
+func (m *InitDialogCmp) Close() tea.Cmd {
+	return nil
 }
 
 // SetSize sets the size of the component.

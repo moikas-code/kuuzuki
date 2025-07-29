@@ -5,6 +5,8 @@ import { IncrementalTokenTracker } from "./token-tracker"
 import { SemanticExtractor } from "./semantic-extractor"
 import { Storage } from "../storage/storage"
 import { HybridContextConfig } from "./hybrid-context-config"
+import { TaskAwareCompression } from "./task-aware-compression"
+import { App } from "../app/app"
 
 /**
  * HybridContextManager
@@ -24,6 +26,8 @@ export class HybridContextManager {
   private semanticExtractor: SemanticExtractor
   private messageCache: Map<string, MessageV2.Info> = new Map()
   private partCache: Map<string, MessageV2.Part[]> = new Map()
+  private isTaskSession: boolean = false
+  private taskScore: number = 0
 
   constructor(sessionID: string) {
     this.sessionID = sessionID
@@ -104,6 +108,9 @@ export class HybridContextManager {
         return
       }
 
+      // Update task session analysis
+      await this.updateTaskSessionAnalysis()
+
       // Estimate tokens for this message
       const tokens = this.estimateMessageTokens(message)
 
@@ -168,8 +175,11 @@ export class HybridContextManager {
     const totalTokens = this.getTotalTokens()
     const maxTokens = this.getMaxTokens()
 
-    // Start light compression at 65% capacity
-    return totalTokens > maxTokens * 0.65
+    // Use task-aware thresholds
+    const thresholds = TaskAwareCompression.getTaskCompressionThresholds(this.isTaskSession, this.taskScore)
+
+    // Start compression at the light threshold
+    return totalTokens > maxTokens * thresholds.lightThreshold
   }
 
   /**
@@ -179,12 +189,14 @@ export class HybridContextManager {
     const totalTokens = this.getTotalTokens()
     const maxTokens = this.getMaxTokens()
     const ratio = totalTokens / maxTokens
-    const config = HybridContextConfig.load()
 
-    if (ratio > config.compression.emergencyThreshold) return "emergency"
-    if (ratio > config.compression.heavyThreshold) return "heavy"
-    if (ratio > config.compression.mediumThreshold) return "medium"
-    if (ratio > config.compression.lightThreshold) return "light"
+    // Use task-aware thresholds instead of config defaults
+    const thresholds = TaskAwareCompression.getTaskCompressionThresholds(this.isTaskSession, this.taskScore)
+
+    if (ratio > thresholds.emergencyThreshold) return "emergency"
+    if (ratio > thresholds.heavyThreshold) return "heavy"
+    if (ratio > thresholds.mediumThreshold) return "medium"
+    if (ratio > thresholds.lightThreshold) return "light"
 
     return "none"
   }
@@ -320,23 +332,25 @@ export class HybridContextManager {
     const messages = await this.getRecentMessages(3)
 
     if (messages.length > 0) {
-      // Extract semantic facts
-      const facts = await this.semanticExtractor.extractFacts(messages)
+      // Extract semantic facts using both standard and task-aware extraction
+      const standardFacts = await this.semanticExtractor.extractFacts(messages)
+      const taskFacts = TaskAwareCompression.extractTaskSemanticFacts(messages)
+      const allFacts = [...standardFacts, ...taskFacts]
 
       // Find relationships between facts
-      this.semanticExtractor.findFactRelationships(facts)
+      this.semanticExtractor.findFactRelationships(allFacts)
 
       let totalFactTokens = 0
-      for (const fact of facts) {
+      for (const fact of allFacts) {
         this.semanticFacts.set(fact.id, fact)
         totalFactTokens += IncrementalTokenTracker.estimateTokens(fact.content)
       }
 
       const semanticTier = this.contextTiers.get("semantic")!
       semanticTier.currentTokens += totalFactTokens
-      semanticTier.messageCount += facts.length
+      semanticTier.messageCount += allFacts.length
 
-      this.metrics.factsExtracted += facts.length
+      this.metrics.factsExtracted += allFacts.length
 
       // Also compress the messages
       const compressedTier = this.contextTiers.get("compressed")!
@@ -344,7 +358,7 @@ export class HybridContextManager {
         const compressed = await this.compressMessage(message, "medium")
         if (compressed) {
           // Add extracted fact IDs to compressed message
-          compressed.extractedFacts = facts.filter((f) => f.extractedFrom.includes(message.id)).map((f) => f.id)
+          compressed.extractedFacts = allFacts.filter((f) => f.extractedFrom.includes(message.id)).map((f) => f.id)
 
           this.compressedMessages.set(compressed.id, compressed)
           compressedTier.currentTokens += compressed.originalTokens - compressed.tokensSaved
@@ -354,8 +368,10 @@ export class HybridContextManager {
 
       this.log.info("medium compression completed", {
         messagesProcessed: messages.length,
-        factsExtracted: facts.length,
+        standardFacts: standardFacts.length,
+        taskFacts: taskFacts.length,
         totalFactTokens,
+        isTaskSession: this.isTaskSession,
       })
     }
   }
@@ -991,7 +1007,71 @@ export class HybridContextManager {
   }
 
   /**
-   * Compress a message based on compression level
+   * Update task session analysis based on recent messages
+   */
+  private async updateTaskSessionAnalysis(): Promise<void> {
+    try {
+      const recentMessages = await this.getRecentMessages(10) // Analyze last 10 messages
+      const analysis = TaskAwareCompression.analyzeTaskSession(recentMessages)
+
+      this.isTaskSession = analysis.isTaskSession
+      this.taskScore = analysis.taskScore
+
+      this.log.debug("updated task session analysis", {
+        isTaskSession: this.isTaskSession,
+        taskScore: this.taskScore,
+        indicators: analysis.indicators,
+      })
+
+      // Integrate todo state if this is a task session
+      if (this.isTaskSession) {
+        await this.integrateTodoState()
+      }
+    } catch (error) {
+      this.log.warn("failed to update task session analysis", { error })
+    }
+  }
+
+  /**
+   * Integrate current todo state with hybrid context
+   */
+  private async integrateTodoState(): Promise<void> {
+    try {
+      // Access todo state from the todo tool
+      const todoState = App.state("todo-tool", () => ({}))() as Record<string, any>
+      const sessionTodos = todoState[this.sessionID] || []
+
+      if (sessionTodos.length > 0) {
+        const todoFacts = await TaskAwareCompression.integrateTodoState(this.sessionID, sessionTodos)
+
+        // Add todo facts to semantic facts
+        for (const fact of todoFacts) {
+          this.semanticFacts.set(fact.id, fact)
+        }
+
+        // Update semantic tier
+        const semanticTier = this.contextTiers.get("semantic")!
+        const todoTokens = todoFacts.reduce(
+          (total, fact) => total + IncrementalTokenTracker.estimateTokens(fact.content),
+          0,
+        )
+
+        semanticTier.currentTokens += todoTokens
+        semanticTier.messageCount += todoFacts.length
+
+        this.log.debug("integrated todo state", {
+          todoCount: sessionTodos.length,
+          factsCreated: todoFacts.length,
+          tokensAdded: todoTokens,
+        })
+      }
+    } catch (error) {
+      this.log.warn("failed to integrate todo state", { error })
+    }
+  }
+
+  /**
+   * Compress a message based on compression level using task-aware compression
    */
   private async compressMessage(
     message: MessageV2.Info,
@@ -999,6 +1079,15 @@ export class HybridContextManager {
   ): Promise<HybridContext.CompressedMessage | null> {
     try {
       const parts = await this.getMessageParts(message.id)
+
+      // Use task-aware compression if available
+      const taskAwareCompressed = await TaskAwareCompression.createTaskAwareCompressedMessage(message, parts, level)
+
+      if (taskAwareCompressed) {
+        return taskAwareCompressed
+      }
+
+      // Fallback to original compression logic
       let semanticSummary = ""
       const keyDecisions: string[] = []
       const toolOutputs: string[] = []

@@ -504,6 +504,20 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.editor.SetExitKeyInDebounce(false)
 	case dialog.FindSelectedMsg:
 		return a.openFile(msg.FilePath)
+	case dialog.ShowInitDialogMsg:
+		if msg.Show {
+			initDialog := dialog.NewInitDialogCmp()
+			a.modal = initDialog
+		}
+	case dialog.CloseInitDialogMsg:
+		if a.modal != nil {
+			cmd := a.modal.Close()
+			a.modal = nil
+			cmds = append(cmds, cmd)
+		}
+		if msg.Initialize {
+			cmds = append(cmds, a.app.InitializeProject(context.Background()))
+		}
 
 	// API
 	case api.Request:
