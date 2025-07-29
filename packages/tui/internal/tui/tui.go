@@ -72,11 +72,15 @@ type Model struct {
 	showCompletionDialog bool
 	leaderBinding        *key.Binding
 	// isLeaderSequence     bool
-	toastManager      *toast.ToastManager
-	interruptKeyState InterruptKeyState
-	exitKeyState      ExitKeyState
-	messagesRight     bool
-	fileViewer        fileviewer.Model
+	toastManager         *toast.ToastManager
+	interruptKeyState    InterruptKeyState
+	exitKeyState         ExitKeyState
+	messagesRight        bool
+	fileViewer           fileviewer.Model
+	pendingConfirmation  *chat.ConfirmationMsg
+	activeConfirmation   *chat.ConfirmationMessage
+	activeToolApproval   *chat.ToolApprovalMessage
+	activeTextInput      *chat.TextInputMessage
 }
 
 func (a Model) Init() tea.Cmd {
@@ -94,10 +98,16 @@ func (a Model) Init() tea.Cmd {
 	cmds = append(cmds, a.toastManager.Init())
 	cmds = append(cmds, a.fileViewer.Init())
 
-	// Check if we should show the init dialog
+	// Check if we should show the init confirmation
 	cmds = append(cmds, func() tea.Msg {
 		shouldShow := a.app.Info.Git && a.app.Info.Time.Initialized > 0
-		return dialog.ShowInitDialogMsg{Show: shouldShow}
+		if shouldShow {
+			return chat.ConfirmationMsg{
+				ID:       "init-project",
+				Question: "Would you like to initialize this project? This will create an AGENTS.md file with information about your codebase.",
+			}
+		}
+		return nil
 	})
 
 	return tea.Batch(cmds...)
@@ -133,6 +143,36 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			// Return the updated modal state
+			return a, nil
+		}
+
+		// Handle active confirmation
+		if a.activeConfirmation != nil {
+			updated, cmd := a.activeConfirmation.Update(msg)
+			a.activeConfirmation = updated
+			if cmd != nil {
+				return a, cmd
+			}
+			return a, nil
+		}
+
+		// Handle active tool approval
+		if a.activeToolApproval != nil {
+			updated, cmd := a.activeToolApproval.Update(msg)
+			a.activeToolApproval = updated
+			if cmd != nil {
+				return a, cmd
+			}
+			return a, nil
+		}
+
+		// Handle active text input
+		if a.activeTextInput != nil {
+			updated, cmd := a.activeTextInput.Update(msg)
+			a.activeTextInput = updated
+			if cmd != nil {
+				return a, cmd
+			}
 			return a, nil
 		}
 
@@ -441,6 +481,16 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return a.openFile(msg.Properties.File)
 			}
 		}
+	case opencode.EventListResponseEventPermissionUpdated:
+		// Convert permission event to tool approval message
+		cmds = append(cmds, func() tea.Msg {
+			return chat.ToolApprovalMsg{
+				ID:          msg.Properties.ID,
+				ToolName:    msg.Properties.Title,
+				Description: "Permission requested",
+				Metadata:    msg.Properties.Metadata,
+			}
+		})
 	case tea.WindowSizeMsg:
 		msg.Height -= 2 // Make space for the status bar
 		a.width, a.height = msg.Width, msg.Height
@@ -500,20 +550,35 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.editor.SetExitKeyInDebounce(false)
 	case dialog.FindSelectedMsg:
 		return a.openFile(msg.FilePath)
-	case dialog.ShowInitDialogMsg:
-		if msg.Show {
-			initDialog := dialog.NewInitDialogCmp()
-			a.modal = initDialog
-		}
-	case dialog.CloseInitDialogMsg:
-		if a.modal != nil {
-			cmd := a.modal.Close()
-			a.modal = nil
-			cmds = append(cmds, cmd)
-		}
-		if msg.Initialize {
+	case chat.ConfirmationMsg:
+		// Create a new confirmation message
+		a.activeConfirmation = chat.NewConfirmationMessage(msg.ID, msg.Question)
+		a.editor.Blur() // Remove focus from editor
+	case chat.ConfirmationAnswerMsg:
+		if msg.ID == "init-project" && msg.Answer {
 			cmds = append(cmds, a.app.InitializeProject(context.Background()))
 		}
+		a.activeConfirmation = nil
+		a.editor.Focus() // Return focus to editor
+	case chat.ToolApprovalMsg:
+		// Create a new tool approval message
+		a.activeToolApproval = chat.NewToolApprovalMessage(msg.ID, msg.ToolName, msg.Description, msg.Metadata)
+		a.editor.Blur() // Remove focus from editor
+	case chat.ToolApprovalAnswerMsg:
+		// Handle tool approval response
+		// In the future, this would send the response to the permission system
+		// For now, just clear the approval dialog
+		a.activeToolApproval = nil
+		a.editor.Focus() // Return focus to editor
+	case chat.TextInputMsg:
+		// Create a new text input message
+		a.activeTextInput = chat.NewTextInputMessage(msg.ID, msg.Prompt, msg.Placeholder)
+		a.editor.Blur() // Remove focus from editor
+	case chat.TextInputAnswerMsg:
+		// Handle text input response
+		// TODO: Send input response to server
+		a.activeTextInput = nil
+		a.editor.Focus() // Return focus to editor
 
 	// API
 	case api.Request:
@@ -760,7 +825,17 @@ func (a Model) chat() string {
 		styles.WhitespaceStyle(t.Background()),
 	)
 
-	mainLayout := messagesView + "\n" + editorView
+	// Add interactive messages if active
+	var interactiveView string
+	if a.activeConfirmation != nil {
+		interactiveView = a.activeConfirmation.View(effectiveWidth) + "\n"
+	} else if a.activeToolApproval != nil {
+		interactiveView = a.activeToolApproval.View(effectiveWidth) + "\n"
+	} else if a.activeTextInput != nil {
+		interactiveView = a.activeTextInput.View(effectiveWidth) + "\n"
+	}
+
+	mainLayout := messagesView + "\n" + interactiveView + editorView
 	editorX := (effectiveWidth - editorWidth) / 2
 
 	if lines > 1 {

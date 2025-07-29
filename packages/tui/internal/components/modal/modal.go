@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss/v2"
-	"github.com/sst/opencode/internal/layout"
 	"github.com/sst/opencode/internal/styles"
 	"github.com/sst/opencode/internal/theme"
 )
@@ -146,11 +145,15 @@ func (m *Modal) Render(contentView string, background string) string {
 	row = max(0, row)
 	col = max(0, col)
 
-	// Use PlaceOverlay without border since we already added border to modal
-	return layout.PlaceOverlay(
-		col,
-		row,
+	// Create a simple centered overlay by using lipgloss positioning
+	// This avoids potential issues with PlaceOverlay
+	centered := lipgloss.Place(
+		bgWidth,
+		bgHeight,
+		lipgloss.Center,
+		lipgloss.Center,
 		modalView,
-		background,
 	)
+	
+	return centered
 }

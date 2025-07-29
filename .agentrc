@@ -76,13 +76,13 @@
     "infra": "infra"
   },
   "git": {
-    "commitMode": "ask",
-    "pushMode": "ask", 
+    "commitMode": "always",
+    "pushMode": "always", 
     "configMode": "never",
     "preserveAuthor": true,
     "requireConfirmation": true,
     "maxCommitSize": 50,
-    "allowedBranches": ["main", "develop", "feature/*", "fix/*", "hotfix/*"]
+    "allowedBranches": ["master", "develop", "feature/*", "fix/*", "hotfix/*"]
   },
   "rules": [
     "Always run tests before committing changes",

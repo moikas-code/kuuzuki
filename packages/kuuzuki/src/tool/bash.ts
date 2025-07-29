@@ -3,7 +3,7 @@ import { Tool } from "./tool"
 import DESCRIPTION from "./bash.txt"
 import { App } from "../app/app"
 import { createGitSafetySystem } from "../git/index.js"
-import { parseAgentrc, DEFAULT_AGENTRC } from "../config/agentrc.js"
+import { parseAgentrc, DEFAULT_AGENTRC, type AgentrcConfig } from "../config/agentrc.js"
 
 const MAX_OUTPUT_LENGTH = 30000
 const DEFAULT_TIMEOUT = 1 * 60 * 1000
@@ -121,9 +121,47 @@ async function checkGitPermissions(command: string): Promise<void> {
             gitSafety.permissionManager.grantSessionPermission(operation)
           } else if (promptResult.scope === "project" && promptResult.updateConfig) {
             // Update .agentrc for project-wide permission
-            const newConfig = { ...config }
-            if (!newConfig.git) {
-              newConfig.git = {
+            // Load current .agentrc to preserve existing configuration
+            let currentConfig: AgentrcConfig
+            try {
+              const file = Bun.file(".agentrc")
+              if (await file.exists()) {
+                const content = await file.text()
+                currentConfig = parseAgentrc(content)
+              } else {
+                // Create minimal config preserving the original config structure
+                currentConfig = {
+                  ...config,
+                  project: config.project || { name: "project" },
+                  git: config.git || {
+                    commitMode: "ask",
+                    pushMode: "never",
+                    configMode: "never",
+                    preserveAuthor: true,
+                    requireConfirmation: true,
+                    maxCommitSize: 100,
+                  },
+                }
+              }
+            } catch (error) {
+              // Fallback to current config if parsing fails
+              currentConfig = {
+                ...config,
+                project: config.project || { name: "project" },
+                git: config.git || {
+                  commitMode: "ask",
+                  pushMode: "never",
+                  configMode: "never",
+                  preserveAuthor: true,
+                  requireConfirmation: true,
+                  maxCommitSize: 100,
+                },
+              }
+            }
+
+            // Ensure git config exists
+            if (!currentConfig.git) {
+              currentConfig.git = {
                 commitMode: "ask",
                 pushMode: "never",
                 configMode: "never",
@@ -133,19 +171,20 @@ async function checkGitPermissions(command: string): Promise<void> {
               }
             }
 
+            // Update the specific operation permission
             switch (operation) {
               case "commit":
-                newConfig.git.commitMode = "project"
+                currentConfig.git.commitMode = "project"
                 break
               case "push":
-                newConfig.git.pushMode = "project"
+                currentConfig.git.pushMode = "project"
                 break
               case "config":
-                newConfig.git.configMode = "project"
+                currentConfig.git.configMode = "project"
                 break
             }
 
-            const content = JSON.stringify(newConfig, null, 2)
+            const content = JSON.stringify(currentConfig, null, 2)
             await Bun.write(".agentrc", content)
           }
         } else {

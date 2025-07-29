@@ -1,6 +1,6 @@
 import { $ } from "bun"
 import type { AgentrcConfig } from "../config/agentrc.js"
-import { parseAgentrc, DEFAULT_AGENTRC } from "../config/agentrc.js"
+import { parseAgentrc } from "../config/agentrc.js"
 import {
   GitPermissionManager,
   type GitOperationContext,
@@ -309,7 +309,7 @@ export class SafeGitOperations {
     try {
       this.log.info(`Updating .agentrc for ${operation} permission: ${mode}`)
 
-      // Load current .agentrc or create default
+      // Load current .agentrc or create minimal default
       let config: AgentrcConfig
       try {
         const file = Bun.file(".agentrc")
@@ -317,14 +317,44 @@ export class SafeGitOperations {
           const content = await file.text()
           config = parseAgentrc(content)
         } else {
-          config = DEFAULT_AGENTRC as AgentrcConfig
+          // Create minimal config that only includes required fields
+          config = {
+            project: { name: "project" },
+            git: {
+              commitMode: "ask",
+              pushMode: "never",
+              configMode: "never",
+              preserveAuthor: true,
+              requireConfirmation: true,
+              maxCommitSize: 100,
+            },
+            metadata: {
+              version: "1.0.0",
+              generator: "kuuzuki-init",
+            },
+          }
         }
       } catch (error) {
-        this.log.warn("Failed to load .agentrc, using defaults", { error: String(error) })
-        config = DEFAULT_AGENTRC as AgentrcConfig
+        this.log.warn("Failed to load .agentrc, creating minimal config", { error: String(error) })
+        // Create minimal config that only includes required fields
+        config = {
+          project: { name: "project" },
+          git: {
+            commitMode: "ask",
+            pushMode: "never",
+            configMode: "never",
+            preserveAuthor: true,
+            requireConfirmation: true,
+            maxCommitSize: 100,
+          },
+          metadata: {
+            version: "1.0.0",
+            generator: "kuuzuki-init",
+          },
+        }
       }
 
-      // Ensure git config exists
+      // Ensure git config exists (defensive programming)
       if (!config.git) {
         config.git = {
           commitMode: "ask",
