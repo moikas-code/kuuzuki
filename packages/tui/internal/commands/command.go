@@ -275,7 +275,7 @@ func LoadFromConfig(config *opencode.Config) CommandRegistry {
 		},
 		{
 			Name:        ProjectInitCommand,
-			Description: "create/update AGENTS.md",
+			Description: "create/update .agentrc",
 			Keybindings: parseBindings("<leader>i"),
 			Trigger:     []string{"init"},
 		},

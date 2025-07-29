@@ -28,6 +28,7 @@ import {
   GitPermissionsResetCommand,
   GitPermissionsConfigureCommand,
 } from "./cli/cmd/git-permissions"
+import { HybridCommand } from "./cli/cmd/hybrid"
 import { Trace } from "./trace"
 
 Trace.init()
@@ -97,6 +98,7 @@ const cli = yargs(hideBin(process.argv))
   .command(GitPermissionsDenyCommand)
   .command(GitPermissionsResetCommand)
   .command(GitPermissionsConfigureCommand)
+  .command(HybridCommand)
   .fail((msg) => {
     if (msg.startsWith("Unknown argument") || msg.startsWith("Not enough non-option arguments")) {
       cli.showHelp("log")
