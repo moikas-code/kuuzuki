@@ -1,23 +1,22 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { SafeGitOperations } from "../src/git/index.js"
 import { type AgentrcConfig } from "../src/config/agentrc.js"
-import { rmSync, existsSync, mkdirSync } from "fs"
+import { rmSync, existsSync, mkdtempSync, mkdirSync } from "fs"
+import { tmpdir } from "os"
+import { join } from "path"
 import { $ } from "bun"
 
 describe("Git Integration Tests", () => {
-  const testDir = "test-git-repo"
-  const originalCwd = process.cwd()
+  let testDir: string
+  let originalCwd: string
 
   beforeEach(async () => {
-    // Clean up any existing test directory
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true })
-    }
-
-    // Create and initialize test Git repository
-    mkdirSync(testDir)
+    // Create isolated test directory
+    originalCwd = process.cwd()
+    testDir = mkdtempSync(join(tmpdir(), "kuuzuki-git-integration-test-"))
     process.chdir(testDir)
 
+    // Initialize test Git repository
     await $`git init`.quiet()
     await $`git config user.name "Test User"`.quiet()
     await $`git config user.email "test@example.com"`.quiet()
@@ -29,7 +28,7 @@ describe("Git Integration Tests", () => {
   })
 
   afterEach(() => {
-    // Return to original directory and clean up
+    // Return to original directory and cleanup test directory
     process.chdir(originalCwd)
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true })

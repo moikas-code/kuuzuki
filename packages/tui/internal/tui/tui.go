@@ -116,28 +116,24 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// 1. Handle active modal
 		if a.modal != nil {
-			switch keyString {
-			// Escape always closes current modal
-			case "esc":
-				cmd := a.modal.Close()
-				a.modal = nil
+			// Always pass key presses to the modal first to let it handle its own logic
+			updatedModal, cmd := a.modal.Update(msg)
+			a.modal = updatedModal.(layout.Modal)
+
+			// If the modal returned a command, execute it
+			if cmd != nil {
 				return a, cmd
-			case "ctrl+c":
-				// give the modal a chance to handle the ctrl+c
-				updatedModal, cmd := a.modal.Update(msg)
-				a.modal = updatedModal.(layout.Modal)
-				if cmd != nil {
-					return a, cmd
-				}
+			}
+
+			// Handle ctrl+c as a fallback to force close modal
+			if keyString == "ctrl+c" {
 				cmd = a.modal.Close()
 				a.modal = nil
 				return a, cmd
 			}
 
-			// Pass all other key presses to the modal
-			updatedModal, cmd := a.modal.Update(msg)
-			a.modal = updatedModal.(layout.Modal)
-			return a, cmd
+			// Return the updated modal state
+			return a, nil
 		}
 
 		// 2. Check for commands that require leader

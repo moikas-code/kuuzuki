@@ -25,7 +25,7 @@ func NewInitDialogCmp() InitDialog {
 	return &InitDialogCmp{
 		selected: 0,
 		keys:     initDialogKeyMap{},
-		modal:    modal.New(),
+		modal:    modal.New(modal.WithTitle("Initialize Project")),
 	}
 }
 
@@ -107,13 +107,6 @@ func (m InitDialogCmp) View() string {
 	// Calculate width needed for content
 	maxWidth := 60 // Width for explanation text
 
-	title := baseStyle.
-		Foreground(t.Primary()).
-		Bold(true).
-		Width(maxWidth).
-		Padding(0, 1).
-		Render("Initialize Project")
-
 	explanation := baseStyle.
 		Foreground(t.Text()).
 		Width(maxWidth).
@@ -159,20 +152,14 @@ func (m InitDialogCmp) View() string {
 
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,
-		title,
-		baseStyle.Width(maxWidth).Render(""),
 		explanation,
 		question,
 		buttons,
 		baseStyle.Width(maxWidth).Render(""),
 	)
 
-	return baseStyle.Padding(1, 2).
-		Border(lipgloss.RoundedBorder()).
-		BorderBackground(t.Background()).
-		BorderForeground(t.TextMuted()).
-		Width(lipgloss.Width(content) + 4).
-		Render(content)
+	// Don't add border here since modal will add its own border
+	return content
 }
 
 // Render implements layout.Modal.

@@ -1,23 +1,22 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { SafeGitOperations } from "../src/git/index.js"
 import { type AgentrcConfig } from "../src/config/agentrc.js"
-import { rmSync, existsSync, mkdirSync } from "fs"
+import { rmSync, existsSync, mkdtempSync } from "fs"
+import { tmpdir } from "os"
+import { join } from "path"
 import { $ } from "bun"
 
 describe("Git Permission System - End-to-End User Workflows", () => {
-  const testDir = "test-e2e-repo"
-  const originalCwd = process.cwd()
+  let testDir: string
+  let originalCwd: string
 
   beforeEach(async () => {
-    // Clean up any existing test directory
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true })
-    }
-
-    // Create and initialize test Git repository
-    mkdirSync(testDir)
+    // Create isolated test directory
+    originalCwd = process.cwd()
+    testDir = mkdtempSync(join(tmpdir(), "kuuzuki-git-e2e-test-"))
     process.chdir(testDir)
 
+    // Initialize test Git repository
     await $`git init`.quiet()
     await $`git config user.name "Test User"`.quiet()
     await $`git config user.email "test@example.com"`.quiet()
@@ -26,15 +25,10 @@ describe("Git Permission System - End-to-End User Workflows", () => {
     await Bun.write("README.md", "# Test Repository")
     await $`git add README.md`.quiet()
     await $`git commit -m "Initial commit"`.quiet()
-
-    // Clean up any existing .agentrc
-    if (existsSync(".agentrc")) {
-      rmSync(".agentrc")
-    }
   })
 
   afterEach(() => {
-    // Return to original directory and clean up
+    // Return to original directory and cleanup test directory
     process.chdir(originalCwd)
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true })

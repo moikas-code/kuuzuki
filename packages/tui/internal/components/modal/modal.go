@@ -131,11 +131,17 @@ func (m *Modal) Render(contentView string, background string) string {
 	modalHeight := lipgloss.Height(modalView)
 	modalWidth := lipgloss.Width(modalView)
 
+	// Calculate centered position
+	// Account for border width (1 char on each side) when centering
 	row := (bgHeight - modalHeight) / 2
 	col := (bgWidth - modalWidth) / 2
 
+	// Ensure we don't go negative
+	row = max(0, row)
+	col = max(0, col)
+
 	return layout.PlaceOverlay(
-		col-1, // TODO: whyyyyy
+		col,
 		row,
 		modalView,
 		background,

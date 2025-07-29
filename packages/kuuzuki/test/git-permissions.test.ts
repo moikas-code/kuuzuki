@@ -1,9 +1,14 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { GitPermissionManager, SafeGitOperations } from "../src/git/index.js"
 import { DEFAULT_AGENTRC, type AgentrcConfig } from "../src/config/agentrc.js"
-import { rmSync, existsSync } from "fs"
+import { rmSync, existsSync, mkdtempSync } from "fs"
+import { tmpdir } from "os"
+import { join } from "path"
 
 describe("Git Permission System", () => {
+  let testDir: string
+  let originalCwd: string
+
   const testConfig: AgentrcConfig = {
     project: {
       name: "test-project",
@@ -19,16 +24,17 @@ describe("Git Permission System", () => {
   }
 
   beforeEach(() => {
-    // Clean up any test .agentrc files
-    if (existsSync(".agentrc")) {
-      rmSync(".agentrc")
-    }
+    // Create isolated test directory
+    originalCwd = process.cwd()
+    testDir = mkdtempSync(join(tmpdir(), "kuuzuki-git-permissions-test-"))
+    process.chdir(testDir)
   })
 
   afterEach(() => {
-    // Clean up any test .agentrc files
-    if (existsSync(".agentrc")) {
-      rmSync(".agentrc")
+    // Return to original directory and cleanup test directory
+    process.chdir(originalCwd)
+    if (existsSync(testDir)) {
+      rmSync(testDir, { recursive: true, force: true })
     }
   })
 
