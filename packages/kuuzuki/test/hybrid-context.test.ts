@@ -18,7 +18,22 @@ describe("HybridContextManager", () => {
       Storage,
     }))
 
-    manager = await HybridContextManager.forSession(testSessionID)
+    try {
+      manager = await HybridContextManager.forSession(testSessionID)
+      if (!manager) {
+        throw new Error("Manager is null or undefined")
+      }
+      // Verify manager has expected methods
+      if (typeof manager.getContextTiers !== 'function') {
+        console.error("Manager object:", manager)
+        console.error("Manager constructor:", manager.constructor.name)
+        console.error("Manager prototype:", Object.getPrototypeOf(manager))
+        throw new Error("Manager does not have getContextTiers method")
+      }
+    } catch (error) {
+      console.error("Error creating HybridContextManager:", error)
+      throw error
+    }
   })
 
   test("should initialize with correct tier structure", () => {
@@ -52,15 +67,20 @@ describe("HybridContextManager", () => {
     expect(recentTier.messageCount).toBe(1)
   })
   test("should trigger compression at 65% capacity", async () => {
-    // Add messages until we exceed 65% capacity
+    // Create messages with enough content to trigger compression
+    // Recent tier has 30,000 tokens capacity, so we need ~20,000 tokens to trigger compression at 65%
     const messages: MessageV2.Info[] = []
-    for (let i = 0; i < 50; i++) {
+
+    // Create 400 messages to ensure we exceed the compression threshold
+    for (let i = 0; i < 400; i++) {
       if (i % 2 === 0) {
         messages.push({
           id: Identifier.ascending("message"),
           role: "user",
           sessionID: testSessionID,
           time: { created: Date.now() + i },
+          // Add some content to increase token count
+          content: `This is a test message with content to increase token count. Message number ${i}. `.repeat(5),
         } as MessageV2.User)
       } else {
         messages.push({
@@ -75,6 +95,8 @@ describe("HybridContextManager", () => {
           system: [],
           cost: 0,
           tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          // Add some content to increase token count
+          content: `Assistant response with detailed information. Message ${i}. `.repeat(10),
         } as MessageV2.Assistant)
       }
     }
@@ -89,13 +111,14 @@ describe("HybridContextManager", () => {
   })
 
   test("should build optimized context for requests", async () => {
-    // Add some test messages
+    // Add some test messages with content
     const messages: MessageV2.Info[] = [
       {
         id: "msg-1",
         role: "user",
         sessionID: testSessionID,
         time: { created: Date.now() - 1000 },
+        content: "This is a user message with some content to ensure token count",
       } as MessageV2.User,
       {
         id: "msg-2",
@@ -109,6 +132,7 @@ describe("HybridContextManager", () => {
         system: [],
         cost: 0,
         tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        content: "This is an assistant response with detailed content to ensure proper token counting",
       } as MessageV2.Assistant,
     ]
 

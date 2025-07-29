@@ -1,7 +1,7 @@
 import { cmd } from "./cmd"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
-import * as prompts from "@clack/prompts"
+import * as prompts from "../../util/tui-safe-prompt.js"
 import { UI } from "../ui"
 
 export const McpCommand = cmd({

@@ -12,7 +12,7 @@ Mention `/kuuzuki` in your comment, and kuuzuki will execute tasks within your G
 /kuuzuki explain this issue
 ```
 
-#### Fix or implement issues - opencode will create a PR with the changes.
+#### Fix or implement issues - kuuzuki will create a PR with the changes.
 
 ```bash
 /kuuzuki fix this
@@ -29,28 +29,28 @@ Delete the attachment from S3 when the note is removed /oc
 Run the following command in the terminal from your GitHub repo:
 
 ```bash
-opencode github install
+kuuzuki github install
 ```
 
 This will walk you through installing the GitHub app, creating the workflow, and setting up secrets.
 
 ### Manual Setup
 
-1. Install the GitHub app https://github.com/apps/opencode-agent. Make sure it is installed on the target repository.
-2. Add the following workflow file to `.github/workflows/opencode.yml` in your repo. Set the appropriate `model` and required API keys in `env`.
+1. Install the GitHub app https://github.com/apps/kuuzuki-agent. Make sure it is installed on the target repository.
+2. Add the following workflow file to `.github/workflows/kuuzuki.yml` in your repo. Set the appropriate `model` and required API keys in `env`.
 
    ```yml
-   name: opencode
+   name: kuuzuki
 
    on:
      issue_comment:
        types: [created]
 
    jobs:
-     opencode:
+     kuuzuki:
        if: |
          contains(github.event.comment.body, '/oc') ||
-         contains(github.event.comment.body, '/opencode')
+         contains(github.event.comment.body, '/kuuzuki')
        runs-on: ubuntu-latest
        permissions:
          id-token: write
@@ -60,8 +60,8 @@ This will walk you through installing the GitHub app, creating the workflow, and
            with:
              fetch-depth: 1
 
-         - name: Run opencode
-           uses: sst/opencode/github@latest
+         - name: Run kuuzuki
+           uses: moikas-code/kuuzuki/github@latest
            env:
              ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
            with:
@@ -72,7 +72,7 @@ This will walk you through installing the GitHub app, creating the workflow, and
 
 ## Support
 
-This is an early release. If you encounter issues or have feedback, please create an issue at https://github.com/sst/opencode/issues.
+This is an early release. If you encounter issues or have feedback, please create an issue at https://github.com/moikas-code/kuuzuki/issues.
 
 ## Development
 
@@ -90,22 +90,22 @@ To test locally:
    MODEL=anthropic/claude-sonnet-4-20250514 \
      ANTHROPIC_API_KEY=sk-ant-api03-1234567890 \
      GITHUB_RUN_ID=dummy \
-     bun /path/to/opencode/packages/kuuzuki/src/index.ts github run \
+     bun /path/to/kuuzuki/packages/kuuzuki/src/index.ts github run \
      --token 'github_pat_1234567890' \
      --event '{"eventName":"issue_comment",...}'
    ```
 
-   - `MODEL`: The model used by opencode. Same as the `MODEL` defined in the GitHub workflow.
+   - `MODEL`: The model used by kuuzuki. Same as the `MODEL` defined in the GitHub workflow.
    - `ANTHROPIC_API_KEY`: Your model provider API key. Same as the keys defined in the GitHub workflow.
    - `GITHUB_RUN_ID`: Dummy value to emulate GitHub action environment.
-   - `/path/to/opencode`: Path to your cloned opencode repo. `bun /path/to/opencode/packages/kuuzuki/src/index.ts` runs your local version of `opencode`.
+   - `/path/to/kuuzuki`: Path to your cloned kuuzuki repo. `bun /path/to/kuuzuki/packages/kuuzuki/src/index.ts` runs your local version of `kuuzuki`.
    - `--token`: A GitHub persontal access token. This token is used to verify you have `admin` or `write` access to the test repo. Generate a token [here](https://github.com/settings/personal-access-tokens).
    - `--event`: Mock GitHub event payload (see templates below).
 
 ### Issue comment event
 
 ```
---event '{"eventName":"issue_comment","repo":{"owner":"sst","repo":"hello-world"},"actor":"fwang","payload":{"issue":{"number":4},"comment":{"id":1,"body":"hey opencode, summarize thread"}}}'
+--event '{"eventName":"issue_comment","repo":{"owner":"sst","repo":"hello-world"},"actor":"fwang","payload":{"issue":{"number":4},"comment":{"id":1,"body":"hey kuuzuki, summarize thread"}}}'
 ```
 
 Replace:
@@ -114,12 +114,12 @@ Replace:
 - `"repo":"hello-world"` with repo name
 - `"actor":"fwang"` with the GitHub username of commentor
 - `"number":4` with the GitHub issue id
-- `"body":"hey opencode, summarize thread"` with comment body
+- `"body":"hey kuuzuki, summarize thread"` with comment body
 
 ### Issue comment with image attachment.
 
 ```
---event '{"eventName":"issue_comment","repo":{"owner":"sst","repo":"hello-world"},"actor":"fwang","payload":{"issue":{"number":4},"comment":{"id":1,"body":"hey opencode, what is in my image ![Image](https://github.com/user-attachments/assets/xxxxxxxx)"}}}'
+--event '{"eventName":"issue_comment","repo":{"owner":"sst","repo":"hello-world"},"actor":"fwang","payload":{"issue":{"number":4},"comment":{"id":1,"body":"hey kuuzuki, what is in my image ![Image](https://github.com/user-attachments/assets/xxxxxxxx)"}}}'
 ```
 
 Replace the image URL `https://github.com/user-attachments/assets/xxxxxxxx` with a valid GitHub attachment (you can generate one by commenting with an image in any issue).
@@ -127,5 +127,5 @@ Replace the image URL `https://github.com/user-attachments/assets/xxxxxxxx` with
 ### PR comment event
 
 ```
---event '{"eventName":"issue_comment","repo":{"owner":"sst","repo":"hello-world"},"actor":"fwang","payload":{"issue":{"number":4,"pull_request":{}},"comment":{"id":1,"body":"hey opencode, summarize thread"}}}'
+--event '{"eventName":"issue_comment","repo":{"owner":"sst","repo":"hello-world"},"actor":"fwang","payload":{"issue":{"number":4,"pull_request":{}},"comment":{"id":1,"body":"hey kuuzuki, summarize thread"}}}'
 ```

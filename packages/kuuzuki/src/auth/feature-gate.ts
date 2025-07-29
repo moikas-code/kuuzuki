@@ -1,4 +1,5 @@
-import { getSubscriptionStatus, SubscriptionStatus } from "./subscription"
+import { getSubscriptionStatus } from "./subscription"
+import type { SubscriptionStatus } from "./subscription"
 import { Log } from "../util/log"
 import chalk from "chalk"
 

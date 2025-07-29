@@ -3,8 +3,17 @@
     "name": "kuuzuki",
     "description": "Community-driven fork of OpenCode - AI-powered terminal assistant",
     "type": "monorepo",
-    "languages": ["typescript", "go", "javascript"],
-    "frameworks": ["bun", "node.js", "hono", "astro"],
+    "languages": [
+      "typescript",
+      "go",
+      "javascript"
+    ],
+    "frameworks": [
+      "bun",
+      "node.js",
+      "hono",
+      "astro"
+    ],
     "architecture": "multi-package",
     "repository": "https://github.com/moikas-code/kuuzuki",
     "license": "MIT",
@@ -47,7 +56,12 @@
     "variableNaming": "camelCase",
     "classNaming": "PascalCase",
     "testFilePattern": "*.test.ts",
-    "configFiles": [".agentrc", "package.json", "tsconfig.json", "go.mod"],
+    "configFiles": [
+      ".agentrc",
+      "package.json",
+      "tsconfig.json",
+      "go.mod"
+    ],
     "branchNaming": "feature/description, fix/description, hotfix/description",
     "commitStyle": "conventional"
   },
@@ -61,8 +75,17 @@
     "typeChecker": "typescript",
     "linter": "eslint",
     "formatter": "prettier",
-    "aiProviders": ["anthropic"],
-    "preferred": ["bash", "edit", "read", "write", "grep", "glob"]
+    "aiProviders": [
+      "anthropic"
+    ],
+    "preferred": [
+      "bash",
+      "edit",
+      "read",
+      "write",
+      "grep",
+      "glob"
+    ]
   },
   "paths": {
     "src": "packages/kuuzuki/src",
@@ -77,62 +100,58 @@
   },
   "git": {
     "commitMode": "always",
-    "pushMode": "always", 
+    "pushMode": "always",
     "configMode": "never",
     "preserveAuthor": true,
     "requireConfirmation": true,
     "maxCommitSize": 50,
-    "allowedBranches": ["master", "develop", "feature/*", "fix/*", "hotfix/*"]
+    "allowedBranches": [
+      "master",
+      "develop",
+      "feature/*",
+      "fix/*",
+      "hotfix/*"
+    ]
   },
-  "rules": [
-    "Always run tests before committing changes",
-    "Use TypeScript for type safety in JavaScript code",
-    "Follow conventional commit message format",
-    "Update documentation when adding new features",
-    "Ensure cross-platform compatibility for all binaries",
-    "Never commit sensitive information like API keys",
-    "Use isolated test directories to avoid interfering with project files",
-    "Maintain backward compatibility with OpenCode where possible",
-    "Focus on terminal/CLI experience as primary interface",
-    "Enable community contributions through clear plugin architecture",
-    "Prefer single word variable/function names",
-    "Avoid try catch where possible - prefer to let exceptions bubble up",
-    "Avoid else statements where possible",
-    "Do not make useless helper functions - inline functionality unless the function is reusable or composable",
-    "Prefer Bun APIs over Node.js APIs",
-    "Use relative imports for local modules, named imports preferred",
-    "Use Zod schemas for validation, TypeScript interfaces for structure",
-    "Use camelCase for variables/functions, PascalCase for classes/namespaces",
-    "Use Result patterns, avoid throwing exceptions in tools",
-    "Use namespace-based organization (e.g., Tool.define(), Session.create())",
-    "Try to keep things in one function unless composable or reusable",
-    "DO NOT do unnecessary destructuring of variables",
-    "DO NOT use else statements unless necessary",
-    "DO NOT use try/catch if it can be avoided",
-    "AVOID using any type",
-    "AVOID let statements",
-    "PREFER single word variable names where possible",
-    "Use as many bun apis as possible like Bun.file()",
-    "Implement Tool.Info interface with execute() method",
-    "Pass sessionID in tool context, use App.provide() for DI",
-    "All inputs validated with Zod schemas",
-    "Use Log.create({ service: 'name' }) pattern",
-    "Use Storage namespace for persistence",
-    "Go TUI communicates with TypeScript server via stainless SDK",
-    "When adding/modifying server endpoints, ask user to generate new client SDK",
-    "NEVER claim something is ready, working, or complete without testing",
-    "Actually run the software before claiming it works",
-    "Test all claimed features and verify integration between components",
-    "Check error cases before claiming completion",
-    "Provide actual test output, not theoretical explanations",
-    "Show real error messages and how they were resolved",
-    "Create reproducible test scripts",
-    "Document what was actually tested vs what remains untested",
-    "Say 'I've implemented this but haven't tested it yet' when appropriate",
-    "Say 'This should work but needs verification' when uncertain",
-    "Say 'I can't test this directly, we need to verify together' when limited",
-    "Building trust requires accuracy, not appearing capable"
-  ],
+  "rules": {
+    "critical": [
+      {
+        "id": "create-comprehensive-v010-implementation-plan-with-mdopz2cl",
+        "text": "Create comprehensive v0.1.0 implementation plan with stability and improvement features",
+        "category": "critical",
+        "reason": "Planning major version release with focus on stability and user experience",
+        "createdAt": "2025-07-29T15:56:35.109Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "implement-secure-api-key-management-system-with-ke-mdoq6tst",
+        "text": "Implement secure API key management system with keychain storage and provider validation",
+        "category": "critical",
+        "reason": "Creating secure infrastructure for managing API keys across multiple AI providers",
+        "createdAt": "2025-07-29T16:02:37.277Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      }
+    ],
+    "preferred": [],
+    "contextual": [],
+    "deprecated": []
+  },
   "dependencies": {
     "critical": [
       "@modelcontextprotocol/sdk",
@@ -163,7 +182,7 @@
         "description": "Development tools and code analysis server",
         "tools": [
           "check_code_practices",
-          "rust_code_practices", 
+          "rust_code_practices",
           "python_code_analyzer",
           "format_code",
           "rust_formatter",
@@ -199,7 +218,7 @@
         "description": "Knowledge base and documentation management",
         "tools": [
           "kb_read",
-          "kb_update", 
+          "kb_update",
           "kb_search",
           "kb_semantic_search",
           "kb_graph_query",
@@ -240,7 +259,7 @@
   "agent": {
     "preferredTools": [
       "bash",
-      "edit", 
+      "edit",
       "read",
       "write",
       "grep",
@@ -256,13 +275,30 @@
     "contextPreservation": true
   },
   "security": {
-    "sensitiveFiles": [".env", ".env.*", "*.key", "*.pem", "auth.json", "*.secret"],
-    "allowedDomains": ["api.anthropic.com", "api.openai.com", "github.com", "registry.npmjs.org"],
-    "requireApproval": ["credential_operations", "external_api_calls", "file_deletions", "git_config_changes"]
+    "sensitiveFiles": [
+      ".env",
+      ".env.*",
+      "*.key",
+      "*.pem",
+      "auth.json",
+      "*.secret"
+    ],
+    "allowedDomains": [
+      "api.anthropic.com",
+      "api.openai.com",
+      "github.com",
+      "registry.npmjs.org"
+    ],
+    "requireApproval": [
+      "credential_operations",
+      "external_api_calls",
+      "file_deletions",
+      "git_config_changes"
+    ]
   },
   "documentation": {
     "readme": "README.md",
-    "contributing": "CONTRIBUTING.md", 
+    "contributing": "CONTRIBUTING.md",
     "changelog": "CHANGELOG.md",
     "docs_dir": "docs/",
     "api_docs": "docs/openapi.json",
@@ -271,12 +307,33 @@
   },
   "deployment": {
     "npm_package": "kuuzuki",
-    "platforms": ["linux", "macos", "windows"],
+    "platforms": [
+      "linux",
+      "macos",
+      "windows"
+    ],
     "ci_cd": "github_actions",
     "publish_command": "bun run script/publish.ts",
     "binaries": {
       "opencode": "./bin/kuuzuki",
       "kuuzuki": "./bin/kuuzuki"
     }
+  },
+  "ruleMetadata": {
+    "version": "1.0.0",
+    "lastModified": "2025-07-29T16:08:47.350Z",
+    "totalRules": 2,
+    "sessionRules": [
+      {
+        "ruleId": "create-comprehensive-v010-implementation-plan-with-mdopz2cl",
+        "learnedAt": "2025-07-29T15:56:35.109Z",
+        "context": "Planning major version release with focus on stability and user experience"
+      },
+      {
+        "ruleId": "implement-secure-api-key-management-system-with-ke-mdoq6tst",
+        "learnedAt": "2025-07-29T16:02:37.277Z",
+        "context": "Creating secure infrastructure for managing API keys across multiple AI providers"
+      }
+    ]
   }
 }

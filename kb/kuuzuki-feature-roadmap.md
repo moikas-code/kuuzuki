@@ -22,6 +22,24 @@ This roadmap outlines the planned features and enhancements for kuuzuki, priorit
 - **Hybrid Context System**: Advanced context management and optimization
 - **Git Permissions**: Enhanced git operation safety and validation
 - **Documentation Improvements**: Better CLI documentation and examples
+- **TUI Dialog System Fix**: Resolving overlay corruption during chat interactions (0.1.0)
+
+## Immediate Priority Fixes (0.1.0 Release)
+
+### TUI Dialog System Fix
+
+**Status**: In Progress  
+**Priority**: Critical  
+**Complexity**: Low  
+**Timeline**: 1 day
+
+**Problem**: Modal overlays corrupt the TUI display when appearing during chat interactions for tool approvals, yes/no questions, and text input requests.
+
+**Solution**: Disable modal overlays during active chat sessions and use inline message components.
+
+**Implementation**: See detailed plan in `kb/tui-dialog-fix-plan.md`
+
+**Impact**: 🔧 **Critical UX Fix** - Ensures stable chat interaction experience
 
 ## Planned Features
 
@@ -267,6 +285,13 @@ This roadmap outlines the planned features and enhancements for kuuzuki, priorit
 - [ ] Usage analytics and telemetry
 - [ ] Crash reporting and debugging
 
+### UI/UX Improvements (0.2.0)
+
+- [ ] **Dialog System Refactoring**: Proper architectural solution for all dialog types
+- [ ] **Interaction Manager**: Centralized system for user interactions
+- [ ] **Context-Aware Dialogs**: Smarter dialog positioning and behavior
+- [ ] **Unified Dialog API**: Consistent interface for all dialog types
+
 ## Success Metrics
 
 ### Adoption Metrics
@@ -345,4 +370,4 @@ The roadmap is living document that evolves based on community feedback, technic
 
 **Last Updated**: January 2025  
 **Next Review**: February 2025  
-**Version**: 1.0
+**Version**: 1.1

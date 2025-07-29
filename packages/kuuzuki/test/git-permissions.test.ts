@@ -4,6 +4,7 @@ import { DEFAULT_AGENTRC, type AgentrcConfig } from "../src/config/agentrc.js"
 import { rmSync, existsSync, mkdtempSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
+import { $ } from "bun"
 
 describe("Git Permission System", () => {
   let testDir: string
@@ -23,11 +24,21 @@ describe("Git Permission System", () => {
     },
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Create isolated test directory
     originalCwd = process.cwd()
     testDir = mkdtempSync(join(tmpdir(), "kuuzuki-git-permissions-test-"))
     process.chdir(testDir)
+
+    // Initialize test Git repository for tests that need it
+    await $`git init`.quiet()
+    await $`git config user.name "Test User"`.quiet()
+    await $`git config user.email "test@example.com"`.quiet()
+
+    // Create initial commit
+    await Bun.write("README.md", "# Test Repository")
+    await $`git add README.md`.quiet()
+    await $`git commit -m "Initial commit"`.quiet()
   })
 
   afterEach(() => {
@@ -150,10 +161,14 @@ describe("Git Permission System", () => {
       }
       const operations = new SafeGitOperations(config)
 
+      // Create a test file to commit
+      await Bun.write("test.txt", "test content")
+      await $`git add test.txt`.quiet()
+
       const result = await operations.commit("Test commit", ["test.txt"])
 
       expect(result.success).toBe(false)
-      expect(result.error).toContain("disabled")
+      expect(result.error).toContain("operations are disabled")
     })
 
     test("should handle push with never permission", async () => {
@@ -162,7 +177,7 @@ describe("Git Permission System", () => {
       const result = await operations.push("origin", "main")
 
       expect(result.success).toBe(false)
-      expect(result.error).toContain("disabled")
+      expect(result.error).toContain("operations are disabled")
     })
   })
 
@@ -256,10 +271,15 @@ describe("Git Permission System", () => {
       }
       const operations = new SafeGitOperations(config)
 
-      // Small commit should work
+      // Create test files
+      await Bun.write("file1.txt", "content1")
+      await Bun.write("file2.txt", "content2")
+      await Bun.write("file3.txt", "content3")
+      await $`git add file1.txt file2.txt file3.txt`.quiet()
+
+      // Small commit should work (size validation passes)
       const smallResult = await operations.commit("Small commit", ["file1.txt"])
-      // Note: This will fail due to not being in a git repo, but should pass size validation
-      expect(smallResult.error).not.toContain("Too many files")
+      expect(smallResult.error || "").not.toContain("Too many files")
 
       // Large commit should be rejected
       const largeResult = await operations.commit("Large commit", ["file1.txt", "file2.txt", "file3.txt"])
@@ -319,10 +339,14 @@ describe("Git Permission System", () => {
       }
       const operations = new SafeGitOperations(config)
 
+      // Create test file
+      await Bun.write("sensitive.txt", "sensitive content")
+      await $`git add sensitive.txt`.quiet()
+
       const result = await operations.commit("Unauthorized commit", ["sensitive.txt"])
 
       expect(result.success).toBe(false)
-      expect(result.error).toContain("disabled")
+      expect(result.error).toContain("operations are disabled")
     })
 
     test("should prevent unauthorized pushes by default", async () => {
@@ -331,7 +355,7 @@ describe("Git Permission System", () => {
       const result = await operations.push("origin", "main")
 
       expect(result.success).toBe(false)
-      expect(result.error).toContain("disabled")
+      expect(result.error).toContain("operations are disabled")
     })
 
     test("should prevent config changes by default", async () => {

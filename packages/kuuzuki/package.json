@@ -4,7 +4,13 @@
   "name": "kuuzuki",
   "type": "module",
   "description": "AI-powered terminal assistant",
-  "keywords": ["ai", "terminal", "cli", "assistant", "claude"],
+  "keywords": [
+    "ai",
+    "terminal",
+    "cli",
+    "assistant",
+    "claude"
+  ],
   "homepage": "https://github.com/kuuzuki/kuuzuki",
   "repository": {
     "type": "git",
@@ -74,6 +80,7 @@
     "hono": "4.7.10",
     "hono-openapi": "0.4.8",
     "isomorphic-git": "1.32.1",
+    "keytar": "7.9.0",
     "open": "10.2.0",
     "remeda": "2.22.3",
     "turndown": "7.2.0",

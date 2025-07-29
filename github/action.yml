@@ -1,5 +1,5 @@
-name: "opencode GitHub Action"
-description: "Run opencode in GitHub Actions workflows"
+name: "kuuzuki GitHub Action"
+description: "Run kuuzuki in GitHub Actions workflows"
 branding:
   icon: "code"
   color: "orange"
@@ -10,20 +10,20 @@ inputs:
     required: true
 
   share:
-    description: "Share the opencode session (defaults to true for public repos)"
+    description: "Share the kuuzuki session (defaults to true for public repos)"
     required: false
 
 runs:
   using: "composite"
   steps:
-    - name: Install opencode
+    - name: Install kuuzuki
       shell: bash
-      run: curl -fsSL https://opencode.ai/install | bash
+      run: curl -fsSL https://kuuzuki.com/install | bash
 
-    - name: Run opencode
+    - name: Run kuuzuki
       shell: bash
-      id: run_opencode
-      run: opencode github run
+      id: run_kuuzuki
+      run: kuuzuki github run
       env:
         MODEL: ${{ inputs.model }}
         SHARE: ${{ inputs.share }}

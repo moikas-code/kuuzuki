@@ -1,4 +1,5 @@
 import { customAlphabet } from "nanoid"
+import type { KVNamespace } from "../types/kv"
 
 const generateKeyPart = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 32)
 

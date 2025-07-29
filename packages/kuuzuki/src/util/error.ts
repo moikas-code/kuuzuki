@@ -8,14 +8,10 @@ export abstract class NamedError extends Error {
   abstract toObject(): { name: string; data: any }
 
   static create<Name extends string, Data extends ZodSchema>(name: Name, data: Data) {
-    const schema = z
-      .object({
-        name: z.literal(name),
-        data,
-      })
-      .openapi({
-        ref: name,
-      })
+    const schema = z.object({
+      name: z.literal(name),
+      data,
+    })
     const result = class extends NamedError {
       public static readonly Schema = schema
 

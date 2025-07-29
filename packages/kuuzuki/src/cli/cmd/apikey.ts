@@ -1,6 +1,8 @@
 import type { CommandModule } from "yargs"
 import { verifyApiKey, recoverApiKey } from "../../auth/api"
 import { saveAuth, clearAuth, getApiKey, validateApiKeyFormat, getKeyEnvironment, maskApiKey } from "../../auth/storage"
+import { Config } from "../../config/config"
+import { Providers } from "../../auth/providers"
 import chalk from "chalk"
 
 export const ApiKeyCommand = {
@@ -56,6 +58,73 @@ export const ApiKeyCommand = {
         handler: async () => {
           await handleLogout()
         },
+      })
+      .command({
+        command: "provider <subcommand>",
+        describe: "Manage AI provider API keys",
+        builder: (yargs) => {
+          return yargs
+            .command({
+              command: "add <provider> <key>",
+              describe: "Add an AI provider API key",
+              builder: {
+                provider: {
+                  type: "string",
+                  describe: "Provider name (anthropic, openai, openrouter, github-copilot, amazon-bedrock)",
+                  choices: ["anthropic", "openai", "openrouter", "github-copilot", "amazon-bedrock"],
+                },
+                key: {
+                  type: "string",
+                  describe: "API key for the provider",
+                },
+                "no-keychain": {
+                  type: "boolean",
+                  describe: "Don't store in system keychain",
+                  default: false,
+                },
+              },
+              handler: async (args) => {
+                await handleProviderAdd(args["provider"] as string, args["key"] as string, !args["no-keychain"])
+              },
+            })
+            .command({
+              command: "list",
+              describe: "List all stored provider API keys",
+              handler: async () => {
+                await handleProviderList()
+              },
+            })
+            .command({
+              command: "remove <provider>",
+              describe: "Remove a provider API key",
+              builder: {
+                provider: {
+                  type: "string",
+                  describe: "Provider name to remove",
+                  choices: ["anthropic", "openai", "openrouter", "github-copilot", "amazon-bedrock"],
+                },
+              },
+              handler: async (args) => {
+                await handleProviderRemove(args["provider"] as string)
+              },
+            })
+            .command({
+              command: "test [provider]",
+              describe: "Test provider API key health",
+              builder: {
+                provider: {
+                  type: "string",
+                  describe: "Provider to test (tests all if not specified)",
+                  choices: ["anthropic", "openai", "openrouter", "github-copilot", "amazon-bedrock"],
+                },
+              },
+              handler: async (args) => {
+                await handleProviderTest(args["provider"] as string)
+              },
+            })
+            .demandCommand(1, "Please specify a provider subcommand")
+        },
+        handler: () => {},
       })
       .demandCommand(1, "Please specify a subcommand")
   },
@@ -250,4 +319,173 @@ async function handleLogout() {
 function isValidEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return emailRegex.test(email)
+}
+
+// AI Provider API Key Management Functions
+
+async function handleProviderAdd(providerId: string, apiKey: string, useKeychain: boolean) {
+  try {
+    // Validate the API key format
+    if (!Providers.validateProviderKey(providerId, apiKey)) {
+      console.log(chalk.red("❌ Invalid API key format"))
+      const provider = Providers.getProvider(providerId)
+      if (provider) {
+        console.log(chalk.gray(`Expected format for ${provider.name}: ${provider.keyFormat.source}`))
+      }
+      return
+    }
+
+    // Store the API key
+    await Config.ApiKeys.store(providerId, apiKey, useKeychain)
+
+    const provider = Providers.getProvider(providerId)
+    const maskedKey = Providers.maskProviderKey(providerId, apiKey)
+
+    console.log(chalk.green("✅ API key stored successfully!"))
+    console.log(chalk.green(`✓ Provider: ${provider?.name || providerId}`))
+    console.log(chalk.gray(`✓ Key: ${maskedKey}`))
+    console.log(chalk.gray(`✓ Storage: ${useKeychain ? "system keychain" : "local file"}`))
+
+    // Test the key
+    console.log(chalk.gray("Testing API key..."))
+    const healthResult = await Config.ApiKeys.healthCheck(providerId)
+
+    if (healthResult.success) {
+      console.log(chalk.green(`✅ API key is working! (${healthResult.responseTime}ms)`))
+    } else {
+      console.log(chalk.yellow(`⚠️  API key stored but health check failed: ${healthResult.error}`))
+      console.log(chalk.gray("The key may still work for actual requests"))
+    }
+  } catch (error) {
+    console.log(chalk.red("❌ Failed to store API key"))
+    console.error(chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`))
+  }
+}
+
+async function handleProviderList() {
+  try {
+    const keys = await Config.ApiKeys.list()
+
+    if (keys.length === 0) {
+      console.log(chalk.yellow("No AI provider API keys stored"))
+      console.log()
+      console.log(chalk.white("To add a provider API key:"))
+      console.log(chalk.cyan("kuuzuki apikey provider add <provider> <key>"))
+      console.log()
+      console.log(chalk.white("Supported providers:"))
+      for (const provider of Providers.listSupportedProviders()) {
+        console.log(chalk.gray(`• ${provider.name} (${provider.id})`))
+      }
+      return
+    }
+
+    console.log(chalk.white("Stored AI Provider API Keys:"))
+    console.log()
+
+    for (const key of keys) {
+      const provider = Providers.getProvider(key.providerId)
+      const statusIcon = key.healthStatus === "success" ? "✅" : key.healthStatus === "failed" ? "❌" : "❓"
+
+      console.log(`${statusIcon} ${chalk.bold(provider?.name || key.providerId)}`)
+      console.log(chalk.gray(`   Key: ${key.maskedKey}`))
+      console.log(chalk.gray(`   Source: ${key.source}`))
+      console.log(chalk.gray(`   Added: ${new Date(key.createdAt).toLocaleDateString()}`))
+
+      if (key.lastUsed) {
+        console.log(chalk.gray(`   Last used: ${new Date(key.lastUsed).toLocaleDateString()}`))
+      }
+
+      if (key.lastHealthCheck) {
+        const status = key.healthStatus === "success" ? chalk.green("healthy") : chalk.red("unhealthy")
+        console.log(chalk.gray(`   Health: ${status} (${new Date(key.lastHealthCheck).toLocaleDateString()})`))
+      }
+
+      console.log()
+    }
+
+    console.log(chalk.white("Commands:"))
+    console.log(chalk.cyan("kuuzuki apikey provider test") + chalk.gray(" - Test all keys"))
+    console.log(chalk.cyan("kuuzuki apikey provider remove <provider>") + chalk.gray(" - Remove a key"))
+  } catch (error) {
+    console.log(chalk.red("❌ Failed to list API keys"))
+    console.error(chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`))
+  }
+}
+
+async function handleProviderRemove(providerId: string) {
+  try {
+    if (!Config.ApiKeys.hasKey(providerId)) {
+      console.log(chalk.yellow(`No API key found for provider: ${providerId}`))
+      return
+    }
+
+    await Config.ApiKeys.remove(providerId)
+
+    const provider = Providers.getProvider(providerId)
+    console.log(chalk.green("✅ API key removed successfully!"))
+    console.log(chalk.gray(`✓ Provider: ${provider?.name || providerId}`))
+  } catch (error) {
+    console.log(chalk.red("❌ Failed to remove API key"))
+    console.error(chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`))
+  }
+}
+
+async function handleProviderTest(providerId?: string) {
+  try {
+    if (providerId) {
+      // Test single provider
+      if (!Config.ApiKeys.hasKey(providerId)) {
+        console.log(chalk.yellow(`No API key found for provider: ${providerId}`))
+        return
+      }
+
+      const provider = Providers.getProvider(providerId)
+      console.log(chalk.gray(`Testing ${provider?.name || providerId}...`))
+
+      const result = await Config.ApiKeys.healthCheck(providerId)
+
+      if (result.success) {
+        console.log(chalk.green(`✅ ${provider?.name || providerId} - API key is working!`))
+        console.log(chalk.gray(`   Response time: ${result.responseTime}ms`))
+      } else {
+        console.log(chalk.red(`❌ ${provider?.name || providerId} - API key failed`))
+        console.log(chalk.red(`   Error: ${result.error}`))
+      }
+    } else {
+      // Test all providers
+      const availableProviders = Config.ApiKeys.getAvailableProviders()
+
+      if (availableProviders.length === 0) {
+        console.log(chalk.yellow("No API keys to test"))
+        console.log(chalk.gray("Add API keys with: kuuzuki apikey provider add <provider> <key>"))
+        return
+      }
+
+      console.log(chalk.white("Testing all provider API keys..."))
+      console.log()
+
+      const results = await Config.ApiKeys.healthCheckAll()
+
+      for (const providerId of availableProviders) {
+        const provider = Providers.getProvider(providerId)
+        const result = results[providerId]
+
+        if (result.success) {
+          console.log(chalk.green(`✅ ${provider?.name || providerId} - Working (${result.responseTime}ms)`))
+        } else {
+          console.log(chalk.red(`❌ ${provider?.name || providerId} - Failed`))
+          console.log(chalk.gray(`   Error: ${result.error}`))
+        }
+      }
+
+      const successCount = Object.values(results).filter((r) => r.success).length
+      const totalCount = availableProviders.length
+
+      console.log()
+      console.log(chalk.white(`Results: ${successCount}/${totalCount} providers working`))
+    }
+  } catch (error) {
+    console.log(chalk.red("❌ Failed to test API keys"))
+    console.error(chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`))
+  }
 }

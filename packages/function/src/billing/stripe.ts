@@ -2,7 +2,7 @@ import Stripe from "stripe"
 
 export function createStripeClient(apiKey: string): Stripe {
   return new Stripe(apiKey, {
-    apiVersion: "2023-10-16",
+    apiVersion: "2025-06-30.basil",
     httpClient: Stripe.createFetchHttpClient(),
   })
 }
@@ -15,10 +15,7 @@ export interface CreateCheckoutSessionParams {
   clientReferenceId?: string
 }
 
-export async function createCheckoutSession(
-  stripe: Stripe,
-  params: CreateCheckoutSessionParams
-): Promise<string> {
+export async function createCheckoutSession(stripe: Stripe, params: CreateCheckoutSessionParams): Promise<string> {
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     payment_method_types: ["card"],
@@ -45,7 +42,7 @@ export async function createCheckoutSession(
 export async function createBillingPortalSession(
   stripe: Stripe,
   customerId: string,
-  returnUrl: string
+  returnUrl: string,
 ): Promise<string> {
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,
@@ -59,7 +56,7 @@ export async function constructWebhookEvent(
   stripe: Stripe,
   payload: string,
   signature: string,
-  webhookSecret: string
+  webhookSecret: string,
 ): Promise<Stripe.Event> {
-  return stripe.webhooks.constructEvent(payload, signature, webhookSecret)
+  return await stripe.webhooks.constructEventAsync(payload, signature, webhookSecret)
 }

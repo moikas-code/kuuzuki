@@ -93,7 +93,7 @@ if a.hasActiveChat() {
 Ensure all permission/approval events route to inline messages:
 
 ```go
-case opencode.EventListResponseEventPermissionUpdated:
+case kuuzuki.EventListResponseEventPermissionUpdated:
     // Always use inline message, never modal
     cmds = append(cmds, func() tea.Msg {
         return chat.ToolApprovalMsg{

@@ -83,6 +83,7 @@ build_server() {
         --compile \
         --target=bun \
         --outfile=bin/kuuzuki \
+        --external keytar \
         --define KUUZUKI_VERSION="'$VERSION'"
     
     chmod +x bin/kuuzuki

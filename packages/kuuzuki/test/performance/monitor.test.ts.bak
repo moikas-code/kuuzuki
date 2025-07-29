@@ -1,0 +1,528 @@
+import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test"
+import { Monitor } from "../../src/performance/monitor"
+
+describe("Monitor", () => {
+  beforeEach(async () => {
+    await Monitor.shutdown()
+    await Monitor.initialize()
+  })
+
+  afterEach(async () => {
+    await Monitor.shutdown()
+  })
+
+  describe("MonitorConfig", () => {
+    test("should parse default configuration", () => {
+      const config = Monitor.MonitorConfig.parse({})
+      expect(config.performance.enabled).toBe(true)
+      expect(config.performance.sampleInterval).toBe(1000)
+      expect(config.performance.slowThreshold).toBe(1000)
+      expect(config.bottleneck.enabled).toBe(true)
+      expect(config.resources.enabled).toBe(true)
+      expect(config.alerts.enabled).toBe(true)
+    })
+
+    test("should parse custom configuration", () => {
+      const config = Monitor.MonitorConfig.parse({
+        performance: {
+          enabled: false,
+          sampleInterval: 2000,
+          slowThreshold: 500,
+        },
+        bottleneck: {
+          enabled: false,
+        },
+      })
+      expect(config.performance.enabled).toBe(false)
+      expect(config.performance.sampleInterval).toBe(2000)
+      expect(config.performance.slowThreshold).toBe(500)
+      expect(config.bottleneck.enabled).toBe(false)
+    })
+  })
+
+  describe("Performance namespace", () => {
+    test("should record metrics", () => {
+      Monitor.Performance.recordMetric("test-metric", 100, "ms", { tag: "test" })
+      
+      const metrics = Monitor.Performance.getMetrics("test-metric")
+      expect(metrics).toHaveLength(1)
+      expect(metrics[0].name).toBe("test-metric")
+      expect(metrics[0].value).toBe(100)
+      expect(metrics[0].unit).toBe("ms")
+      expect(metrics[0].tags?.tag).toBe("test")
+    })
+
+    test("should record request times", () => {
+      Monitor.Performance.recordRequestTime(150)
+      Monitor.Performance.recordRequestTime(200)
+      
+      const avgTime = Monitor.Performance.getAverageResponseTime()
+      expect(avgTime).toBe(175)
+    })
+
+    test("should record operation times", () => {
+      Monitor.Performance.recordOperationTime("database-query", 50)
+      Monitor.Performance.recordOperationTime("database-query", 75)
+      
+      const stats = Monitor.Performance.getOperationStats("database-query")
+      expect(stats.count).toBe(2)
+      expect(stats.average).toBe(62.5)
+      expect(stats.min).toBe(50)
+      expect(stats.max).toBe(75)
+    })
+
+    test("should record errors", () => {
+      const error = new Error("Test error")
+      Monitor.Performance.recordError(error, { context: "test" })
+      
+      const errorRate = Monitor.Performance.getErrorRate()
+      expect(errorRate).toBeGreaterThan(0)
+    })
+
+    test("should calculate throughput", () => {
+      Monitor.Performance.recordRequestTime(100)
+      Monitor.Performance.recordRequestTime(150)
+      
+      const throughput = Monitor.Performance.getThroughput()
+      expect(throughput).toBeGreaterThan(0)
+    })
+
+    test("should filter metrics by time", () => {
+      const now = Date.now()
+      Monitor.Performance.recordMetric("old-metric", 100)
+      
+      // Wait a bit to ensure different timestamps
+      setTimeout(() => {
+        Monitor.Performance.recordMetric("new-metric", 200)
+        
+        const recentMetrics = Monitor.Performance.getMetrics(undefined, now + 50)
+        expect(recentMetrics.some(m => m.name === "new-metric")).toBe(true)
+        expect(recentMetrics.some(m => m.name === "old-metric")).toBe(false)
+      }, 100)
+    })
+  })
+
+  describe("Resources namespace", () => {
+    test("should get current resource usage", () => {
+      const usage = Monitor.Resources.getCurrentUsage()
+      
+      expect(usage.timestamp).toBeGreaterThan(0)
+      expect(usage.memory.heapUsed).toBeGreaterThan(0)
+      expect(usage.memory.heapTotal).toBeGreaterThan(0)
+      expect(usage.memory.heapUtilization).toBeGreaterThanOrEqual(0)
+      expect(usage.memory.heapUtilization).toBeLessThanOrEqual(1)
+      expect(usage.cpu.usage).toBeGreaterThanOrEqual(0)
+      expect(usage.handles.active).toBeGreaterThanOrEqual(0)
+    })
+
+    test("should track resources", () => {
+      Monitor.Resources.trackResources()
+      
+      const history = Monitor.Resources.getResourceHistory()
+      expect(history.length).toBeGreaterThan(0)
+    })
+
+    test("should filter resource history by time", () => {
+      const now = Date.now()
+      Monitor.Resources.trackResources()
+      
+      const recentHistory = Monitor.Resources.getResourceHistory(now)
+      expect(recentHistory.length).toBeGreaterThan(0)
+      expect(recentHistory.every(r => r.timestamp >= now)).toBe(true)
+    })
+  })
+
+  describe("Bottleneck namespace", () => {
+    test("should detect bottlenecks", () => {
+      const bottlenecks = Monitor.Bottleneck.detectBottlenecks()
+      expect(Array.isArray(bottlenecks)).toBe(true)
+    })
+
+    test("should get bottlenecks", () => {
+      const bottlenecks = Monitor.Bottleneck.getBottlenecks()
+      expect(Array.isArray(bottlenecks)).toBe(true)
+    })
+
+    test("should filter bottlenecks by time", () => {
+      const now = Date.now()
+      const recentBottlenecks = Monitor.Bottleneck.getBottlenecks(now)
+      expect(Array.isArray(recentBottlenecks)).toBe(true)
+    })
+  })
+
+  describe("Alerts namespace", () => {
+    test("should get alerts", () => {
+      const alerts = Monitor.Alerts.getAlerts()
+      expect(Array.isArray(alerts)).toBe(true)
+    })
+
+    test("should filter alerts by resolved status", () => {
+      const unresolvedAlerts = Monitor.Alerts.getAlerts(false)
+      const resolvedAlerts = Monitor.Alerts.getAlerts(true)
+      
+      expect(Array.isArray(unresolvedAlerts)).toBe(true)
+      expect(Array.isArray(resolvedAlerts)).toBe(true)
+    })
+
+    test("should clear resolved alerts", () => {
+      const clearedCount = Monitor.Alerts.clearResolvedAlerts()
+      expect(typeof clearedCount).toBe("number")
+      expect(clearedCount).toBeGreaterThanOrEqual(0)
+    })
+
+    test("should clear all alerts", () => {
+      const clearedCount = Monitor.Alerts.clearAllAlerts()
+      expect(typeof clearedCount).toBe("number")
+      expect(clearedCount).toBeGreaterThanOrEqual(0)
+    })
+  })
+
+  describe("High-level utilities", () => {
+    test("should measure async operations", async () => {
+      const result = await Monitor.measureAsync("async-test", async () => {
+        await new Promise(resolve => setTimeout(resolve, 10))
+        return "test-result"
+      })
+      
+      expect(result).toBe("test-result")
+      const stats = Monitor.Performance.getOperationStats("async-test")
+      expect(stats.count).toBe(1)
+      expect(stats.average).toBeGreaterThan(0)
+    })
+
+    test("should measure sync operations", () => {
+      const result = Monitor.measureSync("sync-test", () => {
+        // Simulate some work
+        let sum = 0
+        for (let i = 0; i < 1000; i++) {
+          sum += i
+        }
+        return sum
+      })
+      
+      expect(result).toBe(499500)
+      const stats = Monitor.Performance.getOperationStats("sync-test")
+      expect(stats.count).toBe(1)
+      expect(stats.average).toBeGreaterThan(0)
+    })
+
+    test("should create and use timers", () => {
+      const timer = Monitor.createTimer("timer-test")
+      
+      // Simulate some work
+      const start = Date.now()
+      while (Date.now() - start < 10) {
+        // Busy wait
+      }
+      
+      const duration = timer.stop()
+      expect(duration).toBeGreaterThan(0)
+      
+      const stats = Monitor.Performance.getOperationStats("timer-test")
+      expect(stats.count).toBe(1)
+      expect(stats.average).toBeGreaterThan(0)
+    })
+
+    test("should handle errors in async measurements", async () => {
+      await expect(
+        Monitor.measureAsync("error-test", async () => {
+          throw new Error("Test error")
+        })
+      ).rejects.toThrow("Test error")
+      
+      const stats = Monitor.Performance.getOperationStats("error-test")
+      expect(stats.count).toBe(1)
+    })
+
+    test("should handle errors in sync measurements", () => {
+      expect(() => {
+        Monitor.measureSync("sync-error-test", () => {
+          throw new Error("Sync test error")
+        })
+      }).toThrow("Sync test error")
+      
+      const stats = Monitor.Performance.getOperationStats("sync-error-test")
+      expect(stats.count).toBe(1)
+    })
+  })
+
+  describe("Configuration management", () => {
+    test("should get current configuration", () => {
+      const config = Monitor.getConfig()
+      expect(config).toBeDefined()
+      expect(config.performance).toBeDefined()
+      expect(config.bottleneck).toBeDefined()
+      expect(config.resources).toBeDefined()
+      expect(config.alerts).toBeDefined()
+    })
+
+    test("should update configuration", async () => {
+      await Monitor.updateConfig({
+        performance: {
+          sampleInterval: 5000,
+        },
+      })
+      
+      const config = Monitor.getConfig()
+      expect(config.performance.sampleInterval).toBe(5000)
+    })
+  })
+
+  describe("Statistics", () => {
+    test("should get monitor statistics", () => {
+      const stats = Monitor.getStats()
+      
+      expect(stats.uptime).toBeGreaterThan(0)
+      expect(stats.totalRequests).toBeGreaterThanOrEqual(0)
+      expect(stats.averageResponseTime).toBeGreaterThanOrEqual(0)
+      expect(stats.errorRate).toBeGreaterThanOrEqual(0)
+      expect(stats.throughput).toBeGreaterThanOrEqual(0)
+      expect(stats.activeConnections).toBeGreaterThanOrEqual(0)
+      expect(stats.resourceUsage).toBeDefined()
+      expect(Array.isArray(stats.recentBottlenecks)).toBe(true)
+      expect(Array.isArray(stats.activeAlerts)).toBe(true)
+    })
+  })
+})
+
+  afterEach(() => {
+    Monitor.reset()
+  })
+
+  describe("timing", () => {
+    test("should measure execution time", async () => {
+      const result = await Monitor.time("test-operation", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        return "test-result"
+      })
+
+      expect(result).toBe("test-result")
+      const metrics = Monitor.getMetrics()
+      expect(metrics["test-operation"]).toBeDefined()
+      expect(metrics["test-operation"].count).toBe(1)
+      expect(metrics["test-operation"].totalTime).toBeGreaterThan(0)
+      expect(metrics["test-operation"].averageTime).toBeGreaterThan(0)
+    })
+
+    test("should handle multiple measurements", async () => {
+      await Monitor.time("multi-test", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5))
+      })
+
+      await Monitor.time("multi-test", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5))
+      })
+
+      const metrics = Monitor.getMetrics()
+      expect(metrics["multi-test"].count).toBe(2)
+      expect(metrics["multi-test"].totalTime).toBeGreaterThan(0)
+      expect(metrics["multi-test"].averageTime).toBe(metrics["multi-test"].totalTime / metrics["multi-test"].count)
+    })
+
+    test("should handle errors and still record timing", async () => {
+      await expect(
+        Monitor.time("error-test", async () => {
+          await new Promise((resolve) => setTimeout(resolve, 5))
+          throw new Error("Test error")
+        }),
+      ).rejects.toThrow("Test error")
+
+      const metrics = Monitor.getMetrics()
+      expect(metrics["error-test"]).toBeDefined()
+      expect(metrics["error-test"].count).toBe(1)
+      expect(metrics["error-test"].totalTime).toBeGreaterThan(0)
+    })
+  })
+
+  describe("manual timing", () => {
+    test("should allow manual start/stop timing", () => {
+      const timer = Monitor.start("manual-test")
+
+      // Simulate some work
+      const start = Date.now()
+      while (Date.now() - start < 10) {
+        // Busy wait for 10ms
+      }
+
+      timer.end()
+
+      const metrics = Monitor.getMetrics()
+      expect(metrics["manual-test"]).toBeDefined()
+      expect(metrics["manual-test"].count).toBe(1)
+      expect(metrics["manual-test"].totalTime).toBeGreaterThan(0)
+    })
+
+    test("should handle multiple manual timers", () => {
+      const timer1 = Monitor.start("manual-multi")
+      const timer2 = Monitor.start("manual-multi")
+
+      timer1.end()
+      timer2.end()
+
+      const metrics = Monitor.getMetrics()
+      expect(metrics["manual-multi"].count).toBe(2)
+    })
+  })
+
+  describe("memory tracking", () => {
+    test("should track memory usage", () => {
+      Monitor.recordMemoryUsage("memory-test", 1024 * 1024) // 1MB
+
+      const metrics = Monitor.getMetrics()
+      expect(metrics["memory-test"]).toBeDefined()
+      expect(metrics["memory-test"].memoryUsage).toBe(1024 * 1024)
+    })
+
+    test("should track peak memory usage", () => {
+      Monitor.recordMemoryUsage("memory-peak", 1024 * 1024) // 1MB
+      Monitor.recordMemoryUsage("memory-peak", 2 * 1024 * 1024) // 2MB
+      Monitor.recordMemoryUsage("memory-peak", 512 * 1024) // 512KB
+
+      const metrics = Monitor.getMetrics()
+      expect(metrics["memory-peak"].peakMemoryUsage).toBe(2 * 1024 * 1024)
+    })
+  })
+
+  describe("counter tracking", () => {
+    test("should increment counters", () => {
+      Monitor.increment("counter-test")
+      Monitor.increment("counter-test")
+      Monitor.increment("counter-test", 3)
+
+      const metrics = Monitor.getMetrics()
+      expect(metrics["counter-test"].count).toBe(5)
+    })
+  })
+
+  describe("metrics retrieval", () => {
+    test("should return empty metrics initially", () => {
+      const metrics = Monitor.getMetrics()
+      expect(Object.keys(metrics)).toHaveLength(0)
+    })
+
+    test("should return specific metric", async () => {
+      await Monitor.time("specific-test", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5))
+      })
+
+      const metric = Monitor.getMetric("specific-test")
+      expect(metric).toBeDefined()
+      expect(metric?.count).toBe(1)
+
+      const nonExistent = Monitor.getMetric("non-existent")
+      expect(nonExistent).toBeUndefined()
+    })
+
+    test("should format metrics for display", async () => {
+      await Monitor.time("format-test", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      })
+      Monitor.recordMemoryUsage("format-test", 1024 * 1024)
+
+      const formatted = Monitor.formatMetrics()
+      expect(formatted).toContain("format-test")
+      expect(formatted).toContain("count: 1")
+      expect(formatted).toContain("memory:")
+    })
+  })
+
+  describe("reset functionality", () => {
+    test("should reset all metrics", async () => {
+      await Monitor.time("reset-test", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5))
+      })
+
+      let metrics = Monitor.getMetrics()
+      expect(Object.keys(metrics)).toHaveLength(1)
+
+      Monitor.reset()
+
+      metrics = Monitor.getMetrics()
+      expect(Object.keys(metrics)).toHaveLength(0)
+    })
+
+    test("should reset specific metric", async () => {
+      await Monitor.time("reset-specific", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5))
+      })
+      await Monitor.time("keep-this", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5))
+      })
+
+      Monitor.reset("reset-specific")
+
+      const metrics = Monitor.getMetrics()
+      expect(metrics["reset-specific"]).toBeUndefined()
+      expect(metrics["keep-this"]).toBeDefined()
+    })
+  })
+
+  describe("performance thresholds", () => {
+    test("should detect slow operations", async () => {
+      const slowOperations: string[] = []
+      const originalWarn = console.warn
+      console.warn = mock((message: string) => {
+        if (message.includes("slow operation")) {
+          slowOperations.push(message)
+        }
+      })
+
+      try {
+        await Monitor.time(
+          "slow-test",
+          async () => {
+            await new Promise((resolve) => setTimeout(resolve, 100))
+          },
+          { threshold: 50 },
+        )
+
+        expect(slowOperations.length).toBeGreaterThan(0)
+      } finally {
+        console.warn = originalWarn
+      }
+    })
+
+    test("should not warn for fast operations", async () => {
+      const warnings: string[] = []
+      const originalWarn = console.warn
+      console.warn = mock((message: string) => {
+        warnings.push(message)
+      })
+
+      try {
+        await Monitor.time(
+          "fast-test",
+          async () => {
+            await new Promise((resolve) => setTimeout(resolve, 5))
+          },
+          { threshold: 50 },
+        )
+
+        expect(warnings.length).toBe(0)
+      } finally {
+        console.warn = originalWarn
+      }
+    })
+  })
+
+  describe("concurrent operations", () => {
+    test("should handle concurrent timing operations", async () => {
+      const promises = Array.from({ length: 10 }, (_, i) =>
+        Monitor.time(`concurrent-${i}`, async () => {
+          await new Promise((resolve) => setTimeout(resolve, Math.random() * 20))
+          return i
+        })
+      )
+
+      const results = await Promise.all(promises)
+      expect(results).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+
+      const metrics = Monitor.getMetrics()
+      for (let i = 0; i < 10; i++) {
+        expect(metrics[`concurrent-${i}`]).toBeDefined()
+        expect(metrics[`concurrent-${i}`].count).toBe(1)
+      }
+    })
+  })
+})
+

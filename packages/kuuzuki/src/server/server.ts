@@ -18,6 +18,8 @@ import { LSP } from "../lsp"
 import { MessageV2 } from "../session/message-v2"
 import { Mode } from "../session/mode"
 import { callTui, TuiRoute } from "./tui"
+import { Monitor, Cache } from "../performance"
+import { webhookHandler } from "./billing"
 
 const ERRORS = {
   400: {
@@ -67,9 +69,14 @@ export namespace Server {
         }
         const start = Date.now()
         await next()
+        const duration = Date.now() - start
+
+        // Record performance metrics
+        Monitor.Performance.recordRequestTime(duration)
+
         if (!skipLogging) {
           log.info("response", {
-            duration: Date.now() - start,
+            duration,
           })
         }
       })
@@ -807,6 +814,51 @@ export namespace Server {
         async (c) => c.json(await callTui(c)),
       )
       .route("/tui/control", TuiRoute)
+      .post(
+        "/billing/webhook",
+        describeRoute({
+          description: "Handle Stripe billing webhooks",
+          responses: {
+            200: {
+              description: "Webhook processed successfully",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.object({
+                      received: z.boolean(),
+                    }),
+                  ),
+                },
+              },
+            },
+            400: {
+              description: "Bad request - invalid signature or missing headers",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.object({
+                      error: z.string(),
+                    }),
+                  ),
+                },
+              },
+            },
+            500: {
+              description: "Internal server error",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.object({
+                      error: z.string(),
+                    }),
+                  ),
+                },
+              },
+            },
+          },
+        }),
+        webhookHandler,
+      )
       .get(
         "/health",
         describeRoute({
@@ -821,7 +873,7 @@ export namespace Server {
                       status: z.literal("ok"),
                       timestamp: z.string(),
                       version: z.string().optional(),
-                    })
+                    }),
                   ),
                 },
               },
@@ -834,7 +886,42 @@ export namespace Server {
             timestamp: new Date().toISOString(),
             version: process.env["KUUZUKI_VERSION"] || "dev",
           })
-        }
+        },
+      )
+      .get(
+        "/performance",
+        describeRoute({
+          description: "Get performance metrics and statistics",
+          responses: {
+            200: {
+              description: "Performance statistics",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.object({
+                      monitor: z.any(),
+                      cache: z.any(),
+                      optimizer: z.any(),
+                    }),
+                  ),
+                },
+              },
+            },
+          },
+        }),
+        async (c) => {
+          try {
+            const stats = {
+              monitor: Monitor.getStats(),
+              cache: Cache.getStats(),
+              optimizer: { uptime: Date.now() - Date.now() }, // Placeholder
+            }
+            return c.json(stats)
+          } catch (error) {
+            log.error("Failed to get performance stats", error as Error)
+            return c.json({ error: "Failed to get performance stats" }, 500)
+          }
+        },
       )
 
     return result

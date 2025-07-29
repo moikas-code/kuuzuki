@@ -18,7 +18,7 @@
     "build": "./run.sh build",
     "build:all": "./run.sh build all",
     "build:tui": "./run.sh build tui",
-"build:server": "./run.sh build server",
+    "build:server": "./run.sh build server",
     "dev:tui": "./run.sh dev tui",
     "dev:server": "./run.sh dev server",
     "dev:web": "bun run --filter @kuuzuki/web dev",
@@ -55,6 +55,8 @@
     "protobufjs",
     "sharp"
   ],
-  "patchedDependencies": {}
+  "patchedDependencies": {},
+  "dependencies": {
+    "stripe": "18.3.0"
+  }
 }
-

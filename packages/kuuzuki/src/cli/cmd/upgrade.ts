@@ -1,6 +1,6 @@
 import type { Argv } from "yargs"
 import { UI } from "../ui"
-import * as prompts from "@clack/prompts"
+import * as prompts from "../../util/tui-safe-prompt.js"
 import { Installation } from "../../installation"
 
 export const UpgradeCommand = {

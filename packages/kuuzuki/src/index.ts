@@ -30,6 +30,7 @@ import {
 } from "./cli/cmd/git-permissions"
 import { HybridCommand } from "./cli/cmd/hybrid"
 import { Trace } from "./trace"
+import { ensureInitialized } from "./global"
 
 Trace.init()
 
@@ -107,6 +108,9 @@ const cli = yargs(hideBin(process.argv))
   .strict()
 
 try {
+  // Initialize global paths
+  await ensureInitialized()
+  
   // If no command is provided, default to TUI
   const args = process.argv.slice(2)
   if (args.length === 0 || (args.length === 1 && args[0].startsWith("-"))) {

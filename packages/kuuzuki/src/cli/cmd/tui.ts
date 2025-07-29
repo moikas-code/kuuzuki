@@ -48,6 +48,9 @@ export const TuiCommand = cmd({
         default: "127.0.0.1",
       }),
   handler: async (args) => {
+    // Set TUI mode to prevent external prompts from corrupting display
+    process.env.KUUZUKI_TUI_MODE = 'true'
+    
     while (true) {
       const cwd = args.project ? path.resolve(args.project) : process.cwd()
       try {

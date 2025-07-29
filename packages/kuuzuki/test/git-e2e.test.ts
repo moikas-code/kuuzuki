@@ -8,7 +8,7 @@ import { $ } from "bun"
 
 describe("Git Permission System - End-to-End User Workflows", () => {
   let testDir: string
-  let originalCwd: string
+  let originalCwd: string = process.cwd()
 
   beforeEach(async () => {
     // Create isolated test directory

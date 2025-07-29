@@ -151,6 +151,7 @@ export async function multiselect<T extends string>(options: {
  * Log a message that would normally be shown via console.log
  * In TUI mode: uses the logger
  * In CLI mode: uses console.log
+ * @deprecated Use log.info() instead
  */
 export function logMessage(message: string) {
   if (isTuiMode()) {
@@ -160,12 +161,13 @@ export function logMessage(message: string) {
   }
 }
 
+
 /**
  * Log an error that would normally be shown via console.error
  * In TUI mode: uses the logger
  * In CLI mode: uses console.error
  */
-export function logError(message: string) {
+export function error(message: string) {
   if (isTuiMode()) {
     Log.Default.error("tui-safe-output", { message })
   } else {
@@ -176,8 +178,13 @@ export function logError(message: string) {
 // Re-export other clack utilities that don't interfere with TUI
 export { spinner, intro, outro, cancel, note, isCancel } from "@clack/prompts"
 
-// Log object that matches clack's log interface
-export const log = {
+// Log hybrid - both a function and an object with methods
+// This allows both `prompts.log()` and `prompts.log.info()` to work
+export const log = Object.assign(
+  // Plain log function
+  (message: string) => logMessage(message),
+  // Log level methods
+  {
   info: (message: string) => {
     if (isTuiMode()) {
       Log.Default.info("tui-safe-output", { message })
@@ -216,5 +223,7 @@ export const log = {
     } else {
       clack.log.warning(message)
     }
-  },
-}
+  }
+  }
+)
+

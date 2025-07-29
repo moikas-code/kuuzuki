@@ -492,7 +492,7 @@ export namespace Monitor {
           heapTotal: memUsage.heapTotal,
           external: memUsage.external,
           rss: memUsage.rss,
-          heapUtilization: memUsage.heapUsed / memUsage.heapTotal,
+          heapUtilization: Math.min(memUsage.heapUsed / memUsage.heapTotal, 1),
         },
         cpu: {
           usage: cpuPercent,
@@ -667,6 +667,18 @@ export namespace Monitor {
     const timer = log.time("Monitor initialization")
 
     try {
+      // Reset all state variables
+      totalRequests = 0
+      errorCount = 0
+      startTime = Date.now()
+      performanceMetrics.length = 0
+      requestTimes.length = 0
+      operationTimes.clear()
+      resourceHistory.length = 0
+      bottlenecks.length = 0
+      alerts.clear()
+      metrics.clear()
+
       // Merge configuration
       if (userConfig) {
         config = MonitorConfig.parse({ ...config, ...userConfig })
@@ -830,5 +842,126 @@ export namespace Monitor {
         return duration
       },
     }
+  }
+
+  // Convenience methods for testing compatibility
+  const metrics = new Map<string, {
+    count: number
+    totalTime: number
+    averageTime: number
+    memoryUsage?: number
+    peakMemoryUsage?: number
+  }>()
+
+  export async function time<T>(name: string, fn: () => Promise<T>, options?: { threshold?: number }): Promise<T> {
+    const startTime = Date.now()
+    try {
+      const result = await fn()
+      const duration = Date.now() - startTime
+      
+      // Update metrics
+      const metric = metrics.get(name) || { count: 0, totalTime: 0, averageTime: 0 }
+      metric.count++
+      metric.totalTime += duration
+      metric.averageTime = metric.totalTime / metric.count
+      metrics.set(name, metric)
+
+      // Record in performance system
+      Performance.recordOperationTime(name, duration)
+      Performance.recordMetric(name, duration, "ms")
+
+      // Check threshold
+      if (options?.threshold && duration > options.threshold) {
+        console.warn(`Slow operation detected: ${name} took ${duration}ms (threshold: ${options.threshold}ms)`)
+      }
+
+      return result
+    } catch (error) {
+      const duration = Date.now() - startTime
+      
+      // Update metrics even on error
+      const metric = metrics.get(name) || { count: 0, totalTime: 0, averageTime: 0 }
+      metric.count++
+      metric.totalTime += duration
+      metric.averageTime = metric.totalTime / metric.count
+      metrics.set(name, metric)
+
+      Performance.recordOperationTime(name, duration)
+      Performance.recordError(error as Error, { operation: name })
+      throw error
+    }
+  }
+
+  export function start(name: string) {
+    const startTime = Date.now()
+    return {
+      end: () => {
+        const duration = Date.now() - startTime
+        
+        // Update metrics
+        const metric = metrics.get(name) || { count: 0, totalTime: 0, averageTime: 0 }
+        metric.count++
+        metric.totalTime += duration
+        metric.averageTime = metric.totalTime / metric.count
+        metrics.set(name, metric)
+
+        Performance.recordOperationTime(name, duration)
+        Performance.recordMetric(name, duration, "ms")
+        return duration
+      }
+    }
+  }
+
+  export function getMetrics(): Record<string, any> {
+    const result: Record<string, any> = {}
+    for (const [name, metric] of metrics.entries()) {
+      result[name] = { ...metric }
+    }
+    return result
+  }
+
+  export function getMetric(name: string) {
+    return metrics.get(name) || undefined
+  }
+
+  export function recordMemoryUsage(name: string, usage: number): void {
+    const metric = metrics.get(name) || { count: 0, totalTime: 0, averageTime: 0 }
+    metric.memoryUsage = usage
+    if (!metric.peakMemoryUsage || usage > metric.peakMemoryUsage) {
+      metric.peakMemoryUsage = usage
+    }
+    metrics.set(name, metric)
+  }
+
+  export function increment(name: string, value: number = 1): void {
+    const metric = metrics.get(name) || { count: 0, totalTime: 0, averageTime: 0 }
+    metric.count += value
+    metrics.set(name, metric)
+  }
+
+  export function reset(name?: string): void {
+    if (name) {
+      metrics.delete(name)
+    } else {
+      metrics.clear()
+    }
+  }
+
+  export function formatMetrics(): string {
+    let output = "Performance Metrics:\n"
+    for (const [name, metric] of metrics.entries()) {
+      output += `${name}:\n`
+      output += `  count: ${metric.count}\n`
+      output += `  totalTime: ${metric.totalTime}ms\n`
+      output += `  averageTime: ${metric.averageTime}ms\n`
+      if (metric.memoryUsage) {
+        output += `  memory: ${Math.round(metric.memoryUsage / 1024)}KB\n`
+      }
+      if (metric.peakMemoryUsage) {
+        output += `  peakMemory: ${Math.round(metric.peakMemoryUsage / 1024)}KB\n`
+      }
+      output += "\n"
+    }
+    return output
   }
 }

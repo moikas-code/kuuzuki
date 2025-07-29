@@ -1,4 +1,4 @@
-import { confirm, select } from "@clack/prompts"
+import * as prompts from "../../util/tui-safe-prompt.js"
 import { cmd } from "./cmd.js"
 import { createGitSafetySystem } from "../../git/index.js"
 import { parseAgentrc, DEFAULT_AGENTRC, type AgentrcConfig } from "../../config/agentrc.js"
@@ -111,7 +111,7 @@ export const GitPermissionsAllowCommand = cmd({
 
       console.log(`\n🔓 Allowing ${operation} for this project\n`)
 
-      const confirmed = await confirm({
+      const confirmed = await prompts.confirm({
         message: `Are you sure you want to allow ${operation} for this project?`,
         initialValue: false,
       })
@@ -180,7 +180,7 @@ export const GitPermissionsDenyCommand = cmd({
 
       console.log(`\n🔒 Denying ${operation} for this project\n`)
 
-      const confirmed = await confirm({
+      const confirmed = await prompts.confirm({
         message: `Are you sure you want to deny ${operation} for this project?`,
         initialValue: false,
       })
@@ -238,7 +238,7 @@ export const GitPermissionsResetCommand = cmd({
     try {
       console.log("\n🔄 Resetting Git permissions to defaults\n")
 
-      const confirmed = await confirm({
+      const confirmed = await prompts.confirm({
         message: "Are you sure you want to reset all Git permissions to defaults?",
         initialValue: false,
       })
@@ -284,7 +284,7 @@ export const GitPermissionsConfigureCommand = cmd({
       const currentGit = config.git || DEFAULT_AGENTRC.git!
 
       // Configure commit mode
-      const commitMode = await select({
+      const commitMode = await prompts.select({
         message: "How should commits be handled?",
         options: [
           { value: "never", label: "Never allow commits", hint: "Completely disable commits" },
@@ -296,7 +296,7 @@ export const GitPermissionsConfigureCommand = cmd({
       })
 
       // Configure push mode
-      const pushMode = await select({
+      const pushMode = await prompts.select({
         message: "How should pushes be handled?",
         options: [
           { value: "never", label: "Never allow pushes", hint: "Completely disable pushes (default)" },
@@ -308,7 +308,7 @@ export const GitPermissionsConfigureCommand = cmd({
       })
 
       // Configure config mode
-      const configMode = await select({
+      const configMode = await prompts.select({
         message: "How should Git config changes be handled?",
         options: [
           { value: "never", label: "Never allow config changes", hint: "Completely disable config changes (default)" },
@@ -320,13 +320,13 @@ export const GitPermissionsConfigureCommand = cmd({
       })
 
       // Configure author preservation
-      const preserveAuthor = await confirm({
+      const preserveAuthor = await prompts.confirm({
         message: "Preserve existing Git author settings?",
         initialValue: currentGit.preserveAuthor,
       })
 
       // Configure confirmation requirement
-      const requireConfirmation = await confirm({
+      const requireConfirmation = await prompts.confirm({
         message: "Always show commit preview before committing?",
         initialValue: currentGit.requireConfirmation,
       })

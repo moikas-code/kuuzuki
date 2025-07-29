@@ -1,7 +1,7 @@
 import path from "path"
 import { $ } from "bun"
 import { exec } from "child_process"
-import * as prompts from "@clack/prompts"
+import * as prompts from "../../util/tui-safe-prompt.js"
 import { map, pipe, sortBy, values } from "remeda"
 import { Octokit } from "@octokit/rest"
 import { graphql } from "@octokit/graphql"

@@ -1,4 +1,4 @@
-import { confirm, select, text } from "@clack/prompts"
+import * as prompts from "../util/tui-safe-prompt.js"
 import { Log } from "../util/log.js"
 import type { GitOperationContext, GitOperation } from "./permissions.js"
 
@@ -49,7 +49,7 @@ export class GitPromptSystem {
    * Show detailed context about the Git operation
    */
   private async showOperationContext(context: GitOperationContext): Promise<void> {
-    console.log(`\n🔒 Git ${context.operation.toUpperCase()} Permission Required\n`)
+    prompts.log(`\n🔒 Git ${context.operation.toUpperCase()} Permission Required\n`)
 
     switch (context.operation) {
       case "commit":
@@ -69,29 +69,29 @@ export class GitPromptSystem {
    */
   private async showCommitContext(context: GitOperationContext): Promise<void> {
     if (context.message) {
-      console.log(`📝 Commit message: "${context.message}"`)
+      prompts.log(`📝 Commit message: "${context.message}"`)
     }
 
     if (context.branch) {
-      console.log(`🌿 Branch: ${context.branch}`)
+      prompts.log(`🌿 Branch: ${context.branch}`)
     }
 
     if (context.files && context.files.length > 0) {
-      console.log(`📁 Files to commit (${context.files.length}):`)
+      prompts.log(`📁 Files to commit (${context.files.length}):`)
 
       // Show first 10 files, then summarize if more
       const displayFiles = context.files.slice(0, 10)
       for (const file of displayFiles) {
-        console.log(`   • ${file}`)
+        prompts.log(`   • ${file}`)
       }
 
       if (context.files.length > 10) {
-        console.log(`   ... and ${context.files.length - 10} more files`)
+        prompts.log(`   ... and ${context.files.length - 10} more files`)
       }
     }
 
     // Offer to show diff
-    const showDiff = await confirm({
+    const showDiff = await prompts.confirm({
       message: "Would you like to see the diff before deciding?",
       initialValue: false,
     })
@@ -106,11 +106,11 @@ export class GitPromptSystem {
    */
   private async showPushContext(context: GitOperationContext): Promise<void> {
     if (context.branch) {
-      console.log(`🌿 Pushing branch: ${context.branch}`)
+      prompts.log(`🌿 Pushing branch: ${context.branch}`)
     }
 
     if (context.target) {
-      console.log(`🎯 Target: ${context.target}`)
+      prompts.log(`🎯 Target: ${context.target}`)
     }
   }
 
@@ -119,7 +119,7 @@ export class GitPromptSystem {
    */
   private async showConfigContext(context: GitOperationContext): Promise<void> {
     if (context.config) {
-      console.log(`⚙️  Setting: ${context.config.key} = "${context.config.value}"`)
+      prompts.log(`⚙️  Setting: ${context.config.key} = "${context.config.value}"`)
     }
   }
 
@@ -127,7 +127,7 @@ export class GitPromptSystem {
    * Get user's permission choice
    */
   private async getPermissionChoice(operation: GitOperation): Promise<PermissionScope> {
-    const choice = await select({
+    const choice = await prompts.select<PermissionScope>({
       message: `How would you like to handle ${operation} operations?`,
       options: [
         {
@@ -160,9 +160,9 @@ export class GitPromptSystem {
    * Show git diff (placeholder - would integrate with actual git commands)
    */
   private async showDiff(): Promise<void> {
-    console.log("\n📋 Git Diff:")
-    console.log("(Diff would be shown here - integration with git diff command needed)")
-    console.log()
+    prompts.log("\n📋 Git Diff:")
+    prompts.log("(Diff would be shown here - integration with git diff command needed)")
+    prompts.log("")
   }
 
   /**
@@ -177,7 +177,7 @@ export class GitPromptSystem {
       return branches[0]
     }
 
-    const choice = await select({
+    const choice = await prompts.select<string>({
       message: "Select target branch:",
       options: branches.map((branch) => ({
         value: branch,
@@ -193,7 +193,7 @@ export class GitPromptSystem {
    * Prompt for commit message if not provided
    */
   async promptForCommitMessage(defaultMessage?: string): Promise<string | null> {
-    const message = await text({
+    const message = await prompts.text({
       message: "Enter commit message:",
       placeholder: defaultMessage || "Update files",
       defaultValue: defaultMessage,
@@ -214,17 +214,17 @@ export class GitPromptSystem {
    * Confirm dangerous operations
    */
   async confirmDangerousOperation(operation: string, details: string, consequences: string[]): Promise<boolean> {
-    console.log(`\n⚠️  Dangerous Operation: ${operation}`)
-    console.log(`📋 Details: ${details}`)
+    prompts.log(`\n⚠️  Dangerous Operation: ${operation}`)
+    prompts.log(`📋 Details: ${details}`)
 
     if (consequences.length > 0) {
-      console.log("\n🚨 Potential consequences:")
+      prompts.log("\n🚨 Potential consequences:")
       for (const consequence of consequences) {
-        console.log(`   • ${consequence}`)
+        prompts.log(`   • ${consequence}`)
       }
     }
 
-    const confirmed = await confirm({
+    const confirmed = await prompts.confirm({
       message: "Are you sure you want to proceed?",
       initialValue: false,
     })
@@ -236,11 +236,11 @@ export class GitPromptSystem {
    * Show permission summary
    */
   async showPermissionSummary(permissions: Record<GitOperation, string>): Promise<void> {
-    console.log("\n🔐 Current Git Permissions:")
-    console.log(`   Commits: ${permissions.commit || "ask"}`)
-    console.log(`   Pushes:  ${permissions.push || "never"}`)
-    console.log(`   Config:  ${permissions.config || "never"}`)
-    console.log()
+    prompts.log("\n🔐 Current Git Permissions:")
+    prompts.log(`   Commits: ${permissions.commit || "ask"}`)
+    prompts.log(`   Pushes:  ${permissions.push || "never"}`)
+    prompts.log(`   Config:  ${permissions.config || "never"}`)
+    prompts.log("")
   }
 }
 

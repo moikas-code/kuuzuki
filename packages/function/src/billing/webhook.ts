@@ -1,6 +1,7 @@
 import Stripe from "stripe"
 import { createApiKey, storeApiKey, getApiKeyByCustomerId, updateApiKeyStatus } from "./apikey"
 import { sendApiKeyEmail } from "./email"
+import type { KVNamespace } from "../types/kv"
 
 export async function handleStripeWebhook(
   event: Stripe.Event,

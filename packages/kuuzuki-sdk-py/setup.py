@@ -15,7 +15,7 @@ setup(
     version=VERSION,
     description="Kuuzuki SDK for Python",
     author="Kuuzuki Community",
-    author_email="support@kuuzuki.dev",
+    author_email="support@kuuzuki.com",
     url="https://github.com/moikas-code/kuuzuki",
     keywords=["Kuuzuki", "AI SDK", "API"],
     python_requires=PYTHON_REQUIRES,

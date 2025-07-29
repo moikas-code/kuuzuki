@@ -586,6 +586,11 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var response any = true
 		switch msg.Path {
 		case "/tui/open-help":
+			// Skip modal creation during active chat to prevent overlay corruption
+			if a.hasActiveChat() {
+				slog.Warn("Attempted to create help modal during active chat")
+				break
+			}
 			helpDialog := dialog.NewHelpDialog(a.app)
 			a.modal = helpDialog
 		case "/tui/append-prompt":
@@ -636,6 +641,14 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return a, tea.Batch(cmds...)
 }
 
+// hasActiveChat checks if the user is in an active chat session
+func (a *Model) hasActiveChat() bool {
+	// Check if we have an active session and any interactive elements
+	return a.app != nil && a.app.Session.ID != "" && 
+		(a.activeConfirmation != nil || a.activeToolApproval != nil || 
+		 a.activeTextInput != nil)
+}
+
 func (a Model) View() string {
 	measure := util.Measure("app.View")
 	defer measure()
@@ -662,7 +675,8 @@ func (a Model) View() string {
 	mainStyle := styles.NewStyle().Background(t.Background())
 	mainLayout = mainStyle.Render(mainLayout)
 
-	if a.modal != nil {
+	// Only render modal if not in active chat to prevent overlay corruption
+	if a.modal != nil && !a.hasActiveChat() {
 		mainLayout = a.modal.Render(mainLayout)
 	}
 	mainLayout = a.toastManager.RenderOverlay(mainLayout)
@@ -872,6 +886,11 @@ func (a Model) executeCommand(command commands.Command) (tea.Model, tea.Cmd) {
 	}
 	switch command.Name {
 	case commands.AppHelpCommand:
+		// Skip modal creation during active chat to prevent overlay corruption
+		if a.hasActiveChat() {
+			slog.Warn("Attempted to create help modal during active chat")
+			return a, nil
+		}
 		helpDialog := dialog.NewHelpDialog(a.app)
 		a.modal = helpDialog
 	case commands.SwitchModeCommand:
@@ -937,6 +956,11 @@ func (a Model) executeCommand(command commands.Command) (tea.Model, tea.Cmd) {
 		a.app.Messages = []app.Message{}
 		cmds = append(cmds, util.CmdHandler(app.SessionClearedMsg{}))
 	case commands.SessionListCommand:
+		// Skip modal creation during active chat to prevent overlay corruption
+		if a.hasActiveChat() {
+			slog.Warn("Attempted to create session list modal during active chat")
+			return a, nil
+		}
 		sessionDialog := dialog.NewSessionDialog(a.app)
 		a.modal = sessionDialog
 	case commands.SessionShareCommand:
@@ -1033,9 +1057,19 @@ func (a Model) executeCommand(command commands.Command) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, util.CmdHandler(chat.ToggleToolDetailsMsg{}))
 		cmds = append(cmds, toast.NewInfoToast(message))
 	case commands.ModelListCommand:
+		// Skip modal creation during active chat to prevent overlay corruption
+		if a.hasActiveChat() {
+			slog.Warn("Attempted to create model list modal during active chat")
+			return a, nil
+		}
 		modelDialog := dialog.NewModelDialog(a.app)
 		a.modal = modelDialog
 	case commands.ThemeListCommand:
+		// Skip modal creation during active chat to prevent overlay corruption
+		if a.hasActiveChat() {
+			slog.Warn("Attempted to create theme list modal during active chat")
+			return a, nil
+		}
 		themeDialog := dialog.NewThemeDialog()
 		a.modal = themeDialog
 	// case commands.FileListCommand:

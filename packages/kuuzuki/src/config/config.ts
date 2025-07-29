@@ -4,25 +4,56 @@ import { z } from "zod"
 import { App } from "../app/app"
 import { Filesystem } from "../util/filesystem"
 import { ModelsDev } from "../provider/models"
-import { mergeDeep, pipe } from "remeda"
+import { mergeDeep } from "remeda"
 import { Global } from "../global"
 import fs from "fs/promises"
 import { lazy } from "../util/lazy"
 import { NamedError } from "../util/error"
 import matter from "gray-matter"
+import { ApiKeyManager } from "../auth/apikey"
+import { ConfigSchema } from "./schema"
+import { ConfigMigration } from "./migration"
 
 export namespace Config {
   const log = Log.create({ service: "config" })
 
   export const state = App.state("config", async (app) => {
+    // Load base configuration
     let result = await global()
+
+    // Merge environment variables
+    const envConfig = ConfigSchema.parseEnvironmentVariables()
+    result = mergeDeep(result, envConfig)
+
+    // Load project-specific configurations
     for (const file of ["kuuzuki.jsonc", "kuuzuki.json"]) {
       const found = await Filesystem.findUp(file, app.path.cwd, app.path.root)
       for (const resolved of found.toReversed()) {
-        result = mergeDeep(result, await load(resolved))
+        const projectConfig = await load(resolved)
+        result = mergeDeep(result, projectConfig)
       }
     }
 
+    // Handle configuration migration if needed
+    const migrationEngine = new ConfigMigration.MigrationEngine("")
+    if (await migrationEngine.needsMigration(result)) {
+      log.info("Configuration migration required")
+      try {
+        const migrationResult = await migrationEngine.migrate(result, {
+          createBackup: true,
+          dryRun: false,
+        })
+        result = migrationResult.config
+        if (migrationResult.backupPath) {
+          log.info("Configuration backup created", { backupPath: migrationResult.backupPath })
+        }
+      } catch (error) {
+        log.error("Configuration migration failed", { error })
+        // Continue with unmigrated config but log the issue
+      }
+    }
+
+    // Load markdown agents
     result.agent = result.agent || {}
     const markdownAgents = [
       ...(await Filesystem.globUp("agent/*.md", Global.Path.config, Global.Path.config)),
@@ -38,7 +69,7 @@ export namespace Config {
         ...md.data,
         prompt: md.content.trim(),
       }
-      const parsed = Agent.safeParse(config)
+      const parsed = ConfigSchema.Agent.safeParse(config)
       if (parsed.success) {
         result.agent = mergeDeep(result.agent, {
           [config.name]: parsed.data,
@@ -48,20 +79,28 @@ export namespace Config {
       throw new InvalidError({ path: item }, { cause: parsed.error })
     }
 
-    // Handle migration from autoshare to share field
-    if (result.autoshare === true && !result.share) {
-      result.share = "auto"
-    }
-    if (result.keybinds?.messages_revert && !result.keybinds.messages_undo) {
-      result.keybinds.messages_undo = result.keybinds.messages_revert
-    }
-
+    // Set default username if not provided
     if (!result.username) {
       const os = await import("os")
       result.username = os.userInfo().username
     }
 
-    log.info("loaded", result)
+    // Final validation with schema
+    try {
+      result = ConfigSchema.validateConfig(result, "merged-config")
+    } catch (error) {
+      log.warn("Configuration validation failed, using defaults where possible", { error })
+      // Merge with defaults to ensure we have a valid configuration
+      const defaults = ConfigSchema.getDefaultConfig()
+      result = mergeDeep(defaults, result)
+    }
+
+    log.info("Configuration loaded successfully", {
+      version: result.version,
+      schema: result.$schema,
+      providers: Object.keys(result.provider || {}),
+      mcpServers: Object.keys(result.mcp || {}),
+    })
 
     return result
   })
@@ -181,14 +220,8 @@ export namespace Config {
         .describe(
           "Control sharing behavior:'manual' allows manual sharing via commands, 'auto' enables automatic sharing, 'disabled' disables all sharing",
         ),
-      subscriptionRequired: z
-        .boolean()
-        .optional()
-        .describe("Require subscription for share features (default: true)"),
-      apiUrl: z
-        .string()
-        .optional()
-        .describe("Custom API URL for self-hosted instances"),
+      subscriptionRequired: z.boolean().optional().describe("Require subscription for share features (default: true)"),
+      apiUrl: z.string().optional().describe("Custom API URL for self-hosted instances"),
       autoshare: z
         .boolean()
         .optional()
@@ -273,29 +306,55 @@ export namespace Config {
       ref: "Config",
     })
 
-  export type Info = z.output<typeof Info>
+  export type Info = ConfigSchema.ConfigOutput
 
   export const global = lazy(async () => {
-    let result = pipe(
-      {},
-      mergeDeep(await load(path.join(Global.Path.config, "config.json"))),
-      mergeDeep(await load(path.join(Global.Path.config, "kuuzuki.json"))),
-    )
+    let result: any = {}
 
-    await import(path.join(Global.Path.config, "config"), {
-      with: {
-        type: "toml",
-      },
-    })
-      .then(async (mod) => {
-        const { provider, model, ...rest } = mod.default
-        if (provider && model) result.model = `${provider}/${model}`
-        result["$schema"] = "https://kuuzuki.ai/config.json"
-        result = mergeDeep(result, rest)
-        await Bun.write(path.join(Global.Path.config, "config.json"), JSON.stringify(result, null, 2))
-        await fs.unlink(path.join(Global.Path.config, "config"))
+    // Load from standard config files
+    const configFiles = [path.join(Global.Path.config, "config.json"), path.join(Global.Path.config, "kuuzuki.json")]
+
+    for (const configFile of configFiles) {
+      try {
+        const config = await load(configFile)
+        result = mergeDeep(result, config)
+      } catch (error) {
+        // Ignore file not found errors
+        if (error instanceof JsonError && (error.cause as any)?.code === "ENOENT") {
+          continue
+        }
+        throw error
+      }
+    }
+
+    // Handle legacy TOML config migration
+    try {
+      const tomlConfig = await import(path.join(Global.Path.config, "config"), {
+        with: { type: "toml" },
       })
-      .catch(() => {})
+
+      const { provider, model, ...rest } = tomlConfig.default
+      if (provider && model) {
+        result.model = `${provider}/${model}`
+      }
+
+      result = mergeDeep(result, rest)
+      result.$schema = ConfigSchema.SCHEMA_URL
+      result.version = ConfigSchema.CONFIG_VERSION
+
+      // Write migrated config and remove TOML file
+      await Bun.write(path.join(Global.Path.config, "config.json"), JSON.stringify(result, null, 2))
+      await fs.unlink(path.join(Global.Path.config, "config"))
+
+      log.info("Migrated legacy TOML configuration to JSON")
+    } catch {
+      // TOML config doesn't exist, which is fine
+    }
+
+    // Ensure we have at least default values
+    if (Object.keys(result).length === 0) {
+      result = ConfigSchema.getDefaultConfig()
+    }
 
     return result
   })
@@ -312,6 +371,25 @@ export namespace Config {
     text = text.replace(/\{env:([^}]+)\}/g, (_, varName) => {
       return process.env[varName] || ""
     })
+
+    // Handle API key environment variables
+    const apiKeyEnvVars = [
+      "ANTHROPIC_API_KEY",
+      "CLAUDE_API_KEY",
+      "OPENAI_API_KEY",
+      "OPENROUTER_API_KEY",
+      "GITHUB_TOKEN",
+      "COPILOT_API_KEY",
+      "AWS_ACCESS_KEY_ID",
+      "AWS_BEARER_TOKEN_BEDROCK",
+    ]
+
+    for (const envVar of apiKeyEnvVars) {
+      const value = process.env[envVar]
+      if (value) {
+        text = text.replace(new RegExp(`\\{env:${envVar}\\}`, "g"), value)
+      }
+    }
 
     const fileMatches = text.match(/"?\{file:([^}]+)\}"?/g)
     if (fileMatches) {
@@ -331,15 +409,22 @@ export namespace Config {
       throw new JsonError({ path: configPath }, { cause: err as Error })
     }
 
-    const parsed = Info.safeParse(data)
-    if (parsed.success) {
-      if (!parsed.data.$schema) {
-        parsed.data.$schema = "https://kuuzuki.ai/config.json"
-        await Bun.write(configPath, JSON.stringify(parsed.data, null, 2))
+    try {
+      const validatedData = ConfigSchema.validateConfig(data, configPath)
+
+      // Update schema reference if missing
+      if (!validatedData.$schema) {
+        validatedData.$schema = ConfigSchema.SCHEMA_URL
+        await Bun.write(configPath, JSON.stringify(validatedData, null, 2))
       }
-      return parsed.data
+
+      return validatedData
+    } catch (error) {
+      if (error instanceof ConfigSchema.ValidationError) {
+        throw new InvalidError({ path: configPath, issues: error.data.issues })
+      }
+      throw error
     }
-    throw new InvalidError({ path: configPath, issues: parsed.error.issues })
   }
   export const JsonError = NamedError.create(
     "ConfigJsonError",
@@ -358,5 +443,154 @@ export namespace Config {
 
   export function get() {
     return state()
+  }
+
+  // Configuration management utilities
+  export namespace Management {
+    export async function backup(configPath: string, suffix?: string): Promise<string> {
+      const backupManager = new ConfigMigration.BackupManager(configPath)
+      return backupManager.createBackup(suffix)
+    }
+
+    export async function restore(configPath: string, backupPath: string): Promise<void> {
+      const backupManager = new ConfigMigration.BackupManager(configPath)
+      return backupManager.restoreBackup(backupPath)
+    }
+
+    export async function listBackups(configPath: string): Promise<string[]> {
+      const backupManager = new ConfigMigration.BackupManager(configPath)
+      return backupManager.listBackups()
+    }
+
+    export async function cleanupBackups(configPath: string, keepCount = 5): Promise<void> {
+      const backupManager = new ConfigMigration.BackupManager(configPath)
+      return backupManager.cleanupOldBackups(keepCount)
+    }
+
+    export async function migrate(
+      configPath: string,
+      config: any,
+      options?: {
+        createBackup?: boolean
+        dryRun?: boolean
+        force?: boolean
+      },
+    ): Promise<{ config: any; backupPath?: string }> {
+      return ConfigMigration.migrateConfig(configPath, config, options)
+    }
+
+    export async function rollback(
+      configPath: string,
+      config: any,
+      targetVersion: string,
+      options?: {
+        createBackup?: boolean
+        dryRun?: boolean
+      },
+    ): Promise<{ config: any; backupPath?: string }> {
+      return ConfigMigration.rollbackConfig(configPath, config, targetVersion, options)
+    }
+
+    export async function validate(data: unknown, source = "unknown"): Promise<ConfigSchema.ConfigOutput> {
+      return ConfigSchema.validateConfig(data, source)
+    }
+
+    export function getDefaults(): ConfigSchema.ConfigOutput {
+      return ConfigSchema.getDefaultConfig()
+    }
+
+    export function mergeConfigs(...configs: Partial<ConfigSchema.ConfigInput>[]): ConfigSchema.ConfigInput {
+      return configs.reduce((merged, config) => mergeDeep(merged, config), {} as ConfigSchema.ConfigInput)
+    }
+
+    export async function writeConfig(configPath: string, config: ConfigSchema.ConfigOutput): Promise<void> {
+      // Ensure the config is valid before writing
+      const validatedConfig = ConfigSchema.validateConfig(config, configPath)
+
+      // Ensure schema is set
+      if (!validatedConfig.$schema) {
+        validatedConfig.$schema = ConfigSchema.SCHEMA_URL
+      }
+
+      // Write with proper formatting
+      await Bun.write(configPath, JSON.stringify(validatedConfig, null, 2))
+      log.info("Configuration written successfully", { path: configPath })
+    }
+
+    export async function loadFromFile(configPath: string): Promise<ConfigSchema.ConfigOutput> {
+      return load(configPath)
+    }
+
+    export function parseEnvironment(): Partial<ConfigSchema.ConfigInput> {
+      return ConfigSchema.parseEnvironmentVariables()
+    }
+  }
+
+  // API Key Management Integration
+  export namespace ApiKeys {
+    const apiKeyManager = ApiKeyManager.getInstance()
+
+    export async function store(providerId: string, apiKey: string, useKeychain = true): Promise<void> {
+      return apiKeyManager.storeKey(providerId, apiKey, useKeychain)
+    }
+
+    export async function get(providerId: string): Promise<string | null> {
+      return apiKeyManager.getKey(providerId)
+    }
+
+    export async function remove(providerId: string): Promise<void> {
+      return apiKeyManager.removeKey(providerId)
+    }
+
+    export async function list(): Promise<
+      Array<{
+        providerId: string
+        maskedKey: string
+        source: string
+        createdAt: number
+        lastUsed?: number
+        healthStatus?: "success" | "failed"
+        lastHealthCheck?: number
+      }>
+    > {
+      return apiKeyManager.listKeys()
+    }
+
+    export async function validate(providerId: string, apiKey?: string): Promise<boolean> {
+      return apiKeyManager.validateKey(providerId, apiKey)
+    }
+
+    export async function healthCheck(providerId: string): Promise<{
+      success: boolean
+      error?: string
+      responseTime?: number
+    }> {
+      return apiKeyManager.healthCheck(providerId)
+    }
+
+    export async function healthCheckAll(): Promise<
+      Record<
+        string,
+        {
+          success: boolean
+          error?: string
+          responseTime?: number
+        }
+      >
+    > {
+      return apiKeyManager.healthCheckAll()
+    }
+
+    export function hasKey(providerId: string): boolean {
+      return apiKeyManager.hasKey(providerId)
+    }
+
+    export function getAvailableProviders(): string[] {
+      return apiKeyManager.getAvailableProviders()
+    }
+
+    export async function detectAndStore(apiKey: string, useKeychain = true): Promise<string | null> {
+      return apiKeyManager.detectAndStoreKey(apiKey, useKeychain)
+    }
   }
 }
