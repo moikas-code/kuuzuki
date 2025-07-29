@@ -6,4 +6,11 @@ export namespace Flag {
     const value = process.env[key]?.toLowerCase()
     return value === "true" || value === "1"
   }
+
+  export function boolean(key: string, defaultValue: boolean = false): boolean {
+    const value = process.env[key]?.toLowerCase()
+    if (value === "true" || value === "1") return true
+    if (value === "false" || value === "0") return false
+    return defaultValue
+  }
 }

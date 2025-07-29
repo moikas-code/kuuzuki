@@ -7,6 +7,7 @@ import { SchemaCommand } from "./cli/cmd/schema"
 import { Log } from "./util/log"
 import { AuthCommand } from "./cli/cmd/auth"
 import { BillingCommand } from "./cli/cmd/billing"
+import { ApiKeyCommand } from "./cli/cmd/apikey"
 import { AgentCommand } from "./cli/cmd/agent"
 import { UpgradeCommand } from "./cli/cmd/upgrade"
 import { ModelsCommand } from "./cli/cmd/models"
@@ -20,6 +21,13 @@ import { DebugCommand } from "./cli/cmd/debug"
 import { StatsCommand } from "./cli/cmd/stats"
 import { McpCommand } from "./cli/cmd/mcp"
 import { GithubCommand } from "./cli/cmd/github"
+import {
+  GitPermissionsStatusCommand,
+  GitPermissionsAllowCommand,
+  GitPermissionsDenyCommand,
+  GitPermissionsResetCommand,
+  GitPermissionsConfigureCommand,
+} from "./cli/cmd/git-permissions"
 import { Trace } from "./trace"
 
 Trace.init()
@@ -77,12 +85,18 @@ const cli = yargs(hideBin(process.argv))
   .command(DebugCommand)
   .command(AuthCommand)
   .command(BillingCommand)
+  .command(ApiKeyCommand)
   .command(AgentCommand)
   .command(UpgradeCommand)
   .command(ServeCommand)
   .command(ModelsCommand)
   .command(StatsCommand)
   .command(GithubCommand)
+  .command(GitPermissionsStatusCommand)
+  .command(GitPermissionsAllowCommand)
+  .command(GitPermissionsDenyCommand)
+  .command(GitPermissionsResetCommand)
+  .command(GitPermissionsConfigureCommand)
   .fail((msg) => {
     if (msg.startsWith("Unknown argument") || msg.startsWith("Not enough non-option arguments")) {
       cli.showHelp("log")
@@ -93,8 +107,8 @@ const cli = yargs(hideBin(process.argv))
 try {
   // If no command is provided, default to TUI
   const args = process.argv.slice(2)
-  if (args.length === 0 || (args.length === 1 && args[0].startsWith('-'))) {
-    await cli.parse(['tui', ...args])
+  if (args.length === 0 || (args.length === 1 && args[0].startsWith("-"))) {
+    await cli.parse(["tui", ...args])
   } else {
     await cli.parse()
   }

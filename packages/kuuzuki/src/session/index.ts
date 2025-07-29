@@ -16,7 +16,9 @@ import {
 } from "ai"
 
 import PROMPT_INITIALIZE from "../session/prompt/initialize.txt"
+import { LegacyFiles } from "../config/legacy"
 import PROMPT_PLAN from "../session/prompt/plan.txt"
+import PROMPT_CHAT from "../session/prompt/chat.txt"
 
 import { App } from "../app/app"
 import { Bus } from "../bus"
@@ -42,11 +44,67 @@ import { LSP } from "../lsp"
 import { ReadTool } from "../tool/read"
 import { mergeDeep, pipe, splitWhen } from "remeda"
 import { ToolRegistry } from "../tool/registry"
+import { HybridContextManager } from "./hybrid-context-manager"
+import { HybridContext } from "./hybrid-context"
 
 export namespace Session {
   const log = Log.create({ service: "session" })
 
   const OUTPUT_TOKEN_MAX = 32_000
+
+  // Feature flag for hybrid context management
+  const HYBRID_CONTEXT_ENABLED = Flag.boolean("hybrid-context-enabled", false)
+
+  /**
+   * Estimates token count for text content
+   * Uses rough approximation: 1 token ≈ 4 characters for English text
+   */
+  function estimateTokens(text: string): number {
+    if (!text) return 0
+    // More accurate estimation accounting for whitespace and punctuation
+    return Math.ceil(text.length / 3.5)
+  }
+
+  /**
+   * Estimates total tokens for a request before sending to AI
+   */
+  async function estimateRequestTokens(
+    msgs: { info: MessageV2.Info; parts: MessageV2.Part[] }[],
+    newUserInput: MessageV2.Part[],
+    systemPrompts: string[],
+  ): Promise<number> {
+    let totalTokens = 0
+
+    // Count existing messages
+    for (const msg of msgs) {
+      // Convert to model message format to get accurate representation
+      const modelMsgs = MessageV2.toModelMessage([msg])
+      for (const modelMsg of modelMsgs) {
+        if (typeof modelMsg.content === "string") {
+          totalTokens += estimateTokens(modelMsg.content)
+        } else if (Array.isArray(modelMsg.content)) {
+          for (const part of modelMsg.content) {
+            if (part.type === "text") {
+              totalTokens += estimateTokens(part.text)
+            }
+          }
+        }
+      }
+    }
+
+    // Count new user input
+    for (const part of newUserInput) {
+      if (part.type === "text") {
+        totalTokens += estimateTokens(part.text)
+      }
+    }
+
+    // Count system prompts
+    totalTokens += estimateTokens(systemPrompts.join("\n"))
+
+    // Add buffer for tool calls, formatting, JSON structure, etc.
+    return Math.ceil(totalTokens * 1.25)
+  }
 
   export const Info = z
     .object({
@@ -232,6 +290,40 @@ export namespace Session {
     await Share.remove(id, share.secret)
   }
 
+  /**
+   * Migrate an existing session to use hybrid context management
+   */
+  export async function migrateToHybridContext(sessionID: string): Promise<void> {
+    if (!HYBRID_CONTEXT_ENABLED) {
+      log.warn("hybrid context not enabled, skipping migration", { sessionID })
+      return
+    }
+
+    try {
+      log.info("migrating session to hybrid context", { sessionID })
+
+      const contextManager = await HybridContextManager.forSession(sessionID)
+      const msgs = await messages(sessionID)
+
+      // Process existing messages to build initial context
+      for (const msg of msgs) {
+        await contextManager.addMessage(msg.info, { skipCompression: true })
+      }
+
+      // Perform initial compression if needed
+      await contextManager.performCompression()
+
+      log.info("session migrated to hybrid context", {
+        sessionID,
+        messageCount: msgs.length,
+        metrics: contextManager.getMetrics(),
+      })
+    } catch (error) {
+      log.error("failed to migrate session to hybrid context", { error, sessionID })
+      throw error
+    }
+  }
+
   export async function update(id: string, editor: (session: Info) => void) {
     const { sessions } = state()
     const session = await get(id)
@@ -326,6 +418,17 @@ export namespace Session {
 
   async function updateMessage(msg: MessageV2.Info) {
     await Storage.writeJSON("session/message/" + msg.sessionID + "/" + msg.id, msg)
+
+    // Update hybrid context if enabled
+    if (HYBRID_CONTEXT_ENABLED && msg.role === "assistant") {
+      try {
+        const contextManager = await HybridContextManager.forSession(msg.sessionID)
+        await contextManager.addMessage(msg)
+      } catch (error) {
+        log.warn("failed to update hybrid context", { error, messageId: msg.id })
+      }
+    }
+
     Bus.publish(MessageV2.Event.Updated, {
       info: msg,
     })
@@ -544,6 +647,15 @@ export namespace Session {
         text: PROMPT_PLAN,
         synthetic: true,
       })
+    if (inputMode === "chat")
+      userParts.push({
+        id: Identifier.ascending("part"),
+        messageID: userMsg.id,
+        sessionID: input.sessionID,
+        type: "text",
+        text: PROMPT_CHAT,
+        synthetic: true,
+      })
 
     await updateMessage(userMsg)
     for (const part of userParts) {
@@ -596,11 +708,134 @@ export namespace Session {
     const previous = msgs.filter((x) => x.info.role === "assistant").at(-1)?.info as MessageV2.Assistant
     const outputLimit = Math.min(model.info.limit.output, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX
 
-    // auto summarize if too long
+    // Use hybrid context management if enabled
+    let hybridContextUsed = false
+    let optimizedMessages: { info: MessageV2.Info; parts: MessageV2.Part[] }[] = []
+
+    if (HYBRID_CONTEXT_ENABLED) {
+      const contextManager = await HybridContextManager.forSession(input.sessionID)
+
+      // Add the new user message to the context manager
+      await contextManager.addMessage(userMsg)
+
+      // Check if compression is needed
+      const contextRequest: HybridContext.ContextRequest = {
+        sessionID: input.sessionID,
+        includeRecent: true,
+        includeCompressed: true,
+        includeSemantic: true,
+        includePinned: true,
+        prioritizeTypes: [],
+        maxTokens: model.info.limit.context ? model.info.limit.context - outputLimit : undefined,
+      }
+
+      const optimizedContext = await contextManager.buildContextForRequest(contextRequest)
+
+      // Log context optimization results
+      log.info("hybrid context optimization", {
+        originalMessages: msgs.length,
+        optimizedMessages: optimizedContext.messages.length,
+        semanticFacts: optimizedContext.semanticFacts.length,
+        totalTokens: optimizedContext.totalTokens,
+        compressionSummary: optimizedContext.compressionSummary,
+      })
+
+      // Convert optimized context to message format
+      if (optimizedContext.totalTokens < model.info.limit.context * 0.85) {
+        hybridContextUsed = true
+
+        // Build optimized message list
+        for (const item of optimizedContext.messages) {
+          if ("semanticSummary" in item) {
+            // Compressed message - create a synthetic assistant message
+            optimizedMessages.push({
+              info: {
+                id: item.originalId,
+                role: "assistant",
+                sessionID: item.sessionID,
+                time: { created: item.compressedAt },
+                path: { cwd: app.path.cwd, root: app.path.root },
+                providerID: input.providerID,
+                modelID: input.modelID,
+                mode: inputMode,
+                system: [],
+                cost: 0,
+                tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+              } as MessageV2.Assistant,
+              parts: [
+                {
+                  id: Identifier.ascending("part"),
+                  messageID: item.originalId,
+                  sessionID: item.sessionID,
+                  type: "text",
+                  text: `[Compressed] ${item.semanticSummary}`,
+                },
+              ],
+            })
+          } else {
+            // Regular message - find it in msgs
+            const found = msgs.find((m) => m.info.id === item.id)
+            if (found) {
+              optimizedMessages.push(found)
+            }
+          }
+        }
+
+        // Add semantic facts to the system prompt if any
+        if (optimizedContext.semanticFacts.length > 0) {
+          const factsText = optimizedContext.semanticFacts.map((f) => `[${f.type}] ${f.content}`).join("\n")
+
+          // We'll add this to the system prompt later instead of as a message
+          system.push(`Previous conversation context:\n${factsText}`)
+        }
+      }
+    }
+
+    // PROACTIVE CHECK: Estimate tokens before making request
+    if (model.info.limit.context) {
+      const inputMode = input.mode ?? "build"
+      const mode = await Mode.get(inputMode)
+      let systemPrompts = SystemPrompt.header(input.providerID)
+      systemPrompts.push(
+        ...(() => {
+          if (input.system) return [input.system]
+          if (mode.prompt) return [mode.prompt]
+          return SystemPrompt.provider(input.modelID)
+        })(),
+      )
+      systemPrompts.push(...(await SystemPrompt.environment()))
+      systemPrompts.push(...(await SystemPrompt.custom()))
+
+      const estimatedInputTokens = await estimateRequestTokens(msgs, userParts, systemPrompts)
+      const safetyThreshold = model.info.limit.context * 0.85 // More conservative than 90%
+      const totalEstimated = estimatedInputTokens + outputLimit
+
+      if (totalEstimated > safetyThreshold) {
+        log.info("proactive summarization triggered", {
+          estimatedTokens: totalEstimated,
+          threshold: safetyThreshold,
+          contextLimit: model.info.limit.context,
+          outputLimit,
+        })
+        await summarize({
+          sessionID: input.sessionID,
+          providerID: input.providerID,
+          modelID: input.modelID,
+        })
+        return chat(input)
+      }
+    }
+
+    // REACTIVE CHECK: Keep existing logic as fallback
     if (previous && previous.tokens) {
       const tokens =
         previous.tokens.input + previous.tokens.cache.read + previous.tokens.cache.write + previous.tokens.output
       if (model.info.limit.context && tokens > Math.max((model.info.limit.context - outputLimit) * 0.9, 0)) {
+        log.info("reactive summarization triggered", {
+          actualTokens: tokens,
+          threshold: Math.max((model.info.limit.context - outputLimit) * 0.9, 0),
+          contextLimit: model.info.limit.context,
+        })
         await summarize({
           sessionID: input.sessionID,
           providerID: input.providerID,
@@ -830,7 +1065,7 @@ export namespace Session {
             content: x,
           }),
         ),
-        ...MessageV2.toModelMessage(msgs),
+        ...MessageV2.toModelMessage(hybridContextUsed ? optimizedMessages : msgs),
       ],
       temperature: model.info.temperature
         ? (mode.temperature ?? ProviderTransform.temperature(input.providerID, input.modelID))
@@ -1312,6 +1547,13 @@ export namespace Session {
     messageID: string
   }) {
     const app = App.info()
+
+    // Get legacy file context to help with .agentrc generation
+    const legacyContext = await LegacyFiles.createContextSummary()
+
+    // Combine the base prompt with legacy file context
+    const fullPrompt = [PROMPT_INITIALIZE.replace("${path}", app.path.root), legacyContext].filter(Boolean).join("\n\n")
+
     await Session.chat({
       sessionID: input.sessionID,
       messageID: input.messageID,
@@ -1321,7 +1563,7 @@ export namespace Session {
         {
           id: Identifier.ascending("part"),
           type: "text",
-          text: PROMPT_INITIALIZE.replace("${path}", app.path.root),
+          text: fullPrompt,
         },
       ],
     })
