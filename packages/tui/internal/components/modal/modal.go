@@ -76,21 +76,28 @@ func (m *Modal) SetTitle(title string) {
 func (m *Modal) Render(contentView string, background string) string {
 	t := theme.CurrentTheme()
 
-	outerWidth := layout.Current.Container.Width - 8
+	// Get background dimensions
+	bgHeight := lipgloss.Height(background)
+	bgWidth := lipgloss.Width(background)
+
+	// Calculate content dimensions
+	contentWidth := lipgloss.Width(contentView)
+
+	// Determine modal width
+	outerWidth := contentWidth + 8 // Add padding for borders and spacing
 	if m.maxWidth > 0 && outerWidth > m.maxWidth {
 		outerWidth = m.maxWidth
 	}
-
-	if m.fitContent {
-		titleWidth := lipgloss.Width(m.title)
-		contentWidth := lipgloss.Width(contentView)
-		largestWidth := max(titleWidth+2, contentWidth)
-		outerWidth = largestWidth + 6
+	// Ensure it fits in the terminal
+	if outerWidth > bgWidth - 4 {
+		outerWidth = bgWidth - 4
 	}
 
 	innerWidth := outerWidth - 4
 
-	baseStyle := styles.NewStyle().Foreground(t.TextMuted()).Background(t.BackgroundPanel())
+	baseStyle := styles.NewStyle().
+		Foreground(t.TextMuted()).
+		Background(t.BackgroundPanel())
 
 	var finalContent string
 	if m.title != "" {
@@ -115,24 +122,23 @@ func (m *Modal) Render(contentView string, background string) string {
 		finalContent = contentView
 	}
 
+	// Create modal with border
 	modalStyle := baseStyle.
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(t.BorderActive()).
 		PaddingTop(1).
 		PaddingBottom(1).
 		PaddingLeft(2).
-		PaddingRight(2)
+		PaddingRight(2).
+		Width(innerWidth)
 
-	modalView := modalStyle.
-		Width(outerWidth).
-		Render(finalContent)
+	modalView := modalStyle.Render(finalContent)
 
-	// Calculate position for centering
-	bgHeight := lipgloss.Height(background)
-	bgWidth := lipgloss.Width(background)
+	// Calculate modal dimensions after rendering
 	modalHeight := lipgloss.Height(modalView)
 	modalWidth := lipgloss.Width(modalView)
 
 	// Calculate centered position
-	// Account for border width (1 char on each side) when centering
 	row := (bgHeight - modalHeight) / 2
 	col := (bgWidth - modalWidth) / 2
 
@@ -140,12 +146,11 @@ func (m *Modal) Render(contentView string, background string) string {
 	row = max(0, row)
 	col = max(0, col)
 
+	// Use PlaceOverlay without border since we already added border to modal
 	return layout.PlaceOverlay(
 		col,
 		row,
 		modalView,
 		background,
-		layout.WithOverlayBorder(),
-		layout.WithOverlayBorderColor(t.BorderActive()),
 	)
 }

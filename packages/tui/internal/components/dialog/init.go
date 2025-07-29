@@ -25,7 +25,7 @@ func NewInitDialogCmp() InitDialog {
 	return &InitDialogCmp{
 		selected: 0,
 		keys:     initDialogKeyMap{},
-		modal:    modal.New(modal.WithTitle("Initialize Project")),
+		modal:    modal.New(modal.WithTitle("Initialize Project"), modal.WithMaxWidth(70)),
 	}
 }
 
@@ -105,7 +105,7 @@ func (m InitDialogCmp) View() string {
 	baseStyle := styles.NewStyle().Foreground(t.Text())
 
 	// Calculate width needed for content
-	maxWidth := 60 // Width for explanation text
+	maxWidth := min(60, m.width-10) // Width for explanation text, constrained by window
 
 	explanation := baseStyle.
 		Foreground(t.Text()).
@@ -118,8 +118,6 @@ func (m InitDialogCmp) View() string {
 		Width(maxWidth).
 		Padding(1, 1).
 		Render("Would you like to initialize this project?")
-
-	maxWidth = min(maxWidth, m.width-10)
 	yesStyle := baseStyle
 	noStyle := baseStyle
 
