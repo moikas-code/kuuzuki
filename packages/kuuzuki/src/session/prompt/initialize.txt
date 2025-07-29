@@ -1,8 +1,36 @@
-Please analyze this codebase and create an AGENTS.md file containing:
-1. Build/lint/test commands - especially for running a single test
-2. Code style guidelines including imports, formatting, types, naming conventions, error handling, etc.
+Please analyze this codebase and create a .agentrc file containing structured configuration for AI agents.
 
-The file you create will be given to agentic coding agents (such as yourself) that operate in this repository. Make it about 20 lines long.
-If there are Cursor rules (in .cursor/rules/ or .cursorrules) or Copilot rules (in .github/copilot-instructions.md), make sure to include them.
+The .agentrc file should be a JSON object with the following structure:
+- project: Basic project information (name, type, description)
+- commands: Build, test, lint, dev commands (especially testSingle for running individual tests)
+- codeStyle: Language, formatter, linter, import style, quotes, semicolons
+- conventions: File naming, function naming, test file patterns
+- tools: Package manager, runtime, bundler, framework, database, testing framework
+- paths: Important directories (src, tests, docs, config)
+- rules: Array of development rules and guidelines
+- dependencies: Critical, preferred, and avoided libraries
+- mcp: MCP (Model Context Protocol) server configurations and tool preferences
+- agent: AI-specific settings like preferred built-in tools
 
-If there's already an AGENTS.md, improve it if it's located in ${path}
+**IMPORTANT: Analyze and incorporate existing configuration files:**
+
+1. **Configuration Files**: Extract information from package.json, tsconfig.json, and other config files
+2. **Legacy Agent Files**: If AGENTS.md exists in ${path}, extract and convert its structured information (commands, tools, conventions) and include its rules/guidelines in the rules array
+3. **Claude Files**: If CLAUDE.md exists in ${path}, extract its development rules, coding standards, and guidelines and include them in the rules array
+4. **Cursor Rules**: Include any existing rules from .cursor/rules/, .cursorrules, or .github/copilot-instructions.md in the rules array
+5. **MCP Configuration**: Check for existing MCP server configurations in kuuzuki.json or config.json files and include them in the mcp.servers section
+6. **Global Files**: Check for ~/.config/kuuzuki/AGENTS.md or ~/.claude/CLAUDE.md and incorporate relevant global rules
+
+**Content Integration Strategy:**
+- Extract structured data (commands, tools, paths) from AGENTS.md into appropriate .agentrc fields
+- Convert prose rules and guidelines from both AGENTS.md and CLAUDE.md into the rules array
+- Preserve important project context and coding standards from all sources
+- Merge overlapping rules intelligently, avoiding duplication
+- Maintain the intent and specificity of existing instructions
+
+**File Priority:**
+1. If .agentrc already exists in ${path}, improve and enhance it with information from other sources
+2. If only legacy files exist, create a comprehensive .agentrc that captures all their information
+3. Preserve any custom agent-specific settings while adding missing structured data
+
+Create a comprehensive configuration that consolidates all existing project knowledge into a single, well-structured .agentrc file that will help AI agents understand and work effectively with this codebase.

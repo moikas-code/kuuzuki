@@ -3,11 +3,11 @@ title: Keybinds
 description: Customize your keybinds.
 ---
 
-opencode has a list of keybinds that you can customize through the opencode config.
+kuuzuki has a list of keybinds that you can customize through the kuuzuki config.
 
-```json title="opencode.json"
+```json title="kuuzuki.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://kuuzuki.com/config.json",
   "keybinds": {
     "leader": "ctrl+x",
     "app_help": "<leader>h",
@@ -47,7 +47,7 @@ opencode has a list of keybinds that you can customize through the opencode conf
 
 ## Leader key
 
-opencode uses a `leader` key for most keybinds. This avoids conflicts in your terminal.
+kuuzuki uses a `leader` key for most keybinds. This avoids conflicts in your terminal.
 
 By default, `ctrl+x` is the leader key and most actions require you to first press the leader key and then the shortcut. For example, to start a new session you first press `ctrl+x` and then press `n`.
 
@@ -57,9 +57,9 @@ You don't need to use a leader key for your keybinds but we recommend doing so.
 
 You can disable a keybind by adding the key to your config with a value of "none".
 
-```json title="opencode.json"
+```json title="kuuzuki.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://kuuzuki.com/config.json",
   "keybinds": {
     "session_compact": "none",
   }

@@ -433,7 +433,14 @@ export namespace MessageV2 {
     const result: UIMessage[] = []
 
     for (const msg of input) {
-      if (msg.parts.length === 0) continue
+      if (msg.parts.length === 0) {
+        console.warn("MessageV2.toModelMessage: Skipping message with empty parts", {
+          messageId: msg.info.id,
+          role: msg.info.role,
+          sessionID: msg.info.sessionID,
+        })
+        continue
+      }
 
       if (msg.info.role === "user") {
         result.push({

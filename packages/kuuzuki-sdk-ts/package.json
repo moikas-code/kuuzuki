@@ -1,0 +1,31 @@
+{
+  "name": "@moikas/kuuzuki-sdk",
+  "version": "0.1.0",
+  "description": "Kuuzuki SDK for TypeScript/JavaScript",
+  "author": "Kuuzuki Community",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/moikas-code/kuuzuki.git"
+  },
+  "main": "./dist/index.js",
+  "typings": "./dist/index.d.ts",
+  "module": "./dist/esm/index.js",
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc && tsc -p tsconfig.esm.json",
+    "prepare": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^4.0 || ^5.0"
+  },
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "typesVersions": {
+    ">=3.9": {
+      "*": [
+        "dist/index.d.ts"
+      ]
+    }
+  }
+}

@@ -1,0 +1,1 @@
+{"project": {"name": "test"}, "rules": ["Always test before deployment", "Use TypeScript for type safety"]}

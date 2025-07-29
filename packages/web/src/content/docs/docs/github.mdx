@@ -1,17 +1,17 @@
 ---
 title: GitHub
-description: Using opencode within GitHub Issues and Pull-Requests
+description: Using kuuzuki within GitHub Issues and Pull-Requests
 ---
 
-opencode integrates directly into your GitHub workflow. Mention `/opencode` in your comment, and opencode will execute tasks within your GitHub Actions runner.
+kuuzuki integrates directly into your GitHub workflow. Mention `/kuuzuki` in your comment, and kuuzuki will execute tasks within your GitHub Actions runner.
 
 ---
 
 ## Features
 
-- **Triage Issues**: Ask opencode to look into an issue and explain it to you
-- **Fix and Implement**: Ask opencode to fix an issue or implement a feature. And it will work in a new branch and submits a PR with all the changes.
-- **Secure**: opencode runs inside your GitHub's runners.
+- **Triage Issues**: Ask kuuzuki to look into an issue and explain it to you
+- **Fix and Implement**: Ask kuuzuki to fix an issue or implement a feature. And it will work in a new branch and submits a PR with all the changes.
+- **Secure**: kuuzuki runs inside your GitHub's runners.
 
 ---
 
@@ -20,7 +20,7 @@ opencode integrates directly into your GitHub workflow. Mention `/opencode` in y
 Run the following command in the terminal from your GitHub repo:
 
 ```bash
-opencode github install
+kuuzuki github install
 ```
 
 This will walk you through installing the GitHub app, creating the workflow, and setting up secrets.
@@ -29,21 +29,21 @@ This will walk you through installing the GitHub app, creating the workflow, and
 
 ### Manual Setup
 
-1. Install the GitHub app https://github.com/apps/opencode-agent. Make sure it is installed on the target repository.
-2. Add the following workflow file to `.github/workflows/opencode.yml` in your repo. Set the appropriate `model` and required API keys in `env`.
+1. Install the GitHub app https://github.com/apps/kuuzuki-agent. Make sure it is installed on the target repository.
+2. Add the following workflow file to `.github/workflows/kuuzuki.yml` in your repo. Set the appropriate `model` and required API keys in `env`.
 
    ```yml
-   name: opencode
+   name: kuuzuki
 
    on:
      issue_comment:
        types: [created]
 
    jobs:
-     opencode:
+     kuuzuki:
        if: |
          contains(github.event.comment.body, '/oc') ||
-         contains(github.event.comment.body, '/opencode')
+         contains(github.event.comment.body, '/kuuzuki')
        runs-on: ubuntu-latest
        permissions:
          id-token: write
@@ -53,8 +53,8 @@ This will walk you through installing the GitHub app, creating the workflow, and
            with:
              fetch-depth: 1
 
-         - name: Run opencode
-           uses: sst/opencode/github@latest
+         - name: Run kuuzuki
+           uses: moikas-code/kuuzuki/github@latest
            env:
              ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
            with:
@@ -68,7 +68,7 @@ This will walk you through installing the GitHub app, creating the workflow, and
 
 ### Inputs
 
-- `model`: The model used by opencode. Takes the format of `provider/model` (**required**)
+- `model`: The model used by kuuzuki. Takes the format of `provider/model` (**required**)
 - `share`: Share the session. Sessions are shared by default for public repos.
 
 ---
@@ -78,13 +78,13 @@ This will walk you through installing the GitHub app, creating the workflow, and
 - Explain an issue
 
   ```bash
-  /opencode explain this issue
+  /kuuzuki explain this issue
   ```
 
-- Fix an issue - opencode will create a PR with the changes.
+- Fix an issue - kuuzuki will create a PR with the changes.
 
   ```bash
-  /opencode fix this
+  /kuuzuki fix this
   ```
 
 - Review PRs and make changes

@@ -3,7 +3,7 @@ title: MCP servers
 description: Add local and remote MCP tools.
 ---
 
-You can add external tools to opencode using the _Model Context Protocol_, or MCP. opencode supports both:
+You can add external tools to kuuzuki using the _Model Context Protocol_, or MCP. kuuzuki supports both:
 
 - Local servers
 - And remote servers
@@ -14,15 +14,15 @@ Once added, MCP tools are automatically available to the LLM alongside built-in 
 
 ## Configure
 
-You can define MCP servers in your opencode config under `mcp`.
+You can define MCP servers in your kuuzuki config under `mcp`.
 
 ### Local
 
 Add local MCP servers using `"type": "local"` within the MCP object. Multiple MCP servers can be added. The key string for each server can be any arbitrary name.
 
-```json title="opencode.json"
+```json title="kuuzuki.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://kuuzuki.com/config.json",
   "mcp": {
     "my-local-mcp-server": {
       "type": "local",
@@ -47,9 +47,9 @@ You can also disable a server by setting `enabled` to `false`. This is useful if
 
 Add remote MCP servers under `mcp` with `"type": "remote"`.
 
-```json title="opencode.json"
+```json title="kuuzuki.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://kuuzuki.com/config.json",
   "mcp": {
     "my-remote-mcp": {
       "type": "remote",
@@ -65,9 +65,9 @@ Add remote MCP servers under `mcp` with `"type": "remote"`.
 
 Local and remote servers can be used together within the same `mcp` config object.
 
-```json title="opencode.json"
+```json title="kuuzuki.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://kuuzuki.com/config.json",
   "mcp": {
     "my-local-mcp-server": {
       "type": "local",

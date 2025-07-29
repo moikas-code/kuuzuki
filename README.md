@@ -8,6 +8,7 @@ Kuuzuki is a community-driven fork of [OpenCode](https://github.com/sst/opencode
 ## 🌟 Why Kuuzuki?
 
 Kuuzuki was created to:
+
 - Provide an **npm-installable** version of OpenCode
 - Enable **community-driven** development and features
 - Maintain **compatibility** with OpenCode while adding new capabilities
@@ -42,16 +43,19 @@ kuuzuki --version
 ## 🎯 Features
 
 ### Core Features (from OpenCode)
+
 - **AI-Powered Assistance**: Built-in Claude integration for intelligent help
 - **Terminal UI**: Clean, keyboard-driven interface
 - **Multi-Mode Support**: TUI, CLI, and server modes
 - **Smart Context**: Automatic context gathering from your project
 
 ### Community Additions
+
 - **NPM Package**: Easy installation without building from source
 - **Simplified Deployment**: Streamlined for terminal/CLI usage
 - **Community Plugins**: (Coming soon) Extended functionality through plugins
 - **Cross-Platform**: Works on macOS, Linux, and Windows
+- **Hybrid Context Management**: (v0.1.0) Intelligent conversation compression for 50-70% more context
 
 ## 🛠️ Development
 
@@ -106,6 +110,7 @@ See [STATS.md](STATS.md) for download statistics and usage metrics.
 Kuuzuki is a fork of [OpenCode](https://github.com/sst/opencode) by SST. We maintain compatibility where possible and contribute improvements back upstream when appropriate.
 
 ### Key Differences:
+
 - **Distribution**: NPM package vs build from source
 - **Focus**: Terminal/CLI first vs multiple interfaces
 - **Development**: Community-driven vs company-maintained

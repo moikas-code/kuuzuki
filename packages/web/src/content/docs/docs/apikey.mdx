@@ -1,0 +1,210 @@
+---
+title: API Keys
+description: Authenticate with Kuuzuki Pro using API keys
+---
+
+Kuuzuki uses API keys to authenticate the share feature. This guide explains how to get, use, and manage your API key for sharing conversations.
+
+---
+
+## What are API Keys?
+
+API keys are secure tokens that identify your Kuuzuki Pro subscription. They follow the format:
+- **Production**: `kz_live_abc123...` 
+- **Test**: `kz_test_abc123...`
+
+API keys are:
+- **Unique**: Each subscription has its own API key
+- **Secure**: 32 cryptographically random characters
+- **Revocable**: Can be regenerated if compromised
+- **Tied to your subscription**: Automatically disabled if subscription ends
+
+---
+
+## Getting Your API Key
+
+When you subscribe to Kuuzuki Pro, you'll receive your API key via email.
+
+### Subscribe to Pro
+
+```bash
+kuuzuki billing subscribe
+```
+
+This will:
+1. Open Stripe checkout in your browser
+2. Process your subscription
+3. Email your API key to the provided address
+
+### Lost Your API Key?
+
+Recover your API key using your subscription email:
+
+```bash
+kuuzuki apikey recover --email your@email.com
+```
+
+---
+
+## Using Your API Key
+
+There are two ways to authenticate with your API key:
+
+### Method 1: Environment Variable (Recommended)
+
+Set the `KUUZUKI_API_KEY` environment variable:
+
+```bash
+# Add to your shell profile (.bashrc, .zshrc, etc.)
+export KUUZUKI_API_KEY=kz_live_your_api_key_here
+```
+
+This is the recommended approach because:
+- Works automatically across all kuuzuki commands
+- Perfect for CI/CD environments
+- No need to login on each machine
+- Secure when using environment secret management
+
+### Method 2: CLI Login
+
+Use the `apikey login` command:
+
+```bash
+kuuzuki apikey login --api-key kz_live_your_api_key_here
+```
+
+This stores the API key locally on your machine. Useful for:
+- Personal development machines
+- Quick testing
+- When you can't modify environment variables
+
+---
+
+## Managing API Keys
+
+### Check Status
+
+View your current authentication status:
+
+```bash
+kuuzuki apikey status
+```
+
+Show the full API key (be careful!):
+
+```bash
+kuuzuki apikey status --show-key
+```
+
+### Logout
+
+Remove stored API key from local machine:
+
+```bash
+kuuzuki apikey logout
+```
+
+Note: This only removes the locally stored key. The API key remains valid.
+
+---
+
+## Security Best Practices
+
+### Do's
+- ✅ Use environment variables for production
+- ✅ Store API keys in secure secret managers
+- ✅ Use different API keys for different environments
+- ✅ Regenerate keys if compromised
+- ✅ Keep keys out of version control
+
+### Don'ts
+- ❌ Share API keys with others
+- ❌ Commit API keys to Git
+- ❌ Use production keys in development
+- ❌ Log or display keys in applications
+- ❌ Send keys over insecure channels
+
+---
+
+## Team Usage
+
+For teams, we recommend:
+
+1. **Shared Project Keys**: Use one API key per project/repository
+2. **Environment Variables**: Set `KUUZUKI_API_KEY` in your CI/CD
+3. **Secret Management**: Use tools like:
+   - GitHub Secrets
+   - Vercel Environment Variables
+   - AWS Secrets Manager
+   - HashiCorp Vault
+
+Example GitHub Actions:
+
+```yaml
+- name: Run kuuzuki
+  env:
+    KUUZUKI_API_KEY: ${{ secrets.KUUZUKI_API_KEY }}
+  run: kuuzuki run "Fix the build errors"
+```
+
+---
+
+## Self-Hosted Instances
+
+If you're running kuuzuki on your own infrastructure:
+
+1. Set `KUUZUKI_SELF_HOSTED=true` to bypass subscription checks
+2. Or use a localhost API URL to auto-detect self-hosted mode
+3. Pro features will be available without an API key
+
+```bash
+export KUUZUKI_SELF_HOSTED=true
+kuuzuki  # All features available
+```
+
+---
+
+## Troubleshooting
+
+### API Key Not Working
+
+1. **Check format**: Ensure it starts with `kz_live_` or `kz_test_`
+2. **Check subscription**: Verify your subscription is active
+3. **Check environment**: Ensure the variable is set correctly
+4. **Try recovery**: Use `kuuzuki apikey recover` to get a fresh copy
+
+### Environment Variable Not Detected
+
+```bash
+# Check if set
+echo $KUUZUKI_API_KEY
+
+# Check kuuzuki can see it
+kuuzuki apikey status
+```
+
+### Permission Denied Errors
+
+If you get "subscription required" errors:
+1. Verify API key is set: `kuuzuki apikey status`
+2. Check subscription status
+3. Ensure you're not using a test key in production
+
+---
+
+## API Key Lifecycle
+
+1. **Creation**: Generated when you subscribe
+2. **Active**: Works while subscription is active
+3. **Grace Period**: 30 days access after cancellation
+4. **Expiration**: Disabled after grace period
+5. **Regeneration**: Contact support to regenerate
+
+---
+
+## Need Help?
+
+- **Documentation**: [kuuzuki.com/docs](https://kuuzuki.com/docs)
+- **Discord**: [kuuzuki.com/discord](https://kuuzuki.com/discord)
+- **Email**: support@kuuzuki.com
+- **GitHub Issues**: [github.com/moikas-code/kuuzuki/issues](https://github.com/moikas-code/kuuzuki/issues)

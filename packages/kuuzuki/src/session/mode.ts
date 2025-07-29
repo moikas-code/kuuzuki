@@ -39,6 +39,17 @@ export namespace Mode {
           patch: false,
         },
       },
+      chat: {
+        name: "chat",
+        model,
+        tools: {
+          write: false,
+          edit: false,
+          patch: false,
+          bash: false,
+          todowrite: false,
+        },
+      },
     }
     for (const [key, value] of Object.entries(cfg.mode ?? {})) {
       if (value.disable) continue

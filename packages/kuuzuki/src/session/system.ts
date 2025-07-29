@@ -3,6 +3,7 @@ import { Ripgrep } from "../file/ripgrep"
 import { Global } from "../global"
 import { Filesystem } from "../util/filesystem"
 import { Config } from "../config/config"
+import { parseAgentrc, agentrcToPrompt } from "../config/agentrc"
 import path from "path"
 import os from "os"
 
@@ -50,7 +51,8 @@ export namespace SystemPrompt {
   }
 
   const CUSTOM_FILES = [
-    "AGENTS.md",
+    ".agentrc",
+    "AGENTS.md", // legacy support
     "CLAUDE.md",
     "CONTEXT.md", // deprecated
   ]
@@ -59,15 +61,44 @@ export namespace SystemPrompt {
     const { cwd, root } = App.info().path
     const config = await Config.get()
     const found = []
+
+    // Process custom files with special handling for .agentrc
     for (const item of CUSTOM_FILES) {
       const matches = await Filesystem.findUp(item, cwd, root)
-      found.push(...matches.map((x) => Bun.file(x).text()))
+      for (const match of matches) {
+        if (item === ".agentrc") {
+          // Parse .agentrc and convert to prompt format
+          try {
+            const content = await Bun.file(match).text()
+            const agentrcConfig = parseAgentrc(content)
+            found.push(agentrcToPrompt(agentrcConfig))
+          } catch (error) {
+            // If parsing fails, treat as regular text file
+            found.push(Bun.file(match).text())
+          }
+        } else {
+          found.push(Bun.file(match).text())
+        }
+      }
     }
+
+    // Check global locations
     found.push(
-      Bun.file(path.join(Global.Path.config, "AGENTS.md"))
-        .text()
-        .catch(() => ""),
+      (async () => {
+        try {
+          const globalAgentrc = path.join(Global.Path.config, ".agentrc")
+          const content = await Bun.file(globalAgentrc).text()
+          const agentrcConfig = parseAgentrc(content)
+          return agentrcToPrompt(agentrcConfig)
+        } catch {
+          // Fallback to legacy AGENTS.md
+          return Bun.file(path.join(Global.Path.config, "AGENTS.md"))
+            .text()
+            .catch(() => "")
+        }
+      })(),
     )
+
     found.push(
       Bun.file(path.join(os.homedir(), ".claude", "CLAUDE.md"))
         .text()

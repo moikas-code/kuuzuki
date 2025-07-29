@@ -8,6 +8,7 @@ import { graphql } from "@octokit/graphql"
 import * as core from "@actions/core"
 import * as github from "@actions/github"
 import type { Context } from "@actions/github/lib/context"
+import { createGitSafetySystem } from "../../git/index.js"
 import type { IssueCommentEvent } from "@octokit/webhooks-types"
 import { UI } from "../ui"
 import { cmd } from "./cmd"
@@ -721,6 +722,23 @@ export const GithubRunCommand = cmd({
         if (isMock) return
 
         console.log("Configuring git...")
+
+        // Create Git safety system with default config that allows config changes for GitHub integration
+        const gitSafety = createGitSafetySystem({
+          project: {
+            name: "github-integration",
+            type: "github-action",
+          },
+          git: {
+            commitMode: "project" as const,
+            pushMode: "never" as const,
+            configMode: "project" as const, // Allow config changes for GitHub integration
+            preserveAuthor: true, // But preserve author by default
+            requireConfirmation: false,
+            maxCommitSize: 100,
+          },
+        })
+
         const config = "http.https://github.com/.extraheader"
         const ret = await $`git config --local --get ${config}`
         gitConfig = ret.stdout.toString().trim()
@@ -729,8 +747,16 @@ export const GithubRunCommand = cmd({
 
         await $`git config --local --unset-all ${config}`
         await $`git config --local ${config} "AUTHORIZATION: basic ${newCredentials}"`
-        await $`git config --global user.name "kuuzuki-agent[bot]"`
-        await $`git config --global user.email "kuuzuki-agent[bot]@users.noreply.github.com"`
+
+        // Only set bot user if preserveAuthor is disabled or no user is configured
+        const currentUser = await gitSafety.contextProvider.getCurrentUser()
+        if (!currentUser.name || !currentUser.email) {
+          console.log("No Git user configured, setting kuuzuki-agent[bot] as author")
+          await $`git config --global user.name "kuuzuki-agent[bot]"`
+          await $`git config --global user.email "kuuzuki-agent[bot]@users.noreply.github.com"`
+        } else {
+          console.log(`Using existing Git user: ${currentUser.name} <${currentUser.email}>`)
+        }
       }
 
       async function restoreGitConfig() {
@@ -780,20 +806,78 @@ export const GithubRunCommand = cmd({
 
       async function pushToNewBranch(summary: string, branch: string) {
         console.log("Pushing to new branch...")
-        await $`git add .`
-        await $`git commit -m "${summary}
-  
-Co-authored-by: ${actor} <${actor}@users.noreply.github.com>"`
-        await $`git push -u origin ${branch}`
+
+        // Create Git safety system for GitHub operations
+        const gitSafety = createGitSafetySystem({
+          project: {
+            name: "github-integration",
+            type: "github-action",
+          },
+          git: {
+            commitMode: "project" as const, // Allow commits for GitHub integration
+            pushMode: "project" as const, // Allow pushes for GitHub integration
+            configMode: "never" as const,
+            preserveAuthor: true,
+            requireConfirmation: false,
+            maxCommitSize: 100,
+          },
+        })
+
+        // Use safe commit operation
+        const commitResult = await gitSafety.safeCommit(
+          `${summary}\n\nCo-authored-by: ${actor} <${actor}@users.noreply.github.com>`,
+          undefined,
+          { addAll: true },
+        )
+
+        if (!commitResult.success) {
+          throw new Error(`Commit failed: ${commitResult.error}`)
+        }
+
+        // Use safe push operation
+        const pushResult = await gitSafety.safePush("origin", branch, { setUpstream: true })
+
+        if (!pushResult.success) {
+          throw new Error(`Push failed: ${pushResult.error}`)
+        }
       }
 
       async function pushToLocalBranch(summary: string) {
         console.log("Pushing to local branch...")
-        await $`git add .`
-        await $`git commit -m "${summary}
-  
-Co-authored-by: ${actor} <${actor}@users.noreply.github.com>"`
-        await $`git push`
+
+        // Create Git safety system for GitHub operations
+        const gitSafety = createGitSafetySystem({
+          project: {
+            name: "github-integration",
+            type: "github-action",
+          },
+          git: {
+            commitMode: "project" as const,
+            pushMode: "project" as const,
+            configMode: "never" as const,
+            preserveAuthor: true,
+            requireConfirmation: false,
+            maxCommitSize: 100,
+          },
+        })
+
+        // Use safe commit operation
+        const commitResult = await gitSafety.safeCommit(
+          `${summary}\n\nCo-authored-by: ${actor} <${actor}@users.noreply.github.com>`,
+          undefined,
+          { addAll: true },
+        )
+
+        if (!commitResult.success) {
+          throw new Error(`Commit failed: ${commitResult.error}`)
+        }
+
+        // Use safe push operation
+        const pushResult = await gitSafety.safePush()
+
+        if (!pushResult.success) {
+          throw new Error(`Push failed: ${pushResult.error}`)
+        }
       }
 
       async function pushToForkBranch(summary: string, pr: GitHubPullRequest) {
@@ -801,11 +885,39 @@ Co-authored-by: ${actor} <${actor}@users.noreply.github.com>"`
 
         const remoteBranch = pr.headRefName
 
-        await $`git add .`
-        await $`git commit -m "${summary}
-  
-Co-authored-by: ${actor} <${actor}@users.noreply.github.com>"`
-        await $`git push fork HEAD:${remoteBranch}`
+        // Create Git safety system for GitHub operations
+        const gitSafety = createGitSafetySystem({
+          project: {
+            name: "github-integration",
+            type: "github-action",
+          },
+          git: {
+            commitMode: "project" as const,
+            pushMode: "project" as const,
+            configMode: "never" as const,
+            preserveAuthor: true,
+            requireConfirmation: false,
+            maxCommitSize: 100,
+          },
+        })
+
+        // Use safe commit operation
+        const commitResult = await gitSafety.safeCommit(
+          `${summary}\n\nCo-authored-by: ${actor} <${actor}@users.noreply.github.com>`,
+          undefined,
+          { addAll: true },
+        )
+
+        if (!commitResult.success) {
+          throw new Error(`Commit failed: ${commitResult.error}`)
+        }
+
+        // Use safe push operation - push to fork remote
+        const pushResult = await gitSafety.safePush("fork", remoteBranch)
+
+        if (!pushResult.success) {
+          throw new Error(`Push failed: ${pushResult.error}`)
+        }
       }
 
       async function branchIsDirty() {

@@ -1,0 +1,44 @@
+{
+  "name": "kuuzuki-vscode",
+  "displayName": "Kuuzuki for VS Code",
+  "description": "AI-powered coding assistant for VS Code",
+  "version": "0.1.0",
+  "publisher": "kuuzuki",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": ["AI", "Programming Languages", "Other"],
+  "keywords": ["ai", "assistant", "kuuzuki", "code", "claude"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/moikas-code/kuuzuki.git"
+  },
+  "icon": "images/icon.png",
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "kuuzuki.openInTerminal",
+        "title": "Open Kuuzuki in Terminal",
+        "category": "Kuuzuki"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
+    "watch": "npm run build -- --watch",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "dependencies": {
+    "@moikas/kuuzuki-sdk": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "20.x",
+    "esbuild": "^0.19.0",
+    "@vscode/vsce": "^2.24.0"
+  }
+}

@@ -141,6 +141,7 @@ const (
 	MessagesUndoCommand         CommandName = "messages_undo"
 	MessagesRedoCommand         CommandName = "messages_redo"
 	AppExitCommand              CommandName = "app_exit"
+	HybridContextToggleCommand  CommandName = "hybrid_context_toggle"
 )
 
 func (k Command) Matches(msg tea.KeyPressMsg, leader bool) bool {
@@ -365,6 +366,12 @@ func LoadFromConfig(config *opencode.Config) CommandRegistry {
 			Description: "exit the app",
 			Keybindings: parseBindings("ctrl+c", "<leader>q"),
 			Trigger:     []string{"exit", "quit", "q"},
+		},
+		{
+			Name:        HybridContextToggleCommand,
+			Description: "toggle hybrid context",
+			Keybindings: parseBindings("<leader>b"),
+			Trigger:     []string{"hybrid"},
 		},
 	}
 	registry := make(CommandRegistry)

@@ -22,25 +22,27 @@ type ModeModel struct {
 }
 
 type State struct {
-	Theme              string               `toml:"theme"`
-	ScrollSpeed        *int                 `toml:"scroll_speed"`
-	ModeModel          map[string]ModeModel `toml:"mode_model"`
-	Provider           string               `toml:"provider"`
-	Model              string               `toml:"model"`
-	Mode               string               `toml:"mode"`
-	RecentlyUsedModels []ModelUsage         `toml:"recently_used_models"`
-	MessagesRight      bool                 `toml:"messages_right"`
-	SplitDiff          bool                 `toml:"split_diff"`
-	MessageHistory     []Prompt             `toml:"message_history"`
+	Theme                string               `toml:"theme"`
+	ScrollSpeed          *int                 `toml:"scroll_speed"`
+	ModeModel            map[string]ModeModel `toml:"mode_model"`
+	Provider             string               `toml:"provider"`
+	Model                string               `toml:"model"`
+	Mode                 string               `toml:"mode"`
+	RecentlyUsedModels   []ModelUsage         `toml:"recently_used_models"`
+	MessagesRight        bool                 `toml:"messages_right"`
+	SplitDiff            bool                 `toml:"split_diff"`
+	MessageHistory       []Prompt             `toml:"message_history"`
+	HybridContextEnabled bool                 `toml:"hybrid_context_enabled"`
 }
 
 func NewState() *State {
 	return &State{
-		Theme:              "opencode",
-		Mode:               "build",
-		ModeModel:          make(map[string]ModeModel),
-		RecentlyUsedModels: make([]ModelUsage, 0),
-		MessageHistory:     make([]Prompt, 0),
+		Theme:                "kuuzuki",
+		Mode:                 "build",
+		ModeModel:            make(map[string]ModeModel),
+		RecentlyUsedModels:   make([]ModelUsage, 0),
+		MessageHistory:       make([]Prompt, 0),
+		HybridContextEnabled: true, // Default to enabled
 	}
 }
 

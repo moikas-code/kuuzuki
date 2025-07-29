@@ -2,7 +2,7 @@
 title: LSP servers
 ---
 
-opencode integrates with _Language Server Protocol_, or LSP to improve how the LLM interacts with your codebase.
+kuuzuki integrates with _Language Server Protocol_, or LSP to improve how the LLM interacts with your codebase.
 
 LSP servers for different languages give the LLM:
 
@@ -11,13 +11,13 @@ LSP servers for different languages give the LLM:
 
 ## Auto-detection
 
-By default, opencode will **automatically detect** the languages used in your project and add the right LSP servers.
+By default, kuuzuki will **automatically detect** the languages used in your project and add the right LSP servers.
 
 ## Manual configuration
 
-You can also manually configure LSP servers by adding them under the `lsp` section in your opencode config.
+You can also manually configure LSP servers by adding them under the `lsp` section in your kuuzuki config.
 
-```json title="opencode.json"
+```json title="kuuzuki.json"
 {
   "lsp": {
     "go": {

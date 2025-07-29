@@ -62,11 +62,13 @@ Kuuzuki is a powerful AI-powered terminal assistant that's **free and open sourc
 ### Free Version (Default)
 
 1. **Install Kuuzuki**
+
    ```bash
    npm install -g kuuzuki
    ```
 
 2. **Start using immediately**
+
    ```bash
    kuuzuki  # Launches TUI
    ```
@@ -79,15 +81,21 @@ Kuuzuki is a powerful AI-powered terminal assistant that's **free and open sourc
 ### Upgrading to Pro
 
 1. **Subscribe**
+
    ```bash
    kuuzuki billing subscribe
    ```
 
-2. **Receive license key** via email
+2. **Receive API key** via email
 
-3. **Activate**
+3. **Set your API key**
+
    ```bash
-   kuuzuki billing login --email your@email.com --license XXXX-XXXX-XXXX-XXXX
+   # Option 1: Environment variable (recommended)
+   export KUUZUKI_API_KEY=kz_live_your_api_key_here
+
+   # Option 2: Explicit login
+   kuuzuki apikey login --api-key kz_live_your_api_key_here
    ```
 
 4. **Share sessions**
@@ -100,6 +108,7 @@ Kuuzuki is a powerful AI-powered terminal assistant that's **free and open sourc
 ### How Sharing Works
 
 When you share a session (Pro only):
+
 1. Session data syncs to Cloudflare R2 storage
 2. Real-time updates via WebSockets
 3. Viewers see a web-based read-only interface
@@ -108,11 +117,13 @@ When you share a session (Pro only):
 ### Privacy & Security
 
 **Free Version:**
+
 - All data stays local
 - No telemetry or tracking
 - AI API calls go directly to your chosen provider
 
 **Pro Version:**
+
 - Shared sessions are encrypted at rest
 - Links are unguessable UUIDs
 - You control when to share/unshare
@@ -161,40 +172,64 @@ A: Not currently, but the free version lets you evaluate all core features befor
 
 ## Comparison Table
 
-| Feature | Free | Pro |
-|---------|------|-----|
-| Terminal UI (TUI) | ✅ | ✅ |
-| AI Providers | ✅ All | ✅ All |
-| Local Sessions | ✅ Unlimited | ✅ Unlimited |
-| File Editing | ✅ | ✅ |
-| Web Search | ✅ | ✅ |
-| All Tools | ✅ | ✅ |
-| Themes | ✅ | ✅ |
-| IDE Integration | ✅ | ✅ |
-| Session Sharing | ❌ | ✅ Unlimited |
-| Shareable Links | ❌ | ✅ |
-| Real-time Sync | ❌ | ✅ |
-| Cloud Backup | ❌ | ✅ |
-| Priority Support | ❌ | ✅ |
-| Price | $0 | $5/month |
+| Feature           | Free         | Pro          |
+| ----------------- | ------------ | ------------ |
+| Terminal UI (TUI) | ✅           | ✅           |
+| AI Providers      | ✅ All       | ✅ All       |
+| Local Sessions    | ✅ Unlimited | ✅ Unlimited |
+| File Editing      | ✅           | ✅           |
+| Web Search        | ✅           | ✅           |
+| All Tools         | ✅           | ✅           |
+| Themes            | ✅           | ✅           |
+| IDE Integration   | ✅           | ✅           |
+| Session Sharing   | ❌           | ✅ Unlimited |
+| Shareable Links   | ❌           | ✅           |
+| Real-time Sync    | ❌           | ✅           |
+| Cloud Backup      | ❌           | ✅           |
+| Priority Support  | ❌           | ✅           |
+| Price             | $0           | $5/month     |
 
 ## Getting Started
 
 ### Try Free Version
+
 ```bash
 npm install -g kuuzuki
 kuuzuki
 ```
 
 ### Upgrade to Pro
+
 ```bash
 kuuzuki billing subscribe
 ```
 
 ### Check Status
+
 ```bash
-kuuzuki billing status
+kuuzuki apikey status
 ```
+
+### Lost Your API Key?
+
+If you forget your API key:
+
+1. **Check current status**:
+
+   ```bash
+   kuuzuki apikey status --show-key
+   ```
+
+2. **Recover by email**:
+
+   ```bash
+   kuuzuki apikey recover --email your@email.com
+   ```
+
+3. **Access billing portal**:
+   ```bash
+   kuuzuki billing portal
+   ```
 
 ---
 

@@ -24,7 +24,9 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "dev": "bun run ./src/index.ts"
+    "dev": "bun run ./src/index.ts",
+    "build": "tsc",
+    "prepublishOnly": "bun run build && node scripts/prepublish.js"
   },
   "bin": {
     "opencode": "./bin/kuuzuki",
@@ -47,6 +49,14 @@
     "vscode-languageserver-types": "3.17.5",
     "zod-to-json-schema": "3.24.5"
   },
+  "files": [
+    "bin",
+    "binaries",
+    "script",
+    "scripts",
+    "src",
+    "README.md"
+  ],
   "dependencies": {
     "@actions/core": "1.11.1",
     "@actions/github": "6.0.1",

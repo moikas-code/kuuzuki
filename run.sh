@@ -82,10 +82,10 @@ build_server() {
     bun build src/index.ts \
         --compile \
         --target=bun \
-        --outfile=kuuzuki-cli \
+        --outfile=bin/kuuzuki \
         --define KUUZUKI_VERSION="'$VERSION'"
     
-    chmod +x kuuzuki-cli
+    chmod +x bin/kuuzuki
     print_success "Server/CLI built successfully"
     cd "$SCRIPT_DIR"
 }
@@ -120,15 +120,15 @@ run_prod() {
     case "$1" in
         "server")
             print_info "Starting kuuzuki server..."
-            "$SCRIPT_DIR/packages/kuuzuki/kuuzuki-cli" serve --port ${2:-4096}
+            "$SCRIPT_DIR/packages/kuuzuki/bin/kuuzuki" serve --port ${2:-4096}
             ;;
         "tui")
             print_info "Starting kuuzuki TUI..."
-            "$SCRIPT_DIR/packages/kuuzuki/kuuzuki-cli"
+            "$SCRIPT_DIR/packages/kuuzuki/bin/kuuzuki"
             ;;
         *)
             print_info "Starting kuuzuki (default: TUI mode)..."
-            "$SCRIPT_DIR/packages/kuuzuki/kuuzuki-cli"
+            "$SCRIPT_DIR/packages/kuuzuki/bin/kuuzuki"
             ;;
     esac
 }
@@ -149,7 +149,7 @@ clean() {
     print_header "Cleaning Build Artifacts"
     
     rm -rf "$SCRIPT_DIR/packages/tui/kuuzuki-tui"
-    rm -rf "$SCRIPT_DIR/packages/kuuzuki/kuuzuki-cli"
+    rm -rf "$SCRIPT_DIR/packages/kuuzuki/bin/kuuzuki"
     rm -rf "$SCRIPT_DIR/packages/kuuzuki/binaries"
     
     print_success "Clean complete"

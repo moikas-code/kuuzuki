@@ -1,8 +1,8 @@
-# Opencode Go API Library
+# Kuuzuki Go API Library
 
-<a href="https://pkg.go.dev/github.com/sst/opencode-sdk-go"><img src="https://pkg.go.dev/badge/github.com/sst/opencode-sdk-go.svg" alt="Go Reference"></a>
+<a href="https://pkg.go.dev/github.com/moikas-code/kuuzuki-sdk-go"><img src="https://pkg.go.dev/badge/github.com/moikas-code/kuuzuki-sdk-go.svg" alt="Go Reference"></a>
 
-The Opencode Go library provides convenient access to the [Opencode REST API](https://opencode.ai/docs)
+The Kuuzuki Go library provides convenient access to the [Kuuzuki REST API](https://kuuzuki.com/docs)
 from applications written in Go.
 
 It is generated with [Stainless](https://www.stainless.com/).
@@ -13,7 +13,7 @@ It is generated with [Stainless](https://www.stainless.com/).
 
 ```go
 import (
-	"github.com/sst/opencode-sdk-go" // imported as opencode
+	"github.com/moikas-code/kuuzuki-sdk-go" // imported as kuuzuki
 )
 ```
 
@@ -24,7 +24,7 @@ Or to pin the version:
 <!-- x-release-please-start-version -->
 
 ```sh
-go get -u 'github.com/sst/opencode-sdk-go@v0.1.0-alpha.8'
+go get -u 'github.com/moikas-code/kuuzuki-sdk-go@v0.1.0-alpha.8'
 ```
 
 <!-- x-release-please-end -->
@@ -44,11 +44,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sst/opencode-sdk-go"
+	"github.com/moikas-code/kuuzuki-sdk-go"
 )
 
 func main() {
-	client := opencode.NewClient()
+	client := kuuzuki.NewClient()
 	sessions, err := client.Session.List(context.TODO())
 	if err != nil {
 		panic(err.Error())
@@ -72,18 +72,18 @@ To send a null, use `Null[T]()`, and to send a nonconforming value, use `Raw[T](
 
 ```go
 params := FooParams{
-	Name: opencode.F("hello"),
+	Name: kuuzuki.F("hello"),
 
 	// Explicitly send `"description": null`
-	Description: opencode.Null[string](),
+	Description: kuuzuki.Null[string](),
 
-	Point: opencode.F(opencode.Point{
-		X: opencode.Int(0),
-		Y: opencode.Int(1),
+	Point: kuuzuki.F(kuuzuki.Point{
+		X: kuuzuki.Int(0),
+		Y: kuuzuki.Int(1),
 
 		// In cases where the API specifies a given type,
 		// but you want to send something else, use `Raw`:
-		Z: opencode.Raw[int64](0.01), // sends a float
+		Z: kuuzuki.Raw[int64](0.01), // sends a float
 	}),
 }
 ```
@@ -137,7 +137,7 @@ This library uses the functional options pattern. Functions defined in the
 requests. For example:
 
 ```go
-client := opencode.NewClient(
+client := kuuzuki.NewClient(
 	// Adds a header to every request made by the client
 	option.WithHeader("X-Some-Header", "custom_header_info"),
 )
@@ -150,7 +150,7 @@ client.Session.List(context.TODO(), ...,
 )
 ```
 
-See the [full list of request options](https://pkg.go.dev/github.com/sst/opencode-sdk-go/option).
+See the [full list of request options](https://pkg.go.dev/github.com/moikas-code/kuuzuki-sdk-go/option).
 
 ### Pagination
 
@@ -164,7 +164,7 @@ with additional helper methods like `.GetNextPage()`, e.g.:
 ### Errors
 
 When the API returns a non-success status code, we return an error with type
-`*opencode.Error`. This contains the `StatusCode`, `*http.Request`, and
+`*kuuzuki.Error`. This contains the `StatusCode`, `*http.Request`, and
 `*http.Response` values of the request, as well as the JSON of the error body
 (much like other response objects in the SDK).
 
@@ -173,7 +173,7 @@ To handle errors, we recommend that you use the `errors.As` pattern:
 ```go
 _, err := client.Session.List(context.TODO())
 if err != nil {
-	var apierr *opencode.Error
+	var apierr *kuuzuki.Error
 	if errors.As(err, &apierr) {
 		println(string(apierr.DumpRequest(true)))  // Prints the serialized HTTP request
 		println(string(apierr.DumpResponse(true))) // Prints the serialized HTTP response
@@ -213,7 +213,7 @@ The file name and content-type can be customized by implementing `Name() string`
 string` on the run-time type of `io.Reader`. Note that `os.File` implements `Name() string`, so a
 file returned by `os.Open` will be sent with the file name on disk.
 
-We also provide a helper `opencode.FileParam(reader io.Reader, filename string, contentType string)`
+We also provide a helper `kuuzuki.FileParam(reader io.Reader, filename string, contentType string)`
 which can be used to wrap any `io.Reader` with the appropriate file name and content type.
 
 ### Retries
@@ -226,7 +226,7 @@ You can use the `WithMaxRetries` option to configure or disable this:
 
 ```go
 // Configure the default for all requests:
-client := opencode.NewClient(
+client := kuuzuki.NewClient(
 	option.WithMaxRetries(0), // default is 2
 )
 
@@ -285,9 +285,9 @@ or the `option.WithJSONSet()` methods.
 
 ```go
 params := FooNewParams{
-    ID:   opencode.F("id_xxxx"),
-    Data: opencode.F(FooNewParamsData{
-        FirstName: opencode.F("John"),
+    ID:   kuuzuki.F("id_xxxx"),
+    Data: kuuzuki.F(FooNewParamsData{
+        FirstName: kuuzuki.F("John"),
     }),
 }
 client.Foo.New(context.Background(), params, option.WithJSONSet("data.last_name", "Doe"))
@@ -322,7 +322,7 @@ func Logger(req *http.Request, next option.MiddlewareNext) (res *http.Response, 
     return res, err
 }
 
-client := opencode.NewClient(
+client := kuuzuki.NewClient(
 	option.WithMiddleware(Logger),
 )
 ```
@@ -347,7 +347,7 @@ This package generally follows [SemVer](https://semver.org/spec/v2.0.0.html) con
 
 We take backwards-compatibility seriously and work hard to ensure you can rely on a smooth upgrade experience.
 
-We are keen for your feedback; please open an [issue](https://www.github.com/sst/opencode-sdk-go/issues) with questions, bugs, or suggestions.
+We are keen for your feedback; please open an [issue](https://www.github.com/moikas-code/kuuzuki-sdk-go/issues) with questions, bugs, or suggestions.
 
 ## Contributing
 

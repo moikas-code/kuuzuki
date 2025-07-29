@@ -1049,6 +1049,29 @@ func (a Model) executeCommand(command commands.Command) (tea.Model, tea.Cmd) {
 		updated, cmd := a.messages.RedoLastMessage()
 		a.messages = updated.(chat.MessagesComponent)
 		cmds = append(cmds, cmd)
+	case commands.HybridContextToggleCommand:
+		// For now, toggle the environment variable locally
+		// This will affect new sessions but not the current one
+		currentValue := os.Getenv("KUUZUKI_HYBRID_CONTEXT_ENABLED")
+		newValue := "true"
+		status := "enabled"
+
+		if currentValue == "true" {
+			newValue = "false"
+			status = "disabled"
+		}
+
+		os.Setenv("KUUZUKI_HYBRID_CONTEXT_ENABLED", newValue)
+		// Save to state file for persistence
+		a.app.State.HybridContextEnabled = newValue == "true"
+		if err := app.SaveState(a.app.StatePath, a.app.State); err != nil {
+			slog.Error("Failed to save state", "error", err)
+		}
+
+		cmds = append(cmds, toast.NewSuccessToast(
+			fmt.Sprintf("Hybrid context %s (will apply to new sessions)", status),
+			toast.WithTitle("Hybrid Context"),
+		))
 	case commands.AppExitCommand:
 		return a, tea.Quit
 	}

@@ -18,15 +18,18 @@
     "build": "./run.sh build",
     "build:all": "./run.sh build all",
     "build:tui": "./run.sh build tui",
-    "build:server": "./run.sh build server",
+"build:server": "./run.sh build server",
     "dev:tui": "./run.sh dev tui",
     "dev:server": "./run.sh dev server",
+    "dev:web": "bun run --filter @kuuzuki/web dev",
     "clean": "./run.sh clean",
-    "check": "./run.sh check"
+    "check": "./run.sh check",
+    "generate-sdks": "./scripts/generate-sdks.sh"
   },
   "workspaces": {
     "packages": [
-      "packages/*"
+      "packages/*",
+      "!packages/sdk"
     ],
     "catalog": {
       "typescript": "5.8.2",

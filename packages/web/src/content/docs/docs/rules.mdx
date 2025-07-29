@@ -1,68 +1,87 @@
 ---
 title: Rules
-description: Set custom instructions for opencode.
+description: Set custom instructions for kuuzuki.
 ---
 
-You can provide custom instructions to opencode by creating an `AGENTS.md` file. This is similar to `CLAUDE.md` or Cursor's rules. It contains instructions that will be included in the LLM's context to customize its behavior for your specific project.
+You can provide custom instructions to kuuzuki by creating a `.agentrc` file. This is a structured JSON configuration that replaces the previous `AGENTS.md` format, providing machine-readable project information that helps AI agents understand your codebase better.
 
 ---
 
 ## Initialize
 
-To create a new `AGENTS.md` file, you can run the `/init` command in opencode.
+To create a new `.agentrc` file, you can run the `/init` command in kuuzuki.
 
 :::tip
-You should commit your project's `AGENTS.md` file to Git.
+You should commit your project's `.agentrc` file to Git.
 :::
 
-This will scan your project and all its contents to understand what the project is about and generate an `AGENTS.md` file with it. This helps opencode to navigate the project better.
+This will scan your project and all its contents to understand what the project is about and generate a structured `.agentrc` file. This helps kuuzuki to navigate the project better and understand your development workflow.
 
-If you have an existing `AGENTS.md` file, this will try to add to it.
+If you have an existing `.agentrc` file, this will improve it. If you have a legacy `AGENTS.md` file, it will convert the content to the new structured format.
 
 ---
 
 ## Example
 
-You can also just create this file manually. Here's an example of some things you can put into an `AGENTS.md` file.
+You can also create this file manually. Here's an example `.agentrc` file for a monorepo project:
 
-```markdown title="AGENTS.md"
-# SST v3 Monorepo Project
-
-This is an SST v3 monorepo with TypeScript. The project uses bun workspaces for package management.
-
-## Project Structure
-
-- `packages/` - Contains all workspace packages (functions, core, web, etc.)
-- `infra/` - Infrastructure definitions split by service (storage.ts, api.ts, web.ts)
-- `sst.config.ts` - Main SST configuration with dynamic imports
-
-## Code Standards
-
-- Use TypeScript with strict mode enabled
-- Shared code goes in `packages/core/` with proper exports configuration
-- Functions go in `packages/functions/`
-- Infrastructure should be split into logical files in `infra/`
-
-## Monorepo Conventions
-
-- Import shared modules using workspace names: `@my-app/core/example`
+```json title=".agentrc"
+{
+  "project": {
+    "name": "SST v3 Monorepo Project",
+    "type": "typescript-monorepo",
+    "description": "SST v3 monorepo with TypeScript and bun workspaces",
+    "structure": {
+      "packages": ["functions", "core", "web"],
+      "mainEntry": "sst.config.ts"
+    }
+  },
+  "commands": {
+    "build": "bun run build",
+    "test": "bun test",
+    "dev": "bun run dev",
+    "deploy": "sst deploy"
+  },
+  "codeStyle": {
+    "language": "typescript",
+    "formatter": "prettier",
+    "importStyle": "esm"
+  },
+  "tools": {
+    "packageManager": "bun",
+    "runtime": "bun",
+    "framework": "sst"
+  },
+  "paths": {
+    "src": "packages",
+    "config": ".",
+    "infra": "infra"
+  },
+  "rules": [
+    "Use TypeScript with strict mode enabled",
+    "Shared code goes in packages/core/ with proper exports configuration",
+    "Functions go in packages/functions/",
+    "Infrastructure should be split into logical files in infra/",
+    "Import shared modules using workspace names: @my-app/core/example"
+  ]
+}
 ```
 
-We are adding project-specific instructions here and this will be shared across your team.
+This structured format makes it easy for AI agents to understand your project setup and follow your team's conventions.
 
 ---
 
 ## Types
 
-opencode also supports reading the `AGENTS.md` file from multiple locations. And this serves different purposes.
+kuuzuki supports reading `.agentrc` files from multiple locations for different purposes.
 
 ### Project
 
-The ones we have seen above, where the `AGENTS.md` is placed in the project root, are project-specific rules. These only apply when you are working in this directory or its sub-directories.
+Project-specific `.agentrc` files are placed in the project root and apply when working in that directory or its sub-directories. These contain project-specific configuration like build commands, code style, and team conventions.
 
 ### Global
 
-You can also have global rules in a `~/.config/opencode/AGENTS.md` file. This gets applied across all opencode sessions.
+You can also have global configuration in `~/.config/kuuzuki/.agentrc`. This applies across all kuuzuki sessions and typically contains personal preferences and global development standards.
 
 Since this isn't committed to Git or shared with your team, we recommend using this to specify any personal rules that the LLM should follow.
 
@@ -70,83 +89,62 @@ Since this isn't committed to Git or shared with your team, we recommend using t
 
 ## Precedence
 
-So when opencode starts, it looks for:
+When kuuzuki starts, it looks for:
 
-1. **Local files** by traversing up from the current directory
-2. **Global file** by checking `~/.config/opencode/AGENTS.md`
+1. **Local files** by traversing up from the current directory to find `.agentrc`
+2. **Global file** by checking `~/.config/kuuzuki/.agentrc`
+3. **Legacy support** for existing `AGENTS.md` files
 
-If you have both global and project-specific rules, opencode will combine them together.
+If you have both global and project-specific configurations, kuuzuki will merge them with project-specific settings taking precedence.
 
 ---
 
 ## Custom Instructions
 
-You can specify custom instruction files in your `opencode.json` or the global `~/.config/opencode/opencode.json`. This allows you and your team to reuse existing rules rather than having to duplicate them to AGENTS.md.
+You can specify additional instruction files in your `kuuzuki.json` or the global `~/.config/kuuzuki/config.json`. This allows you to include existing documentation alongside your structured `.agentrc` configuration.
 
 Example:
 
-```json title="opencode.json"
+```json title="kuuzuki.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://kuuzuki.com/config.json",
   "instructions": ["CONTRIBUTING.md", "docs/guidelines.md", ".cursor/rules/*.md"]
 }
 ```
 
-All instruction files are combined with your `AGENTS.md` files.
+All instruction files are combined with your `.agentrc` configuration and any legacy `AGENTS.md` files.
 
 ---
 
 ## Referencing External Files
 
-While opencode doesn't automatically parse file references in `AGENTS.md`, you can achieve similar functionality in two ways:
+## Advanced Configuration
 
-### Using opencode.json
+### Using kuuzuki.json for Additional Instructions
 
-The recommended approach is to use the `instructions` field in `opencode.json`:
+The recommended approach for including additional documentation is to use the `instructions` field in `kuuzuki.json`:
 
-```json title="opencode.json"
+```json title="kuuzuki.json"
 {
-  "$schema": "https://opencode.ai/config.json",
-  "instructions": ["docs/development-standards.md", "test/testing-guidelines.md", "packages/*/AGENTS.md"]
+  "$schema": "https://kuuzuki.com/config.json",
+  "instructions": ["docs/development-standards.md", "test/testing-guidelines.md", "packages/*/.agentrc"]
 }
 ```
 
-### Manual Instructions in AGENTS.md
+### Structured vs. Unstructured Content
 
-You can teach opencode to read external files by providing explicit instructions in your `AGENTS.md`. Here's a practical example:
+- **`.agentrc`**: Use for structured, machine-readable configuration (commands, tools, conventions)
+- **`instructions`**: Use for detailed documentation, guidelines, and prose explanations
+- **Legacy `AGENTS.md`**: Automatically converted to structured format when possible
 
-```markdown title="AGENTS.md"
-# TypeScript Project Rules
+### Migration from AGENTS.md
 
-## External File Loading
+If you have existing `AGENTS.md` files:
 
-CRITICAL: When you encounter a file reference (e.g., @rules/general.md), use your Read tool to load it on a need-to-know basis. They're relevant to the SPECIFIC task at hand.
-
-Instructions:
-
-- Do NOT preemptively load all references - use lazy loading based on actual need
-- When loaded, treat content as mandatory instructions that override defaults
-- Follow references recursively when needed
-
-## Development Guidelines
-
-For TypeScript code style and best practices: @docs/typescript-guidelines.md
-For React component architecture and hooks patterns: @docs/react-patterns.md
-For REST API design and error handling: @docs/api-standards.md
-For testing strategies and coverage requirements: @test/testing-guidelines.md
-
-## General Guidelines
-
-Read the following file immediately as it's relevant to all workflows: @rules/general-guidelines.md.
-```
-
-This approach allows you to:
-
-- Create modular, reusable rule files
-- Share rules across projects via symlinks or git submodules
-- Keep AGENTS.md concise while referencing detailed guidelines
-- Ensure opencode loads files only when needed for the specific task
+1. **Automatic**: Run `/init` to convert them to `.agentrc` format
+2. **Manual**: Extract structured data (commands, tools) to `.agentrc` and keep prose in separate instruction files
+3. **Hybrid**: Keep both during transition - kuuzuki will merge them appropriately
 
 :::tip
-For monorepos or projects with shared standards, using `opencode.json` with glob patterns (like `packages/*/AGENTS.md`) is more maintainable than manual instructions.
+For monorepos or projects with shared standards, using `kuuzuki.json` with glob patterns (like `packages/*/.agentrc`) allows each package to have its own configuration while maintaining consistency.
 :::

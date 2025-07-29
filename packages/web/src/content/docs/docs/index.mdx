@@ -1,13 +1,22 @@
 ---
 title: Intro
-description: Get started with opencode.
+description: Get started with kuuzuki - the community-driven AI coding assistant.
 ---
 
 import { Tabs, TabItem } from "@astrojs/starlight/components"
 
-[**opencode**](/) is an AI coding agent built for the terminal.
+[**kuuzuki**](/) is a community-driven AI-powered terminal assistant for developers, providing an npm-installable coding agent built for the CLI.
 
-![opencode TUI with the opencode theme](../../../assets/lander/screenshot.png)
+![kuuzuki TUI with the kuuzuki theme](../../../assets/lander/screenshot.png)
+
+### Why kuuzuki?
+
+- **Community-Driven**: Open to contributions and enhancements from the developer community
+- **NPM Distribution**: Easy installation via npm, no manual binary downloads
+- **Terminal-First**: Built specifically for CLI/terminal workflows
+- **Cross-Platform**: Works on macOS, Linux, and Windows
+- **AI-Powered**: Integrated Claude support for intelligent coding assistance
+- **Extensible**: Support for custom tools, themes, and configurations
 
 Let's get started.
 
@@ -15,9 +24,10 @@ Let's get started.
 
 #### Prerequisites
 
-To use opencode, you'll need:
+To use kuuzuki, you'll need:
 
 1. A modern terminal emulator like:
+
    - [WezTerm](https://wezterm.org), cross-platform
    - [Alacritty](https://alacritty.org), cross-platform
    - [Ghostty](https://ghostty.org), Linux and macOS
@@ -29,10 +39,10 @@ To use opencode, you'll need:
 
 ## Install
 
-The easiest way to install opencode is through the install script.
+The easiest way to install kuuzuki is through npm.
 
 ```bash
-curl -fsSL https://opencode.ai/install | bash
+npm install -g kuuzuki
 ```
 
 You can also install it with the following:
@@ -40,56 +50,59 @@ You can also install it with the following:
 - **Using Node.js**
 
   <Tabs>
-    <TabItem label="npm">
-      ```bash
-      npm install -g opencode-ai
-      ```
-    </TabItem>
-    <TabItem label="Bun">
-      ```bash
-      bun install -g opencode-ai
-      ```
-    </TabItem>
-    <TabItem label="pnpm">
-      ```bash
-      pnpm install -g opencode-ai
-      ```
-    </TabItem>
-    <TabItem label="Yarn">
-      ```bash
-      yarn global add opencode-ai
-      ```
-    </TabItem>
+    <TabItem label="npm">```bash npm install -g kuuzuki ```</TabItem>
+    <TabItem label="Bun">```bash bun install -g kuuzuki ```</TabItem>
+    <TabItem label="pnpm">```bash pnpm install -g kuuzuki ```</TabItem>
+    <TabItem label="Yarn">```bash yarn global add kuuzuki ```</TabItem>
   </Tabs>
 
-- **Using Homebrew on macOS**
+### Build from Source
 
-  ```bash
-  brew install sst/tap/opencode
-  ```
+As a community-driven project, you can also build Kuuzuki from source! This gives you access to the latest features and allows you to contribute:
 
-- **Using Paru on Arch Linux**
+```bash
+# Clone the repository
+git clone https://github.com/moikas-code/kuuzuki.git
+cd kuuzuki
 
-  ```bash
-  paru -S opencode-bin
-  ```
+# Install dependencies
+bun install
+
+# Build the project
+bun run build:all
+
+# Run in development mode
+bun run dev
+
+# Or install globally from source
+bun link
+```
+
+Building from source requires:
+- Node.js 18+ or Bun
+- Go 1.21+ (for the TUI component)
+- Git
+
+:::tip
+Building from source is a great way to contribute to Kuuzuki! You can modify the code, add features, and submit pull requests back to the community.
+:::
 
 #### Windows
 
-Right now the automatic installation methods do not work properly on Windows. However you can grab the binary from the [Releases](https://github.com/sst/opencode/releases).
+Right now the automatic installation methods do not work properly on Windows. However you can grab the binary from the [Releases](https://github.com/moikas-code/kuuzuki/releases) or build from source.
 
 ---
 
 ## Configure
 
-With opencode you can use any LLM provider by configuring their API keys.
+With kuuzuki you can use any LLM provider by configuring their API keys.
 
-We recommend signing up for [Claude Pro](https://www.anthropic.com/news/claude-pro) or [Max](https://www.anthropic.com/max), it's the most cost-effective way to use opencode.
+We recommend signing up for [Claude Pro](https://www.anthropic.com/news/claude-pro) or [Max](https://www.anthropic.com/max), it's the most cost-effective way to use kuuzuki.
 
-Once you've singed up, run `opencode auth login` and select Anthropic.
+Once you've singed up, run `kuuzuki auth login` and select Anthropic.
 
 ```bash
-$ opencode auth login
+$ kuuzuki auth login
 
 ┌  Add credential
 │
@@ -118,33 +131,38 @@ you want to work on.
 cd /path/to/project
 ```
 
-And run opencode.
+And run kuuzuki.
 
 ```bash
-opencode
+kuuzuki
 ```
 
-Next, initialize opencode for the project by running the following command.
+Next, initialize kuuzuki for the project by running the following command.
 
 ```bash frame="none"
 /init
 ```
 
-This will get opencode to analyze your project and create an `AGENTS.md` file in
-the project root.
+This will get kuuzuki to analyze your project and create a structured `.agentrc` file in the project root containing your:
+
+- Build and test commands
+- Code style preferences
+- Development conventions
+- Tool configurations
+- Custom system prompts
 
 :::tip
-You should commit your project's `AGENTS.md` file to Git.
+The `.agentrc` file uses JSON5 format, allowing comments and more flexible syntax. You should commit this file to Git to share project context with your team.
 :::
 
-This helps opencode understand the project structure and the coding patterns
-used. 
+This helps kuuzuki understand the project structure and the coding patterns
+used. The `.agentrc` system is a key differentiator, providing fine-grained control over AI behavior.
 
 ---
 
 ## Usage
 
-You are now ready to use opencode to work on your project. Feel free to ask it
+You are now ready to use kuuzuki to work on your project. Feel free to ask it
 anything!
 
 If you are new to using an AI coding agent, here are some examples that might
@@ -154,7 +172,7 @@ help.
 
 ### Ask questions
 
-You can ask opencode to explain the codebase to you.
+You can ask kuuzuki to explain the codebase to you.
 
 ```txt frame="none"
 How is authentication handled in @packages/functions/src/api/index.ts
@@ -170,39 +188,39 @@ Use the `@` key to fuzzy search for files in the project.
 
 ### Add features
 
-You can ask opencode to add new features to your project. Though we first recommend asking it to create a plan.
+You can ask kuuzuki to add new features to your project. Though we first recommend asking it to create a plan.
 
 1. **Create a plan**
 
-   opencode has a _Plan mode_ that disables its ability to make changes and
+   kuuzuki has a _Plan mode_ that disables its ability to make changes and
    instead suggest _how_ it'll implement the feature.
 
    Switch to it using the **Tab** key. You'll see an indicator for this in the lower right corner.
-   
+
    ```bash frame="none" title="Switch to Plan mode"
    <TAB>
    ```
 
    Now let's describe what we want it to do.
-   
+
    ```txt frame="none"
    When a user deletes a note, we'd like to flag it as deleted in the database.
    Then create a screen that shows all the recently deleted notes.
    From this screen, the user can undelete a note or permanently delete it.
    ```
-   
-   You want to give opencode enough details to understand what you want. It helps
+
+   You want to give kuuzuki enough details to understand what you want. It helps
    to talk to it like you are talking to a junior developer on your team.
-   
+
    :::tip
-   Give opencode plenty of context and examples to help it understand what you
+   Give kuuzuki plenty of context and examples to help it understand what you
    want.
    :::
 
 2. **Iterate on the plan**
 
    Once it gives you a plan, you can give it feedback or add more details.
-   
+
    ```txt frame="none"
    We'd like to design this new screen using a design I've used before.
    [Image #1] Take a look at this image and use it as a reference.
@@ -212,20 +230,20 @@ You can ask opencode to add new features to your project. Though we first recomm
    Drag and drop images into the terminal to add them to the prompt.
    :::
 
-   opencode can scan any images you give it and add them to the prompt. You can
+   kuuzuki can scan any images you give it and add them to the prompt. You can
    do this by dragging and dropping an image into the terminal.
 
 3. **Build the feature**
-   
+
    Once you feel comfortable with the plan, switch back to _Build mode_ by
    hitting the **Tab** key again.
-   
+
    ```bash frame="none"
    <TAB>
    ```
-   
+
    And asking it to make the changes.
-   
+
    ```bash frame="none"
    Sounds good! Go ahead and make the changes.
    ```
@@ -234,8 +252,14 @@ You can ask opencode to add new features to your project. Though we first recomm
 
 ### Make changes
 
-For more straightforward changes, you can ask opencode to directly build it
-without having to review the plan first.
+Unlike other AI tools that only provide suggestions, kuuzuki can actually build and modify your project directly. It has full access to your file system and can:
+
+- **Write code**: Create new files, modify existing ones
+- **Run commands**: Execute build scripts, run tests, install dependencies
+- **Refactor**: Update multiple files in a coordinated way
+- **Debug**: Run your code and fix issues it finds
+
+For example, you can ask kuuzuki to implement features:
 
 ```txt frame="none"
 We need to add authentication to the /settings route. Take a look at how this is
@@ -243,14 +267,23 @@ handled in the /notes route in @packages/functions/src/notes.ts and implement
 the same logic in @packages/functions/src/settings.ts
 ```
 
-You want to make sure you provide a good amount of detail so opencode makes the right
-changes.
+Kuuzuki will:
+1. Analyze the existing authentication pattern
+2. Write the new code following the same pattern
+3. Update any related files (routes, tests, etc.)
+4. Run your tests to ensure nothing breaks
+
+:::tip
+Kuuzuki respects your `.agentrc` configuration, so it will follow your project's coding standards, run your specific build commands, and adhere to your development practices.
+:::
+
+You want to make sure you provide context about what you want, and kuuzuki will handle the implementation details.
 
 ---
 
 ## Share
 
-The conversations that you have with opencode can be [shared with your
+The conversations that you have with kuuzuki can be [shared with your
 team](/docs/share).
 
 ```bash frame="none"
@@ -260,15 +293,51 @@ team](/docs/share).
 This'll create a link to the current conversation and copy it to your clipboard.
 
 :::note
-Conversations are not shared by default.
+Conversations are not shared by default. Sharing requires explicit action to protect your privacy.
 :::
 
-Here's an [example conversation](https://opencode.ai/s/4XP1fce5) with opencode.
+Shared conversations will be hosted on kuuzuki.com once the domain is active.
 
 ---
 
 ## Customize
 
-And that's it! You are now a pro at using opencode.
+And that's it! You are now a pro at using kuuzuki.
 
-To make it your own, we recommend [picking a theme](/docs/themes), [customizing the keybinds](/docs/keybinds), or playing around with the [opencode config](/docs/config).
+To make it your own, we recommend:
+- [Picking a theme](/docs/themes) - Choose from 20+ built-in themes or create your own
+- [Customizing keybinds](/docs/keybinds) - Configure vim-style or custom keyboard shortcuts
+- [Setting up your config](/docs/config) - Fine-tune models, providers, and behavior
+- [Creating custom agents](/docs/agents) - Build specialized AI assistants for specific tasks
+- [Configuring modes](/docs/modes) - Control tool access and AI behavior
+
+## Community
+
+Kuuzuki is a community project! We welcome contributions:
+
+- **Report Issues**: [GitHub Issues](https://github.com/moikas-code/kuuzuki/issues)
+- **Join Discussion**: [Discord Server](https://kuuzuki.com/discord)
+- **Contribute Code**: Fork, enhance, and submit PRs
+- **Share Configs**: Share your `.agentrc` configurations and custom themes
+
+## Kuuzuki Pro
+
+Kuuzuki is free and open source! The only feature that requires a subscription is:
+
+### Pro Feature:
+- **Share Sessions** - Create public links to share your AI conversations (requires server infrastructure)
+
+### Everything Else is Free:
+- Terminal UI (TUI) interface
+- All built-in tools (file operations, search, web fetch, etc.)
+- All AI provider integrations (bring your own API key)
+- IDE integrations
+- CLI commands and automation
+- Agent creation and customization
+- GitHub integration
+- MCP server integration
+- Self-hosting capabilities
+
+The share feature requires a subscription because it needs server infrastructure to host shared conversations. Everything else runs locally on your machine.
+
+[Learn more about the share feature →](/docs/share)

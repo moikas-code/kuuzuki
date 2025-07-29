@@ -1,13 +1,13 @@
 ---
 title: Agents
-description: Configure and use specialized agents in opencode.
+description: Configure and use specialized agents in kuuzuki.
 ---
 
 Agents are specialized AI assistants that can be configured for specific tasks and workflows. They allow you to create focused tools with custom prompts, models, and tool access.
 
 ## Creating Agents
 
-You can create new agents using the `opencode agent create` command. This interactive command will:
+You can create new agents using the `kuuzuki agent create` command. This interactive command will:
 
 1. Ask where to save the agent (global or project-specific)
 2. Prompt for a description of what the agent should do
@@ -16,26 +16,26 @@ You can create new agents using the `opencode agent create` command. This intera
 5. Create a markdown file with the agent configuration
 
 ```bash
-opencode agent create
+kuuzuki agent create
 ```
 
 The command will guide you through the process and automatically generate a well-structured agent based on your requirements.
 
 ## Built-in Agents
 
-opencode comes with a built-in `general` agent:
+kuuzuki comes with a built-in `general` agent:
 
 - **general** - General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. Use this when searching for keywords or files and you're not confident you'll find the right match in the first few tries.
 
 ## Configuration
 
-Agents can be configured in your `opencode.json` config file or as markdown files.
+Agents can be configured in your `kuuzuki.json` config file or as markdown files.
 
 ### JSON Configuration
 
-```json title="opencode.json"
+```json title="kuuzuki.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://kuuzuki.com/config.json",
   "agent": {
     "code-reviewer": {
       "description": "Reviews code for best practices and potential issues",
@@ -63,10 +63,10 @@ Agents can be configured in your `opencode.json` config file or as markdown file
 
 You can also define agents using markdown files. Place them in:
 
-- Global: `~/.config/opencode/agent/`
-- Project: `.opencode/agent/`
+- Global: `~/.config/kuuzuki/agent/`
+- Project: `.kuuzuki/agent/`
 
-```markdown title="~/.config/opencode/agent/code-reviewer.md"
+```markdown title="~/.config/kuuzuki/agent/code-reviewer.md"
 ---
 description: Reviews code for best practices and potential issues
 model: anthropic/claude-sonnet-4-20250514
@@ -136,13 +136,13 @@ Agents are automatically available through the Task tool when configured. The ma
 2. **Focused prompts** - Keep agent prompts focused on their specific role
 3. **Appropriate tool access** - Only give agents the tools they need for their tasks
 4. **Consistent naming** - Use descriptive, consistent names for your agents
-5. **Project-specific agents** - Use `.opencode/agent/` for project-specific workflows
+5. **Project-specific agents** - Use `.kuuzuki/agent/` for project-specific workflows
 
 ## Examples
 
 ### Documentation Agent
 
-```markdown title="~/.config/opencode/agent/docs-writer.md"
+```markdown title="~/.config/kuuzuki/agent/docs-writer.md"
 ---
 description: Writes and maintains project documentation
 tools:
@@ -161,7 +161,7 @@ Focus on:
 
 ### Security Auditor
 
-```markdown title="~/.config/opencode/agent/security-auditor.md"
+```markdown title="~/.config/kuuzuki/agent/security-auditor.md"
 ---
 description: Performs security audits and identifies vulnerabilities
 tools:

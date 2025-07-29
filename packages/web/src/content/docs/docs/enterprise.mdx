@@ -1,10 +1,10 @@
 ---
 title: Enterprise
-description: Using opencode in your organization.
+description: Using kuuzuki in your organization.
 ---
 
-opencode does not store any of your code or context data. This makes it easy for
-you to use opencode at your organization.
+kuuzuki does not store any of your code or context data. This makes it easy for
+you to use kuuzuki at your organization.
 
 To get started, we recommend:
 
@@ -15,13 +15,13 @@ To get started, we recommend:
 
 ## Trial
 
-Since opencode is open source and does not store any of your code or context data, your developers can simply [get started](/docs/) and carry out a trial.
+Since kuuzuki is open source and does not store any of your code or context data, your developers can simply [get started](/docs/) and carry out a trial.
 
 ---
 
 ### Data handling
 
-**opencode does not store your code or context data.** All processing happens locally or through direct API calls to your AI provider.
+**kuuzuki does not store your code or context data.** All processing happens locally or through direct API calls to your AI provider.
 
 The only caveat here is the optional `/share` feature.
 
@@ -29,15 +29,15 @@ The only caveat here is the optional `/share` feature.
 
 #### Sharing conversations
 
-If a user enables the `/share` feature, the conversation and the data associated with it are sent to the service we use to host these shares pages at opencode.ai.
+If a user enables the `/share` feature, the conversation and the data associated with it are sent to the service we use to host these shares pages at kuuzuki.com.
 
 The data is currently served through our CDN's edge network, and is cached on the edge near your users.
 
 We recommend you disable this for your trial.
 
-```json title="opencode.json"
+```json title="kuuzuki.json"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://kuuzuki.com/config.json",
   "share": "disabled"
 }
 ```
@@ -48,13 +48,13 @@ We recommend you disable this for your trial.
 
 ### Code ownership
 
-**You own all code produced by opencode.** There are no licensing restrictions or ownership claims.
+**You own all code produced by kuuzuki.** There are no licensing restrictions or ownership claims.
 
 ---
 
 ## Deployment
 
-Once you have completed your trial and you are ready to self-host opencode at
+Once you have completed your trial and you are ready to self-host kuuzuki at
 your organization, you can [**contact us**](mailto:hello@sst.dev) to discuss
 pricing and implementation options.
 
@@ -70,7 +70,7 @@ by your enterprise's authentication system.
 
 ### Private NPM
 
-opencode supports private npm registries through Bun's native `.npmrc` file support. If your organization uses a private registry, such as JFrog Artifactory, Nexus, or similar, ensure developers are authenticated before running opencode.
+kuuzuki supports private npm registries through Bun's native `.npmrc` file support. If your organization uses a private registry, such as JFrog Artifactory, Nexus, or similar, ensure developers are authenticated before running kuuzuki.
 
 To set up authentication with your private registry:
 
@@ -78,11 +78,11 @@ To set up authentication with your private registry:
 npm login --registry=https://your-company.jfrog.io/api/npm/npm-virtual/
 ```
 
-This creates `~/.npmrc` with authentication details. opencode will automatically
+This creates `~/.npmrc` with authentication details. kuuzuki will automatically
 pick this up.
 
 :::caution
-You must be logged into the private registry before running opencode.
+You must be logged into the private registry before running kuuzuki.
 :::
 
 Alternatively, you can manually configure a `.npmrc` file:
@@ -92,7 +92,7 @@ registry=https://your-company.jfrog.io/api/npm/npm-virtual/
 //your-company.jfrog.io/api/npm/npm-virtual/:_authToken=${NPM_AUTH_TOKEN}
 ```
 
-Developers must be logged into the private registry before running opencode to ensure packages can be installed from your enterprise registry.
+Developers must be logged into the private registry before running kuuzuki to ensure packages can be installed from your enterprise registry.
 
 ---
 

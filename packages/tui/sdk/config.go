@@ -59,7 +59,7 @@ type Config struct {
 	Layout ConfigLayout `json:"layout"`
 	// MCP (Model Context Protocol) server configurations
 	Mcp map[string]ConfigMcp `json:"mcp"`
-	// Modes configuration, see https://opencode.ai/docs/modes
+	// Modes configuration, see https://kuuzuki.com/docs/modes
 	Mode ConfigMode `json:"mode"`
 	// Model to use in the format of provider/model, eg anthropic/claude-2
 	Model string `json:"model"`
@@ -302,7 +302,7 @@ func (r ConfigMcpType) IsKnown() bool {
 	return false
 }
 
-// Modes configuration, see https://opencode.ai/docs/modes
+// Modes configuration, see https://kuuzuki.com/docs/modes
 type ConfigMode struct {
 	Build       ModeConfig            `json:"build"`
 	Plan        ModeConfig            `json:"plan"`

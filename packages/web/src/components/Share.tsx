@@ -3,7 +3,7 @@ import { DateTime } from "luxon"
 import { createStore, reconcile, unwrap } from "solid-js/store"
 import { mapValues } from "remeda"
 import { IconArrowDown } from "./icons"
-import { IconOpencode } from "./icons/custom"
+import { IconKuuzuki } from "./icons/custom"
 import styles from "./share.module.css"
 import type { MessageV2 } from "kuuzuki/session/message-v2"
 import type { Message } from "kuuzuki/session/message"
@@ -297,9 +297,9 @@ export default function Share(props: {
         <h1 data-component="header-title">{store.info?.title}</h1>
         <div data-component="header-details">
           <ul data-component="header-stats">
-            <li title="opencode version" data-slot="item">
-              <div data-slot="icon" title="opencode">
-                <IconOpencode width={16} height={16} />
+            <li title="kuuzuki version" data-slot="item">
+              <div data-slot="icon" title="kuuzuki">
+                <IconKuuzuki width={16} height={16} />
               </div>
               <Show when={store.info?.version} fallback="v0.0.1">
                 <span>v{store.info?.version}</span>

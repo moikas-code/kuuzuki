@@ -3,10 +3,10 @@ import { join } from "path"
 import { promises as fs } from "fs"
 
 export interface AuthData {
-  license: string
+  apiKey: string
   email: string
-  validatedAt: number
-  status?: string
+  savedAt: number
+  environment: "live" | "test"
 }
 
 const AUTH_FILE = join(homedir(), ".kuuzuki", "auth.json")
@@ -38,9 +38,36 @@ export async function clearAuth(): Promise<void> {
   }
 }
 
-export async function isAuthValid(auth: AuthData): Promise<boolean> {
-  // Check if auth is less than 5 minutes old
-  const fiveMinutes = 5 * 60 * 1000
-  const now = Date.now()
-  return now - auth.validatedAt < fiveMinutes
+export function validateApiKeyFormat(key: string): boolean {
+  return /^kz_(live|test)_[a-z0-9]{32}$/.test(key)
+}
+
+export function getKeyEnvironment(key: string): "live" | "test" | null {
+  if (key.startsWith("kz_live_")) return "live"
+  if (key.startsWith("kz_test_")) return "test"
+  return null
+}
+
+export function maskApiKey(key: string): string {
+  if (!validateApiKeyFormat(key)) return key
+
+  const parts = key.split("_")
+  const prefix = `${parts[0]}_${parts[1]}_`
+  const random = parts[2]
+  const masked = random.slice(0, 4) + "****" + random.slice(-4)
+
+  return prefix + masked
+}
+
+// Get API key from environment or storage
+export async function getApiKey(): Promise<string | null> {
+  // 1. Check environment variable (highest priority)
+  const envKey = process.env["KUUZUKI_API_KEY"]
+  if (envKey && validateApiKeyFormat(envKey)) {
+    return envKey
+  }
+
+  // 2. Check local storage
+  const auth = await getAuth()
+  return auth?.apiKey || null
 }

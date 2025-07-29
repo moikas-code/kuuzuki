@@ -1,43 +1,73 @@
 ---
 title: CLI
-description: The opencode CLI options and commands.
+description: Complete guide to kuuzuki CLI commands and options.
 ---
 
-Running the opencode CLI starts it for the current directory.
+kuuzuki is a community-driven AI coding assistant built for the terminal. The CLI provides powerful commands for interactive development, automation, and integration with your development workflow.
+
+## Installation
+
+kuuzuki is distributed via npm for easy installation:
 
 ```bash
-opencode
+npm install -g kuuzuki
 ```
 
-Or you can start it for a specific working directory.
+This community-focused approach makes kuuzuki accessible to developers who prefer CLI-first tools and want to integrate AI assistance into their terminal workflows.
+
+---
+
+## Default Behavior
+
+Running `kuuzuki` without any arguments starts the **Terminal UI (TUI)** - the primary interactive interface:
 
 ```bash
-opencode /path/to/project
+kuuzuki
 ```
 
+You can also start kuuzuki in a specific directory:
+
+```bash
+kuuzuki /path/to/project
+```
+
+The TUI provides:
+
+- Interactive chat with AI assistance
+- File browsing and editing capabilities
+- Session management and sharing
+- Real-time tool execution
+- Mode switching (build/plan)
+
 ---
 
-## Commands
-
-The opencode CLI also has the following commands.
-
----
+## Core Commands
 
 ### run
 
-Run opencode in non-interactive mode by passing a prompt directly.
+Execute kuuzuki in non-interactive mode with a direct prompt. Perfect for scripting, automation, and quick queries.
 
 ```bash
-opencode run [message..]
+kuuzuki run [message..]
 ```
 
-This is useful for scripting, automation, or when you want a quick answer without launching the full TUI. For example.
+**Examples:**
 
-```bash "opencode run"
-opencode run Explain the use of context in Go
+```bash
+# Quick code review
+kuuzuki run "Review this file for security issues" @src/auth.ts
+
+# Generate documentation
+kuuzuki run "Create API docs for this module" @api/users.js
+
+# Debug assistance
+kuuzuki run "Why is this test failing?" @tests/user.test.js
+
+# Continue previous conversation
+kuuzuki run --continue "Now add error handling"
 ```
 
-#### Flags
+**Flags:**
 
 | Flag         | Short | Description                                |
 | ------------ | ----- | ------------------------------------------ |
@@ -48,85 +78,504 @@ opencode run Explain the use of context in Go
 
 ---
 
-### auth
+### serve
 
-Command to manage credentials and login for providers.
+Start kuuzuki as a headless server for integration with IDEs, editors, and other tools.
 
 ```bash
-opencode auth [command]
+kuuzuki serve [options]
 ```
 
+**Examples:**
+
+```bash
+# Start server on default port (4096)
+kuuzuki serve
+
+# Start on specific port and host
+kuuzuki serve --port 8080 --hostname 0.0.0.0
+
+# For IDE integration
+kuuzuki serve --port 4096 --hostname 127.0.0.1
+```
+
+**Flags:**
+
+| Flag         | Short | Description                              |
+| ------------ | ----- | ---------------------------------------- |
+| `--port`     | `-p`  | Port to listen on (default: 4096)        |
+| `--hostname` | `-h`  | Hostname to bind to (default: 127.0.0.1) |
+
+**Use Cases:**
+
+- IDE and editor integrations
+- Custom tool development
+- Headless automation environments
+- Remote development setups
+
 ---
+
+### tui
+
+Explicitly start the Terminal UI (same as running `kuuzuki` without arguments).
+
+```bash
+kuuzuki tui [project] [options]
+```
+
+**Flags:**
+
+| Flag         | Description                     |
+| ------------ | ------------------------------- |
+| `--model`    | Model to use                    |
+| `--prompt`   | Initial prompt                  |
+| `--mode`     | Mode to start in (build/plan)   |
+| `--port`     | Server port for TUI backend     |
+| `--hostname` | Server hostname for TUI backend |
+
+---
+
+## Management Commands
+
+### auth
+
+Manage API credentials for AI providers.
+
+```bash
+kuuzuki auth [command]
+```
 
 #### login
 
-opencode is powered by the provider list at [Models.dev](https://models.dev), so you can use `opencode auth login` to configure API keys for any provider you'd like to use. This is stored in `~/.local/share/opencode/auth.json`.
+Configure API keys for AI providers. kuuzuki supports 75+ providers through [Models.dev](https://models.dev).
 
 ```bash
-opencode auth login
+kuuzuki auth login
 ```
 
-When opencode starts up it loads the providers from the credentials file. And if there are any keys defined in your environments or a `.env` file in your project.
+This interactive command will:
 
----
+1. Show available providers
+2. Prompt for API key
+3. Store credentials securely in `~/.local/share/kuuzuki/auth.json`
+
+**Supported Providers:**
+
+- Anthropic (Claude) - Recommended
+- OpenAI (GPT models)
+- Google (Gemini)
+- Amazon Bedrock
+- Azure OpenAI
+- And 70+ more providers
 
 #### list
 
-Lists all the authenticated providers as stored in the credentials file.
+View all configured providers:
 
 ```bash
-opencode auth list
+kuuzuki auth list
+# or
+kuuzuki auth ls
 ```
 
-Or the short version.
+#### logout
+
+Remove credentials for a provider:
 
 ```bash
-opencode auth ls
+kuuzuki auth logout
 ```
 
 ---
 
-#### logout
+### apikey
 
-Logs you out of a provider by clearing it from the credentials file.
+Manage API key authentication for Kuuzuki Pro features.
 
 ```bash
-opencode auth logout
+kuuzuki apikey [command]
 ```
+
+#### login
+
+Set your Kuuzuki API key for pro features.
+
+```bash
+kuuzuki apikey login --api-key kz_live_your_api_key_here
+```
+
+This stores the API key locally for authentication. Alternatively, you can use the `KUUZUKI_API_KEY` environment variable.
+
+#### status
+
+Check your current authentication status.
+
+```bash
+kuuzuki apikey status
+```
+
+Add `--show-key` to display the full API key (be careful in shared environments).
+
+#### recover
+
+Recover your API key using your subscription email.
+
+```bash
+kuuzuki apikey recover --email your@email.com
+```
+
+This will resend your API key to the email associated with your subscription.
+
+#### logout
+
+Remove the stored API key from your local machine.
+
+```bash
+kuuzuki apikey logout
+```
+
+Note: This only removes the local copy. The API key remains valid on the server.
+
+---
+
+### agent
+
+Create and manage specialized AI agents for specific tasks.
+
+```bash
+kuuzuki agent [command]
+```
+
+#### create
+
+Create a new specialized agent with custom prompts and tool access:
+
+```bash
+kuuzuki agent create
+```
+
+This interactive process will:
+
+1. Choose scope (global or project-specific)
+2. Describe the agent's purpose
+3. Generate appropriate system prompts
+4. Select available tools
+5. Create agent configuration file
+
+**Example Agents:**
+
+- Code reviewer (read-only access)
+- Test writer (write access to test files)
+- Documentation generator
+- Security auditor
+- Refactoring assistant
+
+**Agent Storage:**
+
+- Global: `~/.config/kuuzuki/agent/`
+- Project: `.kuuzuki/agent/`
+
+---
+
+### models
+
+List and manage available AI models.
+
+```bash
+kuuzuki models
+```
+
+Shows all configured models from your authenticated providers, including:
+
+- Provider name and model ID
+- Model capabilities
+- Current default model
+- Availability status
+
+---
+
+## Integration Commands
+
+### github
+
+Set up and manage GitHub integration for AI-powered issue and PR assistance.
+
+```bash
+kuuzuki github [command]
+```
+
+#### install
+
+Set up GitHub integration for your repository:
+
+```bash
+kuuzuki github install
+```
+
+This command will:
+
+1. Install the kuuzuki GitHub App
+2. Create workflow files
+3. Guide you through secret configuration
+4. Provide next steps for activation
+
+#### run
+
+Execute the GitHub agent (used internally by GitHub Actions):
+
+```bash
+kuuzuki github run [options]
+```
+
+**GitHub Integration Features:**
+
+- Respond to `/kuuzuki` comments in issues and PRs
+- Automatic code analysis and suggestions
+- Create PRs for issue fixes
+- Review and improve existing PRs
+- Secure execution in GitHub Actions
+
+---
+
+### mcp
+
+Manage Model Context Protocol (MCP) servers for extending kuuzuki with external tools.
+
+```bash
+kuuzuki mcp [command]
+```
+
+MCP servers allow you to add custom tools and integrations to kuuzuki, such as:
+
+- Database query tools
+- API testing utilities
+- Custom code analysis tools
+- External service integrations
+
+---
+
+## Utility Commands
+
+### debug
+
+Debug utilities for troubleshooting kuuzuki issues.
+
+```bash
+kuuzuki debug [command]
+```
+
+Includes tools for:
+
+- LSP server debugging
+- File system analysis
+- Session snapshots
+- Ripgrep integration testing
+
+---
+
+### stats
+
+View usage statistics and analytics.
+
+```bash
+kuuzuki stats
+```
+
+Shows information about:
+
+- Command usage frequency
+- Session statistics
+- Model usage patterns
+- Performance metrics
 
 ---
 
 ### upgrade
 
-Updates opencode to the latest version or a specific version.
+Update kuuzuki to the latest version.
 
 ```bash
-opencode upgrade [target]
+kuuzuki upgrade [target]
 ```
 
-To upgrade to the latest version.
+**Examples:**
 
 ```bash
-opencode upgrade
-```
+# Upgrade to latest version
+kuuzuki upgrade
 
-To upgrade to a specific version.
-
-```bash
-opencode upgrade v0.1.48
+# Upgrade to specific version
+kuuzuki upgrade v0.2.0
 ```
 
 ---
 
-## Flags
+## Global Flags
 
-The opencode CLI takes the following flags.
+These flags work with most kuuzuki commands:
 
-| Flag           | Short | Description          |
-| -------------- | ----- | -------------------- |
-| `--help`       | `-h`  | Display help         |
-| `--version`    |       | Print version number |
-| `--print-logs` |       | Print logs to stderr |
-| `--prompt`     | `-p`  | Prompt to use        |
-| `--model`      | `-m`  | Model to use in the form of provider/model |
-| `--mode`       |       | Mode to use          |
+| Flag           | Short | Description                              |
+| -------------- | ----- | ---------------------------------------- |
+| `--help`       | `-h`  | Display help information                 |
+| `--version`    | `-v`  | Print version number                     |
+| `--print-logs` |       | Print logs to stderr for debugging       |
+| `--log-level`  |       | Set log level (DEBUG, INFO, WARN, ERROR) |
+| `--model`      | `-m`  | Override default model (provider/model)  |
+| `--mode`       |       | Set mode (build, plan, or custom)        |
+
+---
+
+## Configuration Integration
+
+CLI flags override configuration file settings. For example:
+
+```bash
+# CLI override
+kuuzuki --model anthropic/claude-sonnet-4 --mode plan
+
+# Equivalent kuuzuki.json setting:
+{
+  "model": "anthropic/claude-sonnet-4",
+  "mode": "plan"
+}
+```
+
+See the [Configuration Guide](/docs/config) for detailed configuration options.
+
+---
+
+## Practical Workflows
+
+### Development Workflow
+
+```bash
+# Start interactive session for feature development
+kuuzuki
+
+# Quick code review during development
+kuuzuki run "Review this implementation" @src/feature.ts
+
+# Generate tests for new code
+kuuzuki run "Write comprehensive tests" @src/feature.ts
+
+# Debug failing tests
+kuuzuki run --continue "Tests are failing with: [error message]"
+```
+
+### Code Review Workflow
+
+```bash
+# Review security implications
+kuuzuki run "Analyze for security vulnerabilities" @src/auth.ts
+
+# Check performance implications
+kuuzuki run "Review for performance issues" @src/api/
+
+# Suggest improvements
+kuuzuki run "Suggest refactoring opportunities" @src/legacy/
+```
+
+### Learning Workflow
+
+```bash
+# Understand unfamiliar codebase
+kuuzuki run "Explain the architecture" @src/
+
+# Learn specific patterns
+kuuzuki run "Explain this design pattern" @src/patterns/observer.ts
+
+# Get implementation guidance
+kuuzuki run "How would I implement feature X in this codebase?"
+```
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**Installation Problems:**
+
+```bash
+# Permission errors with global install
+sudo npm install -g kuuzuki
+# or use a Node version manager like nvm
+
+# Path issues
+which kuuzuki
+echo $PATH
+```
+
+**API Key Issues:**
+
+```bash
+# Reconfigure authentication
+kuuzuki auth logout
+kuuzuki auth login
+
+# Check stored credentials
+kuuzuki auth list
+```
+
+**Model Availability:**
+
+```bash
+# List available models
+kuuzuki models
+
+# Test specific model
+kuuzuki run --model anthropic/claude-sonnet-4 "Hello"
+```
+
+**Network Issues:**
+
+```bash
+# Check connectivity with debug logs
+kuuzuki --print-logs run "Test connection"
+
+# Verify proxy settings if behind corporate firewall
+```
+
+### Getting Help
+
+- **Documentation**: [kuuzuki.com/docs](https://kuuzuki.com/docs)
+- **GitHub Issues**: [github.com/moikas-code/kuuzuki/issues](https://github.com/moikas-code/kuuzuki/issues)
+- **Community Discord**: [kuuzuki.com/discord](https://kuuzuki.com/discord)
+
+---
+
+## Advanced Usage
+
+### Scripting and Automation
+
+```bash
+#!/bin/bash
+# Automated code review script
+
+files=$(git diff --name-only HEAD~1)
+for file in $files; do
+  echo "Reviewing $file..."
+  kuuzuki run "Review changes in this file" @"$file"
+done
+```
+
+### CI/CD Integration
+
+```bash
+# In your CI pipeline
+kuuzuki run "Analyze this PR for potential issues" @.
+
+# Generate documentation
+kuuzuki run "Update README with new features" @src/
+```
+
+### Custom Workflows
+
+```bash
+# Create project-specific aliases
+alias review="kuuzuki run 'Code review with security focus'"
+alias docs="kuuzuki run 'Generate documentation'"
+alias test="kuuzuki run 'Create comprehensive tests'"
+```
+
+kuuzuki's CLI is designed to integrate seamlessly into your development workflow, providing AI assistance exactly when and where you need it.

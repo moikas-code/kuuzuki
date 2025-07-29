@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "timestamp": "2025-07-25T21:30:04.102Z",
+  "timestamp": "2025-07-28T21:01:31.493Z",
   "commands": [
-    "pkill"
+    "cat /home/moika/Documents/code/kuucode/docs/AGENTRC.md"
   ]
 }

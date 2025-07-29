@@ -1,11 +1,11 @@
 import Stripe from "stripe"
-import { createLicenseKey, storeLicense, getLicenseByCustomerId, updateLicenseStatus } from "./license"
-import { sendLicenseEmail } from "./email"
+import { createApiKey, storeApiKey, getApiKeyByCustomerId, updateApiKeyStatus } from "./apikey"
+import { sendApiKeyEmail } from "./email"
 
 export async function handleStripeWebhook(
   event: Stripe.Event,
   kv: KVNamespace,
-  env?: { EMAIL_API_URL?: string; EMAIL_API_KEY?: string }
+  env?: { EMAIL_API_URL?: string; EMAIL_API_KEY?: string },
 ): Promise<void> {
   switch (event.type) {
     case "checkout.session.completed": {
@@ -21,35 +21,40 @@ export async function handleStripeWebhook(
         return
       }
 
-      // Check if license already exists for this customer
-      const existingLicense = await getLicenseByCustomerId(kv, customerId)
-      if (existingLicense) {
-        console.log("License already exists for customer", customerId)
+      // Check if API key already exists for this customer
+      const existingApiKey = await getApiKeyByCustomerId(kv, customerId)
+      if (existingApiKey) {
+        console.log("API key already exists for customer", customerId)
         return
       }
 
-      // Create new license
-      const licenseKey = createLicenseKey()
-      await storeLicense(kv, {
-        key: licenseKey,
+      // Create new API key
+      const apiKey = createApiKey("live")
+      await storeApiKey(kv, {
+        key: apiKey,
         email,
         customerId,
         subscriptionId,
         status: "active",
+        scopes: ["sharing"],
         createdAt: Date.now(),
         metadata: {
           clientReferenceId: session.client_reference_id,
+          version: "1.0.0",
         },
       })
 
-      console.log("Created license", licenseKey, "for", email)
-      
-      // Send license key via email
-      await sendLicenseEmail({
-        email,
-        licenseKey,
-        customerId,
-      }, env)
+      console.log("Created API key", apiKey, "for", email)
+
+      // Send API key via email
+      await sendApiKeyEmail(
+        {
+          email,
+          apiKey,
+          customerId,
+        },
+        env,
+      )
       break
     }
 
@@ -57,9 +62,9 @@ export async function handleStripeWebhook(
       const subscription = event.data.object as Stripe.Subscription
       const customerId = subscription.customer as string
 
-      const license = await getLicenseByCustomerId(kv, customerId)
-      if (!license) {
-        console.error("No license found for customer", customerId)
+      const apiKey = await getApiKeyByCustomerId(kv, customerId)
+      if (!apiKey) {
+        console.error("No API key found for customer", customerId)
         return
       }
 
@@ -81,8 +86,8 @@ export async function handleStripeWebhook(
           break
       }
 
-      await updateLicenseStatus(kv, license.key, status)
-      console.log("Updated license status", license.key, status)
+      await updateApiKeyStatus(kv, apiKey.key, status)
+      console.log("Updated API key status", apiKey.key, status)
       break
     }
 
@@ -90,14 +95,14 @@ export async function handleStripeWebhook(
       const subscription = event.data.object as Stripe.Subscription
       const customerId = subscription.customer as string
 
-      const license = await getLicenseByCustomerId(kv, customerId)
-      if (!license) {
-        console.error("No license found for customer", customerId)
+      const apiKey = await getApiKeyByCustomerId(kv, customerId)
+      if (!apiKey) {
+        console.error("No API key found for customer", customerId)
         return
       }
 
-      await updateLicenseStatus(kv, license.key, "canceled")
-      console.log("Canceled license", license.key)
+      await updateApiKeyStatus(kv, apiKey.key, "canceled")
+      console.log("Canceled API key", apiKey.key)
       break
     }
 

@@ -4,8 +4,13 @@ import { jwtVerify, createRemoteJWKSet } from "jose"
 import { createAppAuth } from "@octokit/auth-app"
 import { Octokit } from "@octokit/rest"
 import { Resource } from "sst"
-import { createStripeClient, createCheckoutSession, createBillingPortalSession, constructWebhookEvent } from "./billing/stripe"
-import { getLicense, getLicenseByEmail, isLicenseValid } from "./billing/license"
+import {
+  createStripeClient,
+  createCheckoutSession,
+  createBillingPortalSession,
+  constructWebhookEvent,
+} from "./billing/stripe"
+import { getApiKey, getApiKeyByEmail, isApiKeyValid, updateApiKeyUsage } from "./billing/apikey"
 import { handleStripeWebhook } from "./billing/webhook"
 
 type Env = {
@@ -383,7 +388,7 @@ export default {
     if (request.method === "POST" && method === "billing_create_checkout") {
       const stripe = createStripeClient(env.STRIPE_SECRET_KEY)
       const body = await request.json<{ email?: string }>()
-      
+
       try {
         const checkoutUrl = await createCheckoutSession(stripe, {
           priceId: env.STRIPE_PRICE_ID,
@@ -391,7 +396,7 @@ export default {
           cancelUrl: `https://${env.WEB_DOMAIN}/billing/cancel`,
           customerEmail: body.email,
         })
-        
+
         return new Response(JSON.stringify({ checkoutUrl }), {
           headers: { "Content-Type": "application/json" },
         })
@@ -409,23 +414,19 @@ export default {
      */
     if (request.method === "POST" && method === "billing_portal") {
       const stripe = createStripeClient(env.STRIPE_SECRET_KEY)
-      const body = await request.json<{ licenseKey: string }>()
-      
+      const body = await request.json<{ apiKey: string }>()
+
       try {
-        const license = await getLicense(env.LICENSES, body.licenseKey)
-        if (!license) {
-          return new Response(JSON.stringify({ error: "Invalid license" }), {
+        const key = await getApiKey(env.LICENSES, body.apiKey)
+        if (!key) {
+          return new Response(JSON.stringify({ error: "Invalid API key" }), {
             status: 404,
             headers: { "Content-Type": "application/json" },
           })
         }
-        
-        const portalUrl = await createBillingPortalSession(
-          stripe,
-          license.customerId,
-          `https://${env.WEB_DOMAIN}/billing`
-        )
-        
+
+        const portalUrl = await createBillingPortalSession(stripe, key.customerId, `https://${env.WEB_DOMAIN}/billing`)
+
         return new Response(JSON.stringify({ portalUrl }), {
           headers: { "Content-Type": "application/json" },
         })
@@ -444,25 +445,20 @@ export default {
     if (request.method === "POST" && method === "billing_webhook") {
       const stripe = createStripeClient(env.STRIPE_SECRET_KEY)
       const signature = request.headers.get("stripe-signature")
-      
+
       if (!signature) {
         return new Response("Missing signature", { status: 400 })
       }
-      
+
       try {
         const body = await request.text()
-        const event = await constructWebhookEvent(
-          stripe,
-          body,
-          signature,
-          env.STRIPE_WEBHOOK_SECRET
-        )
-        
+        const event = await constructWebhookEvent(stripe, body, signature, env.STRIPE_WEBHOOK_SECRET)
+
         await handleStripeWebhook(event, env.LICENSES, {
           EMAIL_API_URL: env.EMAIL_API_URL,
           EMAIL_API_KEY: env.EMAIL_API_KEY,
         })
-        
+
         return new Response(JSON.stringify({ received: true }), {
           headers: { "Content-Type": "application/json" },
         })
@@ -476,39 +472,48 @@ export default {
     }
 
     /**
-     * Verify license key
+     * Verify API key
      */
-    if (request.method === "GET" && method === "auth_verify_license") {
-      const licenseKey = url.searchParams.get("license")
-      
-      if (!licenseKey) {
-        return new Response(JSON.stringify({ error: "Missing license key" }), {
+    if (request.method === "GET" && method === "auth_verify_apikey") {
+      const apiKey = url.searchParams.get("key") || request.headers.get("Authorization")?.replace("Bearer ", "")
+
+      if (!apiKey) {
+        return new Response(JSON.stringify({ valid: false, error: "Missing API key" }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
         })
       }
-      
+
       try {
-        const license = await getLicense(env.LICENSES, licenseKey)
-        if (!license) {
+        const key = await getApiKey(env.LICENSES, apiKey)
+        if (!key) {
           return new Response(JSON.stringify({ valid: false }), {
             headers: { "Content-Type": "application/json" },
           })
         }
-        
-        const valid = isLicenseValid(license)
-        
-        return new Response(JSON.stringify({ 
-          valid,
-          email: license.email,
-          status: license.status,
-          expiresAt: license.expiresAt,
-        }), {
-          headers: { "Content-Type": "application/json" },
-        })
+
+        const valid = isApiKeyValid(key)
+
+        // Update usage tracking
+        if (valid) {
+          await updateApiKeyUsage(env.LICENSES, apiKey)
+        }
+
+        return new Response(
+          JSON.stringify({
+            valid,
+            email: key.email,
+            status: key.status,
+            scopes: key.scopes,
+            expiresAt: key.expiresAt,
+          }),
+          {
+            headers: { "Content-Type": "application/json" },
+          },
+        )
       } catch (error) {
-        console.error("License verification error:", error)
-        return new Response(JSON.stringify({ error: "Failed to verify license" }), {
+        console.error("API key verification error:", error)
+        return new Response(JSON.stringify({ valid: false, error: "Verification failed" }), {
           status: 500,
           headers: { "Content-Type": "application/json" },
         })
@@ -516,46 +521,38 @@ export default {
     }
 
     /**
-     * Activate license with email
+     * Recover API key by email
      */
-    if (request.method === "POST" && method === "auth_activate") {
-      const body = await request.json<{ email: string; licenseKey: string }>()
-      
-      if (!body.email || !body.licenseKey) {
-        return new Response(JSON.stringify({ error: "Missing email or license key" }), {
+    if (request.method === "POST" && method === "auth_recover_apikey") {
+      const body = await request.json<{ email: string }>()
+
+      if (!body.email) {
+        return new Response(JSON.stringify({ error: "Missing email" }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
         })
       }
-      
+
       try {
-        const license = await getLicense(env.LICENSES, body.licenseKey)
-        if (!license) {
-          return new Response(JSON.stringify({ error: "Invalid license" }), {
-            status: 404,
+        const apiKey = await getApiKeyByEmail(env.LICENSES, body.email)
+        if (!apiKey || !isApiKeyValid(apiKey)) {
+          return new Response(JSON.stringify({ apiKey: null }), {
             headers: { "Content-Type": "application/json" },
           })
         }
-        
-        if (license.email !== body.email) {
-          return new Response(JSON.stringify({ error: "License email mismatch" }), {
-            status: 403,
+
+        return new Response(
+          JSON.stringify({
+            apiKey: apiKey.key,
+            email: apiKey.email,
+          }),
+          {
             headers: { "Content-Type": "application/json" },
-          })
-        }
-        
-        const valid = isLicenseValid(license)
-        
-        return new Response(JSON.stringify({ 
-          success: true,
-          valid,
-          status: license.status,
-        }), {
-          headers: { "Content-Type": "application/json" },
-        })
+          },
+        )
       } catch (error) {
-        console.error("License activation error:", error)
-        return new Response(JSON.stringify({ error: "Failed to activate license" }), {
+        console.error("API key recovery error:", error)
+        return new Response(JSON.stringify({ error: "Recovery failed" }), {
           status: 500,
           headers: { "Content-Type": "application/json" },
         })
