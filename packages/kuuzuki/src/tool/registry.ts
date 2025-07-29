@@ -10,6 +10,7 @@ import { TaskTool } from "./task"
 import { TodoWriteTool, TodoReadTool } from "./todo"
 import { WebFetchTool } from "./webfetch"
 import { WriteTool } from "./write"
+import { MemoryTool } from "./memory"
 
 export namespace ToolRegistry {
   const ALL = [
@@ -19,6 +20,7 @@ export namespace ToolRegistry {
     GlobTool,
     GrepTool,
     ListTool,
+    MemoryTool,
     PatchTool,
     ReadTool,
     WriteTool,
