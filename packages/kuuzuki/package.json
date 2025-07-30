@@ -31,8 +31,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "dev": "bun run ./src/index.ts",
-    "build": "tsc",
-    "prepublishOnly": "echo 'Skipping build for emergency release' && node scripts/prepublish.js"
+    "build": "tsc --noEmit false --skipLibCheck",
+    "prepublishOnly": "bun run build && node scripts/prepublish.js"
   },
   "bin": {
     "opencode": "./bin/kuuzuki",

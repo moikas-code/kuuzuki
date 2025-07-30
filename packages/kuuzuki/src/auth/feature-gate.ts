@@ -1,5 +1,4 @@
-import { getSubscriptionStatus } from "./subscription"
-import type { SubscriptionStatus } from "./subscription"
+import { checkSubscription } from "./subscription"
 import { Log } from "../util/log"
 import chalk from "chalk"
 
@@ -38,8 +37,8 @@ export function isSelfHosted(): boolean {
  */
 export async function hasProSubscription(): Promise<boolean> {
   try {
-    const status = await getSubscriptionStatus()
-    return status.active
+    const status = await checkSubscription()
+    return status.hasSubscription
   } catch (error) {
     log.error("Failed to check subscription status", { error })
     return false

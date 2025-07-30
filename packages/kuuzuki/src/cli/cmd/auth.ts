@@ -83,7 +83,6 @@ export const AuthLoginCommand = cmd({
     }
     let provider = await prompts.select({
       message: "Select provider",
-      maxItems: 8,
       options: [
         ...pipe(
           providers,

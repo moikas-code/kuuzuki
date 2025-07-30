@@ -29,12 +29,10 @@ export const McpAddCommand = cmd({
         {
           label: "Local",
           value: "local",
-          hint: "Run a local command",
         },
         {
           label: "Remote",
           value: "remote",
-          hint: "Connect to a remote URL",
         },
       ],
     })

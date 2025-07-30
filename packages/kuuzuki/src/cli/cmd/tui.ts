@@ -11,7 +11,6 @@ import { Bus } from "../../bus"
 import { Log } from "../../util/log"
 import { FileWatcher } from "../../file/watch"
 import { Mode } from "../../session/mode"
-import { Ide } from "../../ide"
 
 export const TuiCommand = cmd({
   command: "tui [project]",
@@ -49,7 +48,7 @@ export const TuiCommand = cmd({
       }),
   handler: async (args) => {
     // Set TUI mode to prevent external prompts from corrupting display
-    process.env.KUUZUKI_TUI_MODE = 'true'
+    process.env['KUUZUKI_TUI_MODE'] = 'true'
     
     while (true) {
       const cwd = args.project ? path.resolve(args.project) : process.cwd()

@@ -206,7 +206,6 @@ export const GithubInstallCommand = cmd({
         }
         let provider = await prompts.select({
           message: "Select provider",
-          maxItems: 8,
           options: pipe(
             providers,
             values(),
@@ -232,7 +231,6 @@ export const GithubInstallCommand = cmd({
 
         const model = await prompts.select({
           message: "Select model",
-          maxItems: 8,
           options: pipe(
             providerData.models,
             values(),

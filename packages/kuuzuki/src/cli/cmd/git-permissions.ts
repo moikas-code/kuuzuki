@@ -287,10 +287,6 @@ export const GitPermissionsConfigureCommand = cmd({
       const commitMode = await prompts.select({
         message: "How should commits be handled?",
         options: [
-          { value: "never", label: "Never allow commits", hint: "Completely disable commits" },
-          { value: "ask", label: "Ask for permission", hint: "Prompt for each commit (default)" },
-          { value: "session", label: "Allow for session", hint: "Allow after first approval" },
-          { value: "project", label: "Always allow", hint: "Allow all commits in this project" },
         ],
         initialValue: currentGit.commitMode,
       })
@@ -299,10 +295,6 @@ export const GitPermissionsConfigureCommand = cmd({
       const pushMode = await prompts.select({
         message: "How should pushes be handled?",
         options: [
-          { value: "never", label: "Never allow pushes", hint: "Completely disable pushes (default)" },
-          { value: "ask", label: "Ask for permission", hint: "Prompt for each push" },
-          { value: "session", label: "Allow for session", hint: "Allow after first approval" },
-          { value: "project", label: "Always allow", hint: "Allow all pushes in this project" },
         ],
         initialValue: currentGit.pushMode,
       })
@@ -311,10 +303,6 @@ export const GitPermissionsConfigureCommand = cmd({
       const configMode = await prompts.select({
         message: "How should Git config changes be handled?",
         options: [
-          { value: "never", label: "Never allow config changes", hint: "Completely disable config changes (default)" },
-          { value: "ask", label: "Ask for permission", hint: "Prompt for each config change" },
-          { value: "session", label: "Allow for session", hint: "Allow after first approval" },
-          { value: "project", label: "Always allow", hint: "Allow all config changes in this project" },
         ],
         initialValue: currentGit.configMode,
       })

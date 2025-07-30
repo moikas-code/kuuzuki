@@ -23,12 +23,10 @@ const AgentCreateCommand = cmd({
             {
               label: "Current project",
               value: "project" as const,
-              hint: app.path.root,
             },
             {
               label: "Global",
               value: "global" as const,
-              hint: Global.Path.config,
             },
           ],
         })

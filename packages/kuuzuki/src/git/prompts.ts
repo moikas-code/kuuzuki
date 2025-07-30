@@ -133,22 +133,18 @@ export class GitPromptSystem {
         {
           value: "once",
           label: "Yes, allow once",
-          hint: "Perform this operation only",
         },
         {
           value: "session",
           label: "Yes, allow for this session",
-          hint: "Allow until kuuzuki is restarted",
         },
         {
           value: "project",
           label: "Yes, always allow for this project",
-          hint: "Update .agentrc to always allow",
         },
         {
           value: "deny",
           label: "No, don't allow",
-          hint: "Cancel this operation",
         },
       ],
     })
@@ -182,7 +178,6 @@ export class GitPromptSystem {
       options: branches.map((branch) => ({
         value: branch,
         label: branch,
-        hint: branch === currentBranch ? "(current)" : "",
       })),
     })
 
