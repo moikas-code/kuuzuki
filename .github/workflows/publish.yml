@@ -5,6 +5,7 @@ on:
   push:
     tags:
       - "v*"
+      - "kuuzuki-v*"
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
