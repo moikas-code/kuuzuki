@@ -34,7 +34,15 @@ if (!command || command === 'tui') {
     stdio: 'inherit',
     env: {
       ...process.env,
-      KUUZUKI_NPM_INSTALL: 'true'
+      KUUZUKI_NPM_INSTALL: 'true',
+      // Set minimal required environment variables to prevent TUI crashes
+      KUUZUKI_SERVER: process.env.KUUZUKI_SERVER || 'http://127.0.0.1:12275',
+      KUUZUKI_APP_INFO: process.env.KUUZUKI_APP_INFO || JSON.stringify({
+        name: 'kuuzuki',
+        version: require('../package.json').version,
+        npmMode: true
+      }),
+      KUUZUKI_MODES: process.env.KUUZUKI_MODES || '[]'
     }
   });
   
