@@ -72,15 +72,15 @@ type Model struct {
 	showCompletionDialog bool
 	leaderBinding        *key.Binding
 	// isLeaderSequence     bool
-	toastManager         *toast.ToastManager
-	interruptKeyState    InterruptKeyState
-	exitKeyState         ExitKeyState
-	messagesRight        bool
-	fileViewer           fileviewer.Model
-	pendingConfirmation  *chat.ConfirmationMsg
-	activeConfirmation   *chat.ConfirmationMessage
-	activeToolApproval   *chat.ToolApprovalMessage
-	activeTextInput      *chat.TextInputMessage
+	toastManager        *toast.ToastManager
+	interruptKeyState   InterruptKeyState
+	exitKeyState        ExitKeyState
+	messagesRight       bool
+	fileViewer          fileviewer.Model
+	pendingConfirmation *chat.ConfirmationMsg
+	activeConfirmation  *chat.ConfirmationMessage
+	activeToolApproval  *chat.ToolApprovalMessage
+	activeTextInput     *chat.TextInputMessage
 }
 
 func (a Model) Init() tea.Cmd {
@@ -98,16 +98,10 @@ func (a Model) Init() tea.Cmd {
 	cmds = append(cmds, a.toastManager.Init())
 	cmds = append(cmds, a.fileViewer.Init())
 
-	// Check if we should show the init confirmation
+	// Check if we should show the init dialog
 	cmds = append(cmds, func() tea.Msg {
 		shouldShow := a.app.Info.Git && a.app.Info.Time.Initialized > 0
-		if shouldShow {
-			return chat.ConfirmationMsg{
-				ID:       "init-project",
-				Question: "Would you like to initialize this project? This will create an AGENTS.md file with information about your codebase.",
-			}
-		}
-		return nil
+		return dialog.ShowInitDialogMsg{Show: shouldShow}
 	})
 
 	return tea.Batch(cmds...)
@@ -550,6 +544,22 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.editor.SetExitKeyInDebounce(false)
 	case dialog.FindSelectedMsg:
 		return a.openFile(msg.FilePath)
+	case dialog.ShowInitDialogMsg:
+		if msg.Show && a.app.Session == nil {
+			// Create the init dialog modal
+			a.modal = dialog.NewInitDialogCmp()
+			a.editor.Blur()
+			cmd := a.modal.Init()
+			cmds = append(cmds, cmd)
+		}
+	case dialog.CloseInitDialogMsg:
+		if msg.Initialize {
+			cmds = append(cmds, a.app.InitializeProject(context.Background()))
+		}
+		a.modal = nil
+		updated, cmd := a.editor.Focus()
+		a.editor = updated.(chat.EditorComponent)
+		cmds = append(cmds, cmd)
 	case chat.ConfirmationMsg:
 		// Create a new confirmation message
 		a.activeConfirmation = chat.NewConfirmationMessage(msg.ID, msg.Question)
@@ -644,9 +654,9 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // hasActiveChat checks if the user is in an active chat session
 func (a *Model) hasActiveChat() bool {
 	// Check if we have an active session and any interactive elements
-	return a.app != nil && a.app.Session.ID != "" && 
-		(a.activeConfirmation != nil || a.activeToolApproval != nil || 
-		 a.activeTextInput != nil)
+	return a.app != nil && a.app.Session.ID != "" &&
+		(a.activeConfirmation != nil || a.activeToolApproval != nil ||
+			a.activeTextInput != nil)
 }
 
 func (a Model) View() string {

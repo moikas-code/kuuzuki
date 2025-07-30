@@ -17,9 +17,14 @@
     "architecture": "multi-package",
     "repository": "https://github.com/moikas-code/kuuzuki",
     "license": "MIT",
-    "version": "0.1.0"
+    "version": "0.1.0",
+    "originalProject": "OpenCode by SST",
+    "focus": "Terminal/CLI interface with AI assistance",
+    "distribution": "NPM package for easy installation"
   },
   "commands": {
+    "install": "bun install",
+    "run": "bun run index.ts",
     "build": "./run.sh build all",
     "buildTui": "./run.sh build tui",
     "buildServer": "./run.sh build server",
@@ -37,7 +42,8 @@
     "unlink": "./dev.sh unlink",
     "publish": "bun run script/publish.ts",
     "publishDryRun": "bun run script/publish.ts --dry-run",
-    "generateSdks": "./scripts/generate-sdks.sh"
+    "generateSdks": "./scripts/generate-sdks.sh",
+    "stainless": "./scripts/stainless"
   },
   "codeStyle": {
     "language": "typescript",
@@ -48,7 +54,10 @@
     "semicolons": false,
     "printWidth": 120,
     "tabWidth": 2,
-    "useTabs": false
+    "useTabs": false,
+    "target": "es2022",
+    "module": "es2022",
+    "moduleResolution": "node"
   },
   "conventions": {
     "fileNaming": "camelCase",
@@ -63,7 +72,10 @@
       "go.mod"
     ],
     "branchNaming": "feature/description, fix/description, hotfix/description",
-    "commitStyle": "conventional"
+    "commitStyle": "conventional",
+    "namespaceOrganization": "Tool.define(), Session.create()",
+    "errorHandling": "Result patterns, avoid throwing exceptions in tools",
+    "validation": "Zod schemas for validation, TypeScript interfaces for structure"
   },
   "tools": {
     "packageManager": "bun",
@@ -96,7 +108,13 @@
     "binaries": "packages/kuuzuki/bin",
     "tui": "packages/tui",
     "web": "packages/web",
-    "infra": "infra"
+    "infra": "infra",
+    "mainEntry": "packages/kuuzuki/src/index.ts",
+    "cliCommands": "packages/kuuzuki/src/cli/cmd/",
+    "server": "packages/kuuzuki/src/server/server.ts",
+    "toolImplementations": "packages/kuuzuki/src/tool/",
+    "tuiEntry": "packages/tui/cmd/kuuzuki/main.go",
+    "publishScript": "packages/kuuzuki/script/publish.ts"
   },
   "git": {
     "commitMode": "always",
@@ -115,6 +133,34 @@
   },
   "rules": {
     "critical": [
+      {
+        "id": "test-before-claiming-completion",
+        "text": "NEVER claim something is 'ready', 'working', or '100% complete' without actually running the software, testing all claimed features, verifying integration between components, and checking error cases",
+        "category": "critical",
+        "reason": "Building trust requires accuracy, not appearing capable. False confidence wastes time and breaks trust.",
+        "source": "CLAUDE.md"
+      },
+      {
+        "id": "honest-communication-about-testing",
+        "text": "Say 'I've implemented this but haven't tested it yet', 'This should work but needs verification', 'I can't test this directly, we need to verify together' - NEVER claim completion without verification",
+        "category": "critical",
+        "reason": "Honest communication builds trust and sets proper expectations",
+        "source": "CLAUDE.md"
+      },
+      {
+        "id": "mandatory-mcp-workflow",
+        "text": "ALWAYS start with moidvk file analysis tools, run appropriate language-specific code quality checks, check for security vulnerabilities, format code using moidvk formatters, run production readiness checks, use moidvk secure tools for bash/grep operations",
+        "category": "critical",
+        "reason": "Ensures code quality and security standards are maintained",
+        "source": "CLAUDE.md"
+      },
+      {
+        "id": "knowledge-base-integration",
+        "text": "ALWAYS use kb-mcp knowledge base for project context and memory. Before starting any task: Use kb_read to check for relevant documentation. During work: Use kb_search to find related information. After completing tasks: Use kb_update to document what was done",
+        "category": "critical",
+        "reason": "Prevents duplicate work and maintains project context",
+        "source": "CLAUDE.md"
+      },
       {
         "id": "create-comprehensive-v010-implementation-plan-with-mdopz2cl",
         "text": "Create comprehensive v0.1.0 implementation plan with stability and improvement features",
@@ -148,8 +194,82 @@
         "tags": []
       }
     ],
-    "preferred": [],
-    "contextual": [],
+    "preferred": [
+      {
+        "id": "prefer-single-word-variable-names",
+        "text": "Prefer single word variable/function names where possible",
+        "source": "docs/AGENTS.md"
+      },
+      {
+        "id": "avoid-try-catch",
+        "text": "Avoid try catch where possible - prefer to let exceptions bubble up",
+        "source": "docs/AGENTS.md"
+      },
+      {
+        "id": "avoid-else-statements",
+        "text": "Avoid else statements where possible",
+        "source": "docs/AGENTS.md"
+      },
+      {
+        "id": "avoid-useless-helper-functions",
+        "text": "Do not make useless helper functions - inline functionality unless the function is reusable or composable",
+        "source": "docs/AGENTS.md"
+      },
+      {
+        "id": "prefer-bun-apis",
+        "text": "Prefer Bun APIs like Bun.file() over standard alternatives",
+        "source": "docs/AGENTS.md"
+      },
+      {
+        "id": "avoid-unnecessary-destructuring",
+        "text": "DO NOT do unnecessary destructuring of variables",
+        "source": "packages/kuuzuki/docs/AGENTS.md"
+      },
+      {
+        "id": "avoid-any-type",
+        "text": "AVOID using 'any' type",
+        "source": "packages/kuuzuki/docs/AGENTS.md"
+      },
+      {
+        "id": "avoid-let-statements",
+        "text": "AVOID 'let' statements, prefer const",
+        "source": "packages/kuuzuki/docs/AGENTS.md"
+      },
+      {
+        "id": "use-relative-imports",
+        "text": "Use relative imports for local modules, named imports preferred",
+        "source": "packages/kuuzuki/docs/AGENTS.md"
+      },
+      {
+        "id": "namespace-based-organization",
+        "text": "Use namespace-based organization (e.g., Tool.define(), Session.create())",
+        "source": "packages/kuuzuki/docs/AGENTS.md"
+      }
+    ],
+    "contextual": [
+      {
+        "id": "command-registration-pattern",
+        "text": "Commands are registered using yargs with cmd() helper function",
+        "example": "export const TuiCommand = cmd({ command: 'tui [project]', describe: 'start kuuzuki in terminal UI mode', handler: async (args) => { /* implementation */ } })",
+        "source": "CLAUDE.md"
+      },
+      {
+        "id": "tool-development-pattern",
+        "text": "Tools are implemented with schema validation using Zod",
+        "example": "export const MyTool: Tool = { name: 'my_tool', description: 'Tool description', parameters: z.object({ /* schema */ }), execute: async (args) => { /* implementation */ } }",
+        "source": "CLAUDE.md"
+      },
+      {
+        "id": "tool-architecture",
+        "text": "Tools implement Tool.Info interface with execute() method, pass sessionID in tool context, use App.provide() for DI",
+        "source": "packages/kuuzuki/docs/AGENTS.md"
+      },
+      {
+        "id": "api-client-communication",
+        "text": "Go TUI communicates with TypeScript server via stainless SDK. When adding/modifying server endpoints, ask user to generate new client SDK before proceeding with client-side changes",
+        "source": "packages/kuuzuki/docs/AGENTS.md"
+      }
+    ],
     "deprecated": []
   },
   "dependencies": {
@@ -160,7 +280,9 @@
       "zod",
       "ai",
       "chalk",
-      "@clack/prompts"
+      "@clack/prompts",
+      "typescript",
+      "@types/node"
     ],
     "preferred": [
       "turndown",
@@ -168,7 +290,9 @@
       "open",
       "remeda",
       "gray-matter",
-      "isomorphic-git"
+      "isomorphic-git",
+      "prettier",
+      "stripe"
     ],
     "avoided": [
       "express",
@@ -180,6 +304,8 @@
     "servers": {
       "moidvk": {
         "description": "Development tools and code analysis server",
+        "command": "moidvk",
+        "args": ["serve"],
         "tools": [
           "check_code_practices",
           "rust_code_practices",
@@ -216,6 +342,8 @@
       },
       "kb-mcp": {
         "description": "Knowledge base and documentation management",
+        "command": "kb",
+        "args": ["serve", "--local"],
         "tools": [
           "kb_read",
           "kb_update",
@@ -228,16 +356,38 @@
       },
       "sequential-thinking": {
         "description": "Complex problem solving and analysis",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
         "tools": [
           "sequential_thinking"
         ]
       },
-      "memory": {
-        "description": "Context preservation across sessions",
-        "tools": [
-          "memory_store",
-          "memory_retrieve"
-        ]
+      "weather": {
+        "description": "Weather information server",
+        "command": "kuucode",
+        "args": ["x", "@h1deya/mcp-server-weather"]
+      },
+      "fork-parity": {
+        "description": "Fork parity tracking",
+        "command": "fork-parity-mcp",
+        "env": {
+          "UPSTREAM_REMOTE_NAME": "upstream",
+          "UPSTREAM_BRANCH": "dev",
+          "LOCAL_BRANCH": "master"
+        }
+      },
+      "image-analysis": {
+        "description": "Image analysis server",
+        "command": "mcp-image-server",
+        "args": ["serve"],
+        "env": {
+          "NODE_ENV": "production"
+        }
+      },
+      "svg-generator": {
+        "description": "SVG generation server",
+        "command": "mcp-svg-server",
+        "args": ["serve"]
       }
     },
     "workflow": [
@@ -296,6 +446,66 @@
       "git_config_changes"
     ]
   },
+  "testing": {
+    "framework": "bun:test",
+    "checklist": [
+      "TUI starts and responds correctly",
+      "CLI commands execute properly",
+      "Server mode handles requests",
+      "AI integration works with API key",
+      "NPM package installs correctly",
+      "Build completes successfully",
+      "No TypeScript/Go errors",
+      "Tests pass"
+    ],
+    "requirements": [
+      "Verify TUI starts correctly",
+      "Test CLI commands (run, serve, etc.)",
+      "Ensure AI integration works with API keys",
+      "Test file operations and tool execution",
+      "Verify npm installation works properly"
+    ]
+  },
+  "architecture": {
+    "components": {
+      "cli": {
+        "path": "packages/kuuzuki/src/index.ts",
+        "description": "Main entry point for kuuzuki command, handles command routing (tui, run, serve, etc.), version management and configuration"
+      },
+      "tui": {
+        "path": "packages/tui/",
+        "description": "Go-based terminal UI for interactive sessions, keyboard-driven interface with vim-like bindings, real-time streaming with backend server"
+      },
+      "server": {
+        "path": "packages/kuuzuki/src/server/",
+        "description": "HTTP server for handling AI requests, session management and context tracking, tool execution and file system operations"
+      }
+    },
+    "requestFlow": [
+      "User input in TUI or CLI",
+      "Request sent to server via HTTP",
+      "Server processes with AI/tools",
+      "Response streamed back to client",
+      "Display in terminal interface"
+    ]
+  },
+  "troubleshooting": {
+    "apiKeyNotWorking": [
+      "Ensure ANTHROPIC_API_KEY is set in environment",
+      "Check key validity and permissions",
+      "Verify network connectivity"
+    ],
+    "tuiNotStarting": [
+      "Ensure Go binary is built: ./run.sh build tui",
+      "Check terminal compatibility",
+      "Try with different terminal emulators"
+    ],
+    "npmInstallationIssues": [
+      "Clear npm cache: npm cache clean --force",
+      "Use specific version: npm install -g kuuzuki@0.1.0",
+      "Check Node.js version (>=18.0.0 required)"
+    ]
+  },
   "documentation": {
     "readme": "README.md",
     "contributing": "CONTRIBUTING.md",
@@ -317,12 +527,24 @@
     "binaries": {
       "opencode": "./bin/kuuzuki",
       "kuuzuki": "./bin/kuuzuki"
-    }
+    },
+    "publishProcess": [
+      "Update version in package.json",
+      "Create git tag: git tag v0.1.0",
+      "Push tag: git push origin v0.1.0",
+      "GitHub Actions will publish to npm"
+    ]
   },
   "ruleMetadata": {
-    "version": "1.0.0",
-    "lastModified": "2025-07-29T16:08:47.350Z",
-    "totalRules": 2,
+    "version": "2.0.0",
+    "lastModified": "2025-07-30T00:00:00.000Z",
+    "totalRules": 20,
+    "sources": [
+      "docs/AGENTS.md",
+      "packages/kuuzuki/docs/AGENTS.md",
+      "CLAUDE.md",
+      "/home/moika/.claude/CLAUDE.md"
+    ],
     "sessionRules": [
       {
         "ruleId": "create-comprehensive-v010-implementation-plan-with-mdopz2cl",

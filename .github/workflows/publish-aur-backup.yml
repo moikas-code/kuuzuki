@@ -54,11 +54,11 @@ jobs:
         run: |
           bun install
           if [ "${{ startsWith(github.ref, 'refs/tags/') }}" = "true" ]; then
-            ./script/publish.ts
+            ../../scripts/publish.ts
           else
-            ./script/publish.ts --snapshot
+            ../../scripts/publish.ts --snapshot
           fi
-        working-directory: ./packages/opencode
+        working-directory: ./packages/kuuzuki
         env:
           GITHUB_TOKEN: ${{ secrets.SST_GITHUB_TOKEN }}
           AUR_KEY: ${{ secrets.AUR_KEY }}

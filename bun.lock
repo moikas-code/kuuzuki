@@ -3,16 +3,14 @@
   "workspaces": {
     "": {
       "name": "kuuzuki",
-      "dependencies": {
-        "stripe": "18.3.0",
-      },
       "devDependencies": {
         "prettier": "3.5.3",
+        "stripe": "18.3.0",
       },
     },
     "packages/function": {
       "name": "@moikas/function",
-      "version": "0.0.1",
+      "version": "0.1.0",
       "dependencies": {
         "@octokit/auth-app": "8.0.1",
         "@octokit/rest": "22.0.0",
@@ -28,10 +26,9 @@
     },
     "packages/kuuzuki": {
       "name": "kuuzuki",
-      "version": "0.1.0",
+      "version": "0.1.5",
       "bin": {
-        "opencode": "./bin/kuuzuki",
-        "kuuzuki": "./bin/kuuzuki",
+        "kuuzuki": "./bin/kuuzuki.js",
       },
       "dependencies": {
         "@actions/core": "1.11.1",
@@ -42,7 +39,7 @@
         "@openauthjs/openauth": "0.4.3",
         "@standard-schema/spec": "1.0.0",
         "@zip.js/zip.js": "2.7.62",
-        "ai": "catalog:",
+        "ai": "5.0.0-beta.21",
         "chalk": "5.4.1",
         "decimal.js": "10.5.0",
         "diff": "8.0.2",
@@ -57,20 +54,19 @@
         "vscode-jsonrpc": "8.2.1",
         "xdg-basedir": "5.1.0",
         "yargs": "18.0.0",
-        "zod": "catalog:",
+        "zod": "3.25.49",
         "zod-openapi": "4.1.0",
       },
       "devDependencies": {
         "@ai-sdk/amazon-bedrock": "2.2.10",
         "@ai-sdk/anthropic": "1.2.12",
         "@octokit/webhooks-types": "7.6.1",
-        "@standard-schema/spec": "1.0.0",
         "@tsconfig/bun": "1.0.7",
         "@types/bun": "latest",
         "@types/turndown": "5.0.5",
         "@types/yargs": "17.0.33",
         "sst": "3.17.10",
-        "typescript": "catalog:",
+        "typescript": "5.8.0-dev.20250106",
         "vscode-languageserver-types": "3.17.5",
         "zod-to-json-schema": "3.24.5",
       },
@@ -97,7 +93,7 @@
     },
     "packages/web": {
       "name": "@kuuzuki/web",
-      "version": "0.0.1",
+      "version": "0.1.0",
       "dependencies": {
         "@astrojs/cloudflare": "^12.5.4",
         "@astrojs/markdown-remark": "6.3.1",
@@ -2026,6 +2022,8 @@
     "keytar/node-addon-api": ["node-addon-api@4.3.0", "", {}, "sha512-73sE9+3UaLYYFmDsFZnqCInzPyh3MqIwZO9cw58yIqAZhONrrabrYyYe3TuIqtIiOuTXVhsGau8hcrhhwSsDIQ=="],
 
     "kuuzuki/remeda": ["remeda@2.22.3", "", { "dependencies": { "type-fest": "^4.40.1" } }, "sha512-Ka6965m9Zu9OLsysWxVf3jdJKmp6+PKzDv7HWHinEevf0JOJ9y02YpjiC/sKxRpCqGhVyvm1U+0YIj+E6DMgKw=="],
+
+    "kuuzuki/typescript": ["typescript@5.8.0-dev.20250106", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-o7wnxO5cYLyfc7QIUC5XqIhONzvtHj4pKEF3S1lxXh/3zDnAScSaSUzRKyKIRXuTXDgYuaWKhew4jrBRmVAK1Q=="],
 
     "kuuzuki-vscode/@types/node": ["@types/node@20.19.9", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-cuVNgarYWZqxRJDQHEB58GEONhOK79QVR/qYx4S7kcUObQvUwvFnYxJuuHUKm2aieN9X3yZB4LZsuYNU1Qphsw=="],
 

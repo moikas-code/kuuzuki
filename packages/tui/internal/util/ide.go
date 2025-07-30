@@ -6,7 +6,7 @@ import (
 )
 
 var SUPPORTED_IDES = []struct {
-	Search string
+	Search    string
 	ShortName string
 }{
 	{"Windsurf", "Windsurf"},

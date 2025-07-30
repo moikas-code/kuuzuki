@@ -47,9 +47,6 @@ export const TuiCommand = cmd({
         default: "127.0.0.1",
       }),
   handler: async (args) => {
-    // Set TUI mode to prevent external prompts from corrupting display
-    process.env['KUUZUKI_TUI_MODE'] = 'true'
-    
     while (true) {
       const cwd = args.project ? path.resolve(args.project) : process.cwd()
       try {
@@ -75,6 +72,32 @@ export const TuiCommand = cmd({
           writeServerInfo({ port: server.port!, hostname: server.hostname || "127.0.0.1" })
         )
 
+        // Wait for server to be ready before starting TUI
+        const serverUrl = `http://${server.hostname || "127.0.0.1"}:${server.port}`
+        let retries = 0
+        const maxRetries = 30 // 3 seconds with 100ms intervals
+        
+        while (retries < maxRetries) {
+          try {
+            const response = await fetch(`${serverUrl}/health`)
+            if (response.ok) {
+              Log.Default.info("Server is ready", { url: serverUrl })
+              break
+            }
+          } catch (e) {
+            // Server not ready yet
+          }
+          
+          retries++
+          if (retries === maxRetries) {
+            UI.error("Server failed to start. Please try again.")
+            server.stop()
+            return
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+
         let cmd: string[]
         let cwd: string = process.cwd()
 
@@ -86,6 +109,17 @@ export const TuiCommand = cmd({
           // Fallback to go run for development
           cmd = ["go", "run", "./main.go"]
           cwd = Bun.fileURLToPath(new URL("../../../../tui/cmd/kuuzuki", import.meta.url))
+          
+          // Check if the Go source exists
+          const mainGoPath = path.join(cwd, "main.go")
+          try {
+            await fs.access(mainGoPath)
+          } catch (e) {
+            UI.error(`TUI source not found at ${mainGoPath}`)
+            UI.error("Please ensure the TUI source code exists.")
+            server.stop()
+            return "done"
+          }
         }
         if (Bun.embeddedFiles.length > 0) {
           const blob = Bun.embeddedFiles[0] as File
@@ -104,29 +138,118 @@ export const TuiCommand = cmd({
         }
         Log.Default.info("tui", {
           cmd,
-        })
-        const proc = Bun.spawn({
-          cmd: [
-            ...cmd,
-            ...(args.model ? ["--model", args.model] : []),
-            ...(args.prompt ? ["--prompt", args.prompt] : []),
-            ...(args.mode ? ["--mode", args.mode] : []),
-          ],
           cwd,
-          stdout: "inherit",
-          stderr: "inherit",
-          stdin: "inherit",
-          env: {
-            ...process.env,
-            CGO_ENABLED: "0",
-            KUUZUKI_SERVER: server.url.toString(),
-            KUUZUKI_APP_INFO: JSON.stringify(app),
-            KUUZUKI_MODES: JSON.stringify(await Mode.list()),
-          },
-          onExit: () => {
-            server.stop()
-          },
+          server: server.url.toString(),
         })
+        
+        // Add error handling for TUI spawn
+        let proc
+        try {
+          // In development mode, check if go is available
+          if (cmd[0] === "go") {
+            try {
+              const goVersion = await Bun.spawn({
+                cmd: ["go", "version"],
+                stdout: "pipe",
+                stderr: "pipe",
+              }).exited
+              
+              if (goVersion !== 0) {
+                UI.error("Go is not installed or not in PATH. Please install Go to run in development mode.")
+                server.stop()
+                return "done"
+              }
+            } catch (e) {
+              UI.error("Go is not installed or not in PATH. Please install Go to run in development mode.")
+              server.stop()
+              return "done"
+            }
+          }
+          
+          // Log the exact command being run
+          Log.Default.info("Spawning TUI process", {
+            cmd: cmd.join(" "),
+            cwd,
+            server: server.url.toString()
+          })
+          
+          // For development mode with Go, capture stderr to debug issues
+          const isGoRun = cmd[0] === "go"
+          
+          proc = Bun.spawn({
+            cmd: [
+              ...cmd,
+              ...(args.model ? ["--model", args.model] : []),
+              ...(args.prompt ? ["--prompt", args.prompt] : []),
+              ...(args.mode ? ["--mode", args.mode] : []),
+            ],
+            cwd,
+            stdout: "inherit",
+            stderr: isGoRun ? "pipe" : "inherit",  // Capture stderr for go run
+            stdin: "inherit",
+            env: {
+              ...process.env,
+              CGO_ENABLED: "0",
+              KUUZUKI_SERVER: server.url.toString(),
+              KUUZUKI_APP_INFO: JSON.stringify(app),
+              KUUZUKI_MODES: JSON.stringify(await Mode.list()),
+            },
+            onExit: (proc, exitCode, signalCode, error) => {
+              Log.Default.info("TUI process exited", { exitCode, signalCode, error: error?.message })
+              if (error) {
+                Log.Default.error("TUI process error", { error: error.message })
+              }
+              if (exitCode !== 0 && exitCode !== null) {
+                Log.Default.error("TUI exited with error", { exitCode, signalCode })
+              }
+              server.stop()
+              // Force exit to prevent terminal lock
+              process.exit(exitCode || 0)
+            },
+          })
+          
+          // For go run, monitor stderr for compilation errors
+          if (isGoRun && proc.stderr) {
+            const reader = proc.stderr.getReader()
+            const decoder = new TextDecoder()
+            let errorBuffer = ""
+            
+            ;(async () => {
+              try {
+                while (true) {
+                  const { done, value } = await reader.read()
+                  if (done) break
+                  const text = decoder.decode(value)
+                  errorBuffer += text
+                  // Print Go compilation errors immediately
+                  process.stderr.write(text)
+                }
+              } catch (e) {
+                // Reader closed
+              }
+              
+              if (errorBuffer.length > 0) {
+                Log.Default.error("Go compilation errors", { errors: errorBuffer })
+              }
+            })()
+          }
+          
+          // Add a small delay to allow TUI to initialize and potentially fail fast
+          await new Promise(resolve => setTimeout(resolve, 100))
+          
+          // Check if process is still running
+          if (proc.exitCode !== null) {
+            Log.Default.error("TUI process exited immediately", { exitCode: proc.exitCode })
+            UI.error("TUI failed to start. Check logs for details.")
+            server.stop()
+            return "done"
+          }
+        } catch (error) {
+          Log.Default.error("Failed to spawn TUI", { error: error.message })
+          UI.error(`Failed to start TUI: ${error.message}`)
+          server.stop()
+          return "done"
+        }
 
         ;(async () => {
           if (Installation.VERSION === "dev") return
@@ -157,7 +280,25 @@ export const TuiCommand = cmd({
         //             .catch(() => {})
         //         })()
 
+        // Setup signal handlers to ensure clean exit
+        const cleanup = () => {
+          Log.Default.info("Cleaning up...")
+          if (proc && proc.exitCode === null) {
+            proc.kill()
+          }
+          server.stop()
+          process.exit(0)
+        }
+        
+        process.on('SIGINT', cleanup)
+        process.on('SIGTERM', cleanup)
+        
         await proc.exited
+        
+        // Remove signal handlers
+        process.removeListener('SIGINT', cleanup)
+        process.removeListener('SIGTERM', cleanup)
+        
         server.stop()
 
         return "done"

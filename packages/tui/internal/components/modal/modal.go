@@ -88,7 +88,7 @@ func (m *Modal) Render(contentView string, background string) string {
 		outerWidth = m.maxWidth
 	}
 	// Ensure it fits in the terminal
-	if outerWidth > bgWidth - 4 {
+	if outerWidth > bgWidth-4 {
 		outerWidth = bgWidth - 4
 	}
 
@@ -154,6 +154,6 @@ func (m *Modal) Render(contentView string, background string) string {
 		lipgloss.Center,
 		modalView,
 	)
-	
+
 	return centered
 }

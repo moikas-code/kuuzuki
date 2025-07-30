@@ -168,7 +168,7 @@ func (t *ToolApprovalMessage) View(width int) string {
 	borderStyle := baseStyle.
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.Warning()).
-		Width(width - 4).
+		Width(width-4).
 		Margin(1, 2)
 
 	return borderStyle.Render(content)
