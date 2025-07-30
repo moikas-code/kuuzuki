@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "0.1.8",
+  "version": "0.1.7",
   "name": "kuuzuki",
   "description": "AI-powered terminal assistant",
   "keywords": [
