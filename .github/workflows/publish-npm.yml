@@ -130,6 +130,9 @@ jobs:
             
             cd ../../packages/kuuzuki
             
+            # Copy README to platform package
+            cp README.md "dist/npm/kuuzuki-$pkgname/"
+            
             # Create package.json for platform package
             cat > "dist/npm/kuuzuki-$pkgname/package.json" << EOF
           {
@@ -162,6 +165,9 @@ jobs:
           
           # Copy source files
           cp -r src/* dist/npm/kuuzuki/src/
+          
+          # Copy README
+          cp README.md dist/npm/kuuzuki/
           
           # Create launcher script
           cat > dist/npm/kuuzuki/bin/kuuzuki << 'EOF'
