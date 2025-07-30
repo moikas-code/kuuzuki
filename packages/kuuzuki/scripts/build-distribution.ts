@@ -84,7 +84,7 @@ async function createPlatformPackage(platform: typeof PLATFORMS[0]) {
   // Create package.json
   const packageJson = {
     name: platform.npmName,
-    version: "0.1.6",
+    version: "0.1.7",
     description: `Kuuzuki binaries for ${platform.name}`,
     license: "MIT",
     repository: {
@@ -262,7 +262,7 @@ node "%~dp0\\kuuzuki" %*
   // Create package.json
   const mainPackageJson = {
     name: "kuuzuki",
-    version: "0.1.6",
+    version: "0.1.7",
     description: "AI-powered terminal assistant",
     keywords: ["ai", "terminal", "cli", "assistant", "claude"],
     homepage: "https://github.com/moikas-code/kuuzuki",
@@ -283,7 +283,7 @@ node "%~dp0\\kuuzuki" %*
     },
     files: ["bin", "src"],
     optionalDependencies: PLATFORMS.reduce((deps, p) => {
-      deps[p.npmName] = "^0.1.6";
+      deps[p.npmName] = "^0.1.7";
       return deps;
     }, {} as Record<string, string>),
     dependencies: JSON.parse(await readFile(join(KUUZUKI_DIR, "package.json"), "utf-8")).dependencies
