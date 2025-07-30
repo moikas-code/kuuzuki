@@ -1,0 +1,68 @@
+name = "kuuzuki-api"
+main = "packages/function/src/api.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Environment variables
+[vars]
+WEB_DOMAIN = "kuuzuki.com"
+
+# KV Namespaces for license management
+[[kv_namespaces]]
+binding = "LICENSES"
+id = "your-licenses-kv-id"
+preview_id = "your-licenses-preview-kv-id"
+
+# R2 Buckets for file storage
+[[r2_buckets]]
+binding = "Bucket"
+bucket_name = "kuuzuki-storage"
+preview_bucket_name = "kuuzuki-storage-preview"
+
+# Durable Objects for real-time sync
+[[durable_objects.bindings]]
+name = "SYNC_SERVER"
+class_name = "SyncServer"
+
+# Custom domain configuration (optional)
+# routes = [
+#   { pattern = "api.kuuzuki.com/*", zone_name = "kuuzuki.com" },
+# ]
+
+# Worker limits and configuration
+[limits]
+cpu_ms = 30000
+
+# Build configuration
+[build]
+command = "npm run build"
+
+# Development configuration
+[env.development]
+name = "kuuzuki-api-dev"
+
+[env.development.vars]
+WEB_DOMAIN = "dev.kuuzuki.com"
+
+[[env.development.kv_namespaces]]
+binding = "LICENSES"
+id = "your-dev-licenses-kv-id"
+
+[[env.development.r2_buckets]]
+binding = "Bucket"
+bucket_name = "kuuzuki-storage-dev"
+
+# Production configuration
+[env.production]
+name = "kuuzuki-api-prod"
+
+[env.production.vars]
+WEB_DOMAIN = "kuuzuki.com"
+
+[[env.production.kv_namespaces]]
+binding = "LICENSES"
+id = "your-prod-licenses-kv-id"
+
+[[env.production.r2_buckets]]
+binding = "Bucket"
+bucket_name = "kuuzuki-storage-prod"
