@@ -1,0 +1,11 @@
+theme = "kuuzuki"
+provider = ""
+model = ""
+mode = "build"
+recently_used_models = []
+messages_right = false
+split_diff = false
+message_history = []
+hybrid_context_enabled = true
+
+[mode_model]
