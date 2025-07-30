@@ -41,13 +41,19 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Publishing version: $VERSION"
       
-      # 7. Update version in package.json
+      # 7. Fix catalog dependencies
+      - name: Fix catalog dependencies
+        run: |
+          cd packages/kuuzuki
+          node scripts/fix-catalog-deps.js
+
+      # 8. Update version in package.json
       - name: Update package version
         run: |
           cd packages/kuuzuki
           npm version ${{ steps.extract_version.outputs.version }} --no-git-tag-version
       
-      # 8. Prepare source for npm (fix Bun macros)
+      # 9. Prepare source for npm (fix Bun macros)
       - name: Prepare source files
         run: |
           cd packages/kuuzuki
