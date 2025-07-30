@@ -30,7 +30,11 @@ jobs:
       
       # 5. Install dependencies
       - name: Install dependencies
-        run: bun install
+        shell: bash
+        run: |
+          set -x
+          which bun
+          bun install
       
       # 6. Extract version from tag
       - name: Extract version
