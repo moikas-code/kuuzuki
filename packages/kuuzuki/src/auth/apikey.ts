@@ -39,20 +39,20 @@ export namespace ApiKeyManager {
       // Try to load system keychain
       if (process.platform === "darwin") {
         // macOS Keychain
-        const keytar = await import("keytar").catch(() => null)
-        if (keytar) {
+        const keychain = await import("./keychain").catch(() => null)
+        if (keychain) {
           keychainAdapter = {
             async store(service: string, account: string, password: string) {
-              await keytar.setPassword(service, account, password)
+              await keychain.default.setPassword(service, account, password)
             },
             async retrieve(service: string, account: string) {
-              return await keytar.getPassword(service, account)
+              return await keychain.default.getPassword(service, account)
             },
             async remove(service: string, account: string) {
-              await keytar.deletePassword(service, account)
+              await keychain.default.deletePassword(service, account)
             },
             async list() {
-              const credentials = await keytar.findCredentials(KEYCHAIN_SERVICE)
+              const credentials = await keychain.default.findCredentials(KEYCHAIN_SERVICE)
               return credentials.map((cred) => ({ service: KEYCHAIN_SERVICE, account: cred.account }))
             },
           }
@@ -61,20 +61,20 @@ export namespace ApiKeyManager {
         }
       } else if (process.platform === "linux") {
         // Linux Secret Service
-        const keytar = await import("keytar").catch(() => null)
-        if (keytar) {
+        const keychain = await import("./keychain").catch(() => null)
+        if (keychain) {
           keychainAdapter = {
             async store(service: string, account: string, password: string) {
-              await keytar.setPassword(service, account, password)
+              await keychain.default.setPassword(service, account, password)
             },
             async retrieve(service: string, account: string) {
-              return await keytar.getPassword(service, account)
+              return await keychain.default.getPassword(service, account)
             },
             async remove(service: string, account: string) {
-              await keytar.deletePassword(service, account)
+              await keychain.default.deletePassword(service, account)
             },
             async list() {
-              const credentials = await keytar.findCredentials(KEYCHAIN_SERVICE)
+              const credentials = await keychain.default.findCredentials(KEYCHAIN_SERVICE)
               return credentials.map((cred) => ({ service: KEYCHAIN_SERVICE, account: cred.account }))
             },
           }
@@ -83,20 +83,20 @@ export namespace ApiKeyManager {
         }
       } else if (process.platform === "win32") {
         // Windows Credential Manager
-        const keytar = await import("keytar").catch(() => null)
-        if (keytar) {
+        const keychain = await import("./keychain").catch(() => null)
+        if (keychain) {
           keychainAdapter = {
             async store(service: string, account: string, password: string) {
-              await keytar.setPassword(service, account, password)
+              await keychain.default.setPassword(service, account, password)
             },
             async retrieve(service: string, account: string) {
-              return await keytar.getPassword(service, account)
+              return await keychain.default.getPassword(service, account)
             },
             async remove(service: string, account: string) {
-              await keytar.deletePassword(service, account)
+              await keychain.default.deletePassword(service, account)
             },
             async list() {
-              const credentials = await keytar.findCredentials(KEYCHAIN_SERVICE)
+              const credentials = await keychain.default.findCredentials(KEYCHAIN_SERVICE)
               return credentials.map((cred) => ({ service: KEYCHAIN_SERVICE, account: cred.account }))
             },
           }

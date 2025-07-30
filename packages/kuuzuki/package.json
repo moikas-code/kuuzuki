@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "name": "kuuzuki",
   "description": "AI-powered terminal assistant",
   "keywords": [
@@ -36,7 +36,7 @@
     "postinstall": "node scripts/postinstall.js"
   },
   "bin": {
-    "kuuzuki": "./bin/kuuzuki.js"
+    "kuuzuki": "./bin/kuuzuki-launcher.js"
   },
   "exports": {
     "./*": "./src/*.ts"
@@ -59,7 +59,8 @@
     "binaries/**/*",
     "scripts/**/*",
     "README.md",
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "src/**/*.txt"
   ],
   "dependencies": {
     "@actions/core": "1.11.1",
@@ -78,7 +79,6 @@
     "hono": "4.7.10",
     "hono-openapi": "0.4.8",
     "isomorphic-git": "1.32.1",
-    "keytar": "7.9.0",
     "open": "10.2.0",
     "remeda": "2.22.3",
     "turndown": "7.2.0",

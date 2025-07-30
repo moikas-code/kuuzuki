@@ -1,0 +1,210 @@
+name: Build Platform Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x64
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-latest
+            platform: linux-arm64
+            goos: linux
+            goarch: arm64
+          - os: macos-latest
+            platform: darwin-x64
+            goos: darwin
+            goarch: amd64
+          - os: macos-latest
+            platform: darwin-arm64
+            goos: darwin
+            goarch: arm64
+          - os: windows-latest
+            platform: windows-x64
+            goos: windows
+            goarch: amd64
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build Go TUI
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        working-directory: packages/tui
+        run: |
+          go build -ldflags="-s -w" -o ../kuuzuki/dist/npm/kuuzuki-${{ matrix.platform }}/bin/kuuzuki-tui${{ matrix.goos == 'windows' && '.exe' || '' }} ./cmd/kuuzuki
+
+      - name: Create platform package
+        working-directory: packages/kuuzuki
+        run: |
+          mkdir -p dist/npm/kuuzuki-${{ matrix.platform }}/bin
+          cp -r ../../packages/tui/kuuzuki-tui* dist/npm/kuuzuki-${{ matrix.platform }}/bin/ || true
+          
+          # Create package.json for platform package
+          cat > dist/npm/kuuzuki-${{ matrix.platform }}/package.json << EOF
+          {
+            "name": "kuuzuki-${{ matrix.platform }}",
+            "version": "${GITHUB_REF#refs/tags/v}",
+            "description": "Kuuzuki binaries for ${{ matrix.platform }}",
+            "license": "MIT",
+            "repository": {
+              "type": "git",
+              "url": "https://github.com/moikas-code/kuuzuki.git"
+            },
+            "files": ["bin"],
+            "os": ["${{ matrix.goos == 'darwin' ? 'darwin' : matrix.goos }}"],
+            "cpu": ["${{ matrix.goarch == 'amd64' ? 'x64' : matrix.goarch }}"]
+          }
+          EOF
+
+      - name: Upload platform package
+        uses: actions/upload-artifact@v4
+        with:
+          name: kuuzuki-${{ matrix.platform }}
+          path: packages/kuuzuki/dist/npm/kuuzuki-${{ matrix.platform }}
+
+  create-main-package:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Create main package structure
+        working-directory: packages/kuuzuki
+        run: |
+          mkdir -p dist/npm/kuuzuki/{bin,src}
+          cp -r src/* dist/npm/kuuzuki/src/
+          
+          # Create launcher script
+          cat > dist/npm/kuuzuki/bin/kuuzuki << 'EOF'
+          #!/usr/bin/env node
+          const { spawn, spawnSync } = require('child_process');
+          const { join, dirname, resolve } = require('path');
+          const { existsSync, realpathSync } = require('fs');
+          const os = require('os');
+          
+          // ... (rest of the launcher script from build-distribution.ts)
+          EOF
+          
+          chmod +x dist/npm/kuuzuki/bin/kuuzuki
+          
+          # Create Windows batch file
+          cat > dist/npm/kuuzuki/bin/kuuzuki.cmd << 'EOF'
+          @echo off
+          node "%~dp0\\kuuzuki" %*
+          EOF
+          
+          # Create package.json
+          node -e "
+          const pkg = require('./package.json');
+          const mainPkg = {
+            name: 'kuuzuki',
+            version: process.env.GITHUB_REF ? process.env.GITHUB_REF.replace('refs/tags/v', '') : pkg.version,
+            description: pkg.description,
+            keywords: pkg.keywords,
+            homepage: pkg.homepage,
+            repository: pkg.repository,
+            bugs: pkg.bugs,
+            author: pkg.author,
+            license: pkg.license,
+            bin: { kuuzuki: './bin/kuuzuki' },
+            engines: pkg.engines,
+            files: ['bin', 'src'],
+            optionalDependencies: {
+              'kuuzuki-linux-x64': '^' + (process.env.GITHUB_REF ? process.env.GITHUB_REF.replace('refs/tags/v', '') : pkg.version),
+              'kuuzuki-linux-arm64': '^' + (process.env.GITHUB_REF ? process.env.GITHUB_REF.replace('refs/tags/v', '') : pkg.version),
+              'kuuzuki-darwin-x64': '^' + (process.env.GITHUB_REF ? process.env.GITHUB_REF.replace('refs/tags/v', '') : pkg.version),
+              'kuuzuki-darwin-arm64': '^' + (process.env.GITHUB_REF ? process.env.GITHUB_REF.replace('refs/tags/v', '') : pkg.version),
+              'kuuzuki-windows-x64': '^' + (process.env.GITHUB_REF ? process.env.GITHUB_REF.replace('refs/tags/v', '') : pkg.version)
+            },
+            dependencies: pkg.dependencies
+          };
+          require('fs').writeFileSync('./dist/npm/kuuzuki/package.json', JSON.stringify(mainPkg, null, 2));
+          "
+
+      - name: Upload main package
+        uses: actions/upload-artifact@v4
+        with:
+          name: kuuzuki-main
+          path: packages/kuuzuki/dist/npm/kuuzuki
+
+  publish:
+    needs: [build, create-main-package]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: packages
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish platform packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for platform in linux-x64 linux-arm64 darwin-x64 darwin-arm64 windows-x64; do
+            cd packages/kuuzuki-$platform
+            npm publish --access public
+            cd ../..
+          done
+
+      - name: Publish main package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        working-directory: packages/kuuzuki-main
+        run: npm publish --access public
