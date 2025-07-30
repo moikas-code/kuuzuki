@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "name": "kuuzuki",
   "type": "module",
   "description": "AI-powered terminal assistant",
@@ -32,10 +32,10 @@
     "typecheck": "tsc --noEmit",
     "dev": "bun run ./src/index.ts",
     "build": "echo 'Using Bun runtime - no build needed'",
-    "prepublishOnly": "node scripts/prepublish.js"
+    "prepublishOnly": "node scripts/prepublish.js",
+    "postinstall": "node scripts/postinstall.js"
   },
   "bin": {
-    "opencode": "./bin/kuuzuki.js",
     "kuuzuki": "./bin/kuuzuki.js"
   },
   "exports": {
@@ -45,7 +45,6 @@
     "@ai-sdk/amazon-bedrock": "2.2.10",
     "@ai-sdk/anthropic": "1.2.12",
     "@octokit/webhooks-types": "7.6.1",
-    "@standard-schema/spec": "1.0.0",
     "@tsconfig/bun": "1.0.7",
     "@types/bun": "latest",
     "@types/turndown": "5.0.5",
@@ -58,9 +57,7 @@
   "files": [
     "bin",
     "binaries",
-    "script",
     "scripts",
-    "src",
     "README.md"
   ],
   "dependencies": {

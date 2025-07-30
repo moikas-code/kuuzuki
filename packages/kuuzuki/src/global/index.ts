@@ -25,6 +25,8 @@ async function ensureInitialized() {
   if (initialized) return
   initialized = true
   
+
+  
   await Promise.all([
     fs.mkdir(Global.Path.data, { recursive: true }),
     fs.mkdir(Global.Path.config, { recursive: true }),

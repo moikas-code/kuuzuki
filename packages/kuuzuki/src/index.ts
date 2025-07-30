@@ -32,7 +32,9 @@ import { HybridCommand } from "./cli/cmd/hybrid"
 import { Trace } from "./trace"
 import { ensureInitialized } from "./global"
 
-Trace.init()
+// Initialize global paths before any other initialization
+await ensureInitialized()
+await Trace.init()
 
 const cancel = new AbortController()
 

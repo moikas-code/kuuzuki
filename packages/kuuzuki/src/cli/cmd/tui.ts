@@ -79,13 +79,13 @@ export const TuiCommand = cmd({
         let cwd: string = process.cwd()
 
         // Check for pre-built binary first
-        const prebuiltBinary = path.join(__dirname, "../../../binaries/kuuzuki-tui-linux")
+        const prebuiltBinary = path.join(__dirname, "../../../../tui/kuuzuki-tui")
         if (await Bun.file(prebuiltBinary).exists()) {
           cmd = [prebuiltBinary]
         } else {
           // Fallback to go run for development
           cmd = ["go", "run", "./main.go"]
-          cwd = Bun.fileURLToPath(new URL("../../../../tui/cmd/opencode", import.meta.url))
+          cwd = Bun.fileURLToPath(new URL("../../../../tui/cmd/kuuzuki", import.meta.url))
         }
         if (Bun.embeddedFiles.length > 0) {
           const blob = Bun.embeddedFiles[0] as File
