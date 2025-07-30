@@ -90,25 +90,26 @@ jobs:
           chmod +x binaries/* || true
       
        # 9. Run tests
-       - name: Run tests        run: bun test
+      - name: Run tests
+        run: bun test
         continue-on-error: true  # Don't fail on test errors for now
       
-       # 9. Debug package contents
-       - name: Debug package contents
-         working-directory: packages/kuuzuki
-         run: |
+      # 9. Debug package contents
+      - name: Debug package contents
+        working-directory: packages/kuuzuki
+        run: |
            echo "Package contents:"
            find . -type f -name "kuuzuki*" -ls
            echo "Binary permissions:"
            ls -la binaries/ || echo "No binaries directory"
        
-       # 10. Test npm package
-       - name: Test npm package
-         working-directory: packages/kuuzuki
-         run: |
-           npm pack --dry-run
-           # Test that the bin script has valid syntax (doesn't execute)
-           node -c bin/kuuzuki.js      
+      # 10. Test npm package
+      - name: Test npm package
+        working-directory: packages/kuuzuki
+        run: |
+          npm pack --dry-run
+          # Test that the bin script has valid syntax (doesn't execute)
+          node -c bin/kuuzuki.js      
       # 10. Publish to NPM
       - name: Publish kuuzuki package
         working-directory: packages/kuuzuki
