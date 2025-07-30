@@ -42,7 +42,8 @@
     }
   },
   "devDependencies": {
-    "prettier": "3.5.3"
+    "prettier": "3.5.3",
+    "stripe": "18.3.0"
   },
   "repository": {
     "type": "git",
@@ -58,8 +59,5 @@
     "protobufjs",
     "sharp"
   ],
-  "patchedDependencies": {},
-  "dependencies": {
-    "stripe": "18.3.0"
-  }
+  "patchedDependencies": {}
 }

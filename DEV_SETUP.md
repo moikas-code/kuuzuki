@@ -30,8 +30,7 @@ To use `kuuzuki` command globally, add this to the kuuzuki package.json:
 
 ```json
 "bin": {
-  "opencode": "./bin/opencode",
-  "kuuzuki": "./bin/opencode"
+  "kuuzuki": "./bin/kuuzuki.js"
 }
 ```
 
@@ -43,11 +42,10 @@ After linking, you can use the commands globally:
 ```bash
 # Run from anywhere (TUI is the default)
 kuuzuki
-opencode
 
 # Or specify other commands
 kuuzuki serve --port 8080
-opencode generate
+kuuzuki generate
 
 # Still works with explicit tui command
 kuuzuki tui
@@ -96,7 +94,7 @@ kuucode/
 ├── package.json          # Root package with dev scripts
 ├── run.sh               # Build and run utilities
 ├── packages/
-│   ├── opencode/        # Main CLI package
+│   ├── kuuzuki/        # Main CLI package
 │   │   ├── src/         # Source code
 │   │   ├── bin/         # Binary wrappers
 │   │   └── package.json # Package definition

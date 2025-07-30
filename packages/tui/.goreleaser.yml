@@ -1,5 +1,5 @@
 version: 2
-project_name: opencode
+project_name: kuuzuki
 before:
   hooks:
 builds:
@@ -12,13 +12,13 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X github.com/sst/opencode/internal/version.Version={{.Version}}
+      - -s -w -X github.com/moikas-code/kuuzuki/internal/version.Version={{.Version}}
     main: ./main.go
 
 archives:
   - format: tar.gz
     name_template: >-
-      opencode-
+      kuuzuki-
       {{- if eq .Os "darwin" }}mac-
       {{- else if eq .Os "windows" }}windows-
       {{- else if eq .Os "linux" }}linux-{{end}}
@@ -34,21 +34,21 @@ checksum:
 snapshot:
   name_template: "0.0.0-{{ .Timestamp }}"
 aurs:
-  - name: opencode
-    homepage: "https://github.com/sst/opencode"
+  - name: kuuzuki
+    homepage: "https://github.com/moikas-code/kuuzuki"
     description: "terminal based agent that can build anything"
     maintainers:
       - "dax"
       - "adam"
     license: "MIT"
     private_key: "{{ .Env.AUR_KEY }}"
-    git_url: "ssh://aur@aur.archlinux.org/opencode-bin.git"
+    git_url: "ssh://aur@aur.archlinux.org/kuuzuki-bin.git"
     provides:
-      - opencode
+      - kuuzuki
     conflicts:
-      - opencode
+      - kuuzuki
     package: |-
-      install -Dm755 ./opencode "${pkgdir}/usr/bin/opencode"
+      install -Dm755 ./kuuzuki "${pkgdir}/usr/bin/kuuzuki"
 brews:
   - repository:
       owner: sst

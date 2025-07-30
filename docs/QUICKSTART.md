@@ -72,7 +72,7 @@ bun run clean          # Clean artifacts
 kuucode/
 ├── run.sh              # Main build/run script
 ├── packages/
-│   ├── opencode/       # Core server/CLI code
+│   ├── kuuzuki/       # Core server/CLI code
 │   ├── tui/           # Terminal UI (Go)
 │   └── desktop/       # Desktop app (Tauri + React)
 ```
