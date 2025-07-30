@@ -43,6 +43,9 @@ if (packageJson.peerDependencies) {
   packageJson.peerDependencies = replaceCatalogRefs(packageJson.peerDependencies);
 }
 
+// Remove catalog field from package.json (npm doesn't support it)
+delete packageJson.catalog;
+
 // Write the updated package.json
 fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n');
 console.log('✅ Fixed catalog dependencies in package.json');
