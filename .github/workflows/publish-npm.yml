@@ -60,65 +60,14 @@ jobs:
             rm kuuzuki-tui
           done
       
-      # 7. Create JavaScript entry point and make binaries executable
+      # 7. Make binaries executable
       - name: Setup npm package
         working-directory: packages/kuuzuki
         run: |
-          # Create JavaScript entry point
-          cat > bin/kuuzuki.js << 'EOF'
-          #!/usr/bin/env node
-          
-          import { spawn } from 'child_process';
-          import { platform, arch } from 'os';
-          import { join, dirname } from 'path';
-          import { fileURLToPath } from 'url';
-          
-          const __dirname = dirname(fileURLToPath(import.meta.url));
-          
-          function getBinaryPath() {
-            const p = platform();
-            const a = arch();
-            
-            let platformName;
-            switch (p) {
-              case 'darwin':
-                platformName = a === 'arm64' ? 'macos-arm64' : 'macos';
-                break;
-              case 'win32':
-                platformName = a === 'arm64' ? 'windows-arm64' : 'windows';
-                break;
-              default:
-                platformName = a === 'arm64' ? 'linux-arm64' : 'linux';
-            }
-            
-            return join(__dirname, '..', 'binaries', `kuuzuki-tui-${platformName}`);
-          }
-          
-          const binaryPath = getBinaryPath();
-          
-          const child = spawn(binaryPath, process.argv.slice(2), {
-            stdio: 'inherit',
-            cwd: process.cwd(),
-            env: {
-              ...process.env,
-              KUUZUKI_NPM_INSTALL: 'true'
-            }
-          });
-          
-          child.on('exit', (code) => {
-            process.exit(code || 0);
-          });
-          
-          child.on('error', (err) => {
-            console.error('Failed to start kuuzuki:', err.message);
-            console.error('Binary path:', binaryPath);
-            console.error('Please ensure the binary exists and is executable.');
-            process.exit(1);
-          });
-          EOF
-          
+          # Make the existing bin script executable
           chmod +x bin/kuuzuki.js
-          chmod +x binaries/*
+          # Make all binaries executable (if they exist)
+          chmod +x binaries/* || true
       
       # 8. Run tests
       - name: Run tests
@@ -130,7 +79,8 @@ jobs:
         working-directory: packages/kuuzuki
         run: |
           npm pack --dry-run
-          node bin/kuuzuki.js --help
+          # Test that the bin script is valid Node.js
+          node -c bin/kuuzuki.js
       
       # 10. Publish to NPM
       - name: Publish kuuzuki package

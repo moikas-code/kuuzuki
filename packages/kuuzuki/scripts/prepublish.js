@@ -1,11 +1,9 @@
 #!/usr/bin/env node
-import { execSync } from 'child_process';
-import { existsSync, mkdirSync } from 'fs';
-import { platform } from 'os';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const { execSync } = require('child_process');
+const { existsSync, mkdirSync } = require('fs');
+const { platform } = require('os');
+const { join } = require('path');
 
 // Fix catalog dependencies first
 console.log('📦 Fixing catalog dependencies...');

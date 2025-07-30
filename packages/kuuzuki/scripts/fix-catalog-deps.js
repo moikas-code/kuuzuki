@@ -1,35 +1,31 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const packageJsonPath = join(__dirname, '..', 'package.json');
+const fs = require('fs');
+const path = require('path');
 
-// Read package.json
-const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+// Read the root package.json to get catalog versions
+const rootPackageJsonPath = path.join(__dirname, '../../../package.json');
+const rootPackageJson = JSON.parse(fs.readFileSync(rootPackageJsonPath, 'utf8'));
+const catalog = rootPackageJson.catalog || {};
 
-// Read root package.json to get catalog versions
-const rootPackageJsonPath = join(__dirname, '..', '..', '..', 'package.json');
-const rootPackageJson = JSON.parse(readFileSync(rootPackageJsonPath, 'utf-8'));
+// Read the kuuzuki package.json
+const packageJsonPath = path.join(__dirname, '../package.json');
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
-// Get catalog versions
-const catalogVersions = rootPackageJson.catalog || {};
-
-// Function to replace catalog: references
+// Function to replace catalog: references with actual versions
 function replaceCatalogRefs(deps) {
   if (!deps) return deps;
   
-  const newDeps = {};
+  const fixed = {};
   for (const [name, version] of Object.entries(deps)) {
-    if (version === 'catalog:' && catalogVersions[name]) {
-      console.log(`Replacing ${name}: "catalog:" with "${catalogVersions[name]}"`);
-      newDeps[name] = catalogVersions[name];
+    if (version === 'catalog:' && catalog[name]) {
+      fixed[name] = catalog[name];
+      console.log(`Fixed ${name}: catalog: → ${catalog[name]}`);
     } else {
-      newDeps[name] = version;
+      fixed[name] = version;
     }
   }
-  return newDeps;
+  return fixed;
 }
 
 // Fix dependencies
@@ -47,7 +43,6 @@ if (packageJson.peerDependencies) {
   packageJson.peerDependencies = replaceCatalogRefs(packageJson.peerDependencies);
 }
 
-// Write back
-writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n');
-
-console.log('✅ Fixed catalog dependencies');
+// Write the updated package.json
+fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n');
+console.log('✅ Fixed catalog dependencies in package.json');

@@ -2,7 +2,6 @@
   "$schema": "https://json.schemastore.org/package.json",
   "version": "0.1.2",
   "name": "kuuzuki",
-  "type": "module",
   "description": "AI-powered terminal assistant",
   "keywords": [
     "ai",
@@ -11,13 +10,13 @@
     "assistant",
     "claude"
   ],
-  "homepage": "https://github.com/kuuzuki/kuuzuki",
+  "homepage": "https://github.com/moikas-code/kuuzuki",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kuuzuki/kuuzuki.git"
+    "url": "https://github.com/moikas-code/kuuzuki.git"
   },
   "bugs": {
-    "url": "https://github.com/kuuzuki/kuuzuki/issues"
+    "url": "https://github.com/moikas-code/kuuzuki/issues"
   },
   "author": "Kuuzuki Team",
   "license": "MIT",
