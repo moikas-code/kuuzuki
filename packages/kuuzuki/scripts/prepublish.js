@@ -6,6 +6,18 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Fix catalog dependencies first
+console.log('📦 Fixing catalog dependencies...');
+try {
+  execSync('node scripts/fix-catalog-deps.js', { 
+    cwd: join(__dirname, '..'),
+    stdio: 'inherit' 
+  });
+} catch (error) {
+  console.error('❌ Failed to fix catalog dependencies:', error.message);
+  process.exit(1);
+}
 const rootDir = join(__dirname, '..');
 const tuiDir = join(rootDir, '..', 'tui');
 const binariesDir = join(rootDir, 'binaries');
