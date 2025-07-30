@@ -32,24 +32,105 @@ jobs:
       # 5. Install dependencies
       - run: bun install
       
-      # 6. Build everything
-      - name: Build TUI
-        run: ./run.sh build tui
-      
-      # 7. Build CLI/Server
-      - name: Build Server
-        run: ./run.sh build server
-      
-      # 8. Copy TUI binary to package
-      - name: Copy TUI binary
+      # 6. Build cross-platform TUI binaries
+      - name: Build TUI binaries for all platforms
         run: |
-          mkdir -p packages/kuuzuki/binaries
-          cp packages/tui/kuuzuki-tui packages/kuuzuki/binaries/kuuzuki-tui-linux
+          cd packages/tui
+          platforms=(
+            "darwin:amd64:macos"
+            "darwin:arm64:macos-arm64"
+            "linux:amd64:linux"
+            "linux:arm64:linux-arm64"
+            "windows:amd64:windows"
+            "windows:arm64:windows-arm64"
+          )
+          
+          for platform in "${platforms[@]}"; do
+            IFS=':' read -r os arch suffix <<< "$platform"
+            echo "Building for $os/$arch..."
+            
+            export GOOS="$os"
+            export GOARCH="$arch"
+            export CGO_ENABLED=0
+            
+            go build -o kuuzuki-tui ./cmd/kuuzuki
+            
+            mkdir -p ../kuuzuki/binaries
+            cp kuuzuki-tui "../kuuzuki/binaries/kuuzuki-tui-$suffix"
+            rm kuuzuki-tui
+          done
       
-      # 9. Run tests
+      # 7. Create JavaScript entry point and make binaries executable
+      - name: Setup npm package
+        working-directory: packages/kuuzuki
+        run: |
+          # Create JavaScript entry point
+          cat > bin/kuuzuki.js << 'EOF'
+          #!/usr/bin/env node
+          
+          import { spawn } from 'child_process';
+          import { platform, arch } from 'os';
+          import { join, dirname } from 'path';
+          import { fileURLToPath } from 'url';
+          
+          const __dirname = dirname(fileURLToPath(import.meta.url));
+          
+          function getBinaryPath() {
+            const p = platform();
+            const a = arch();
+            
+            let platformName;
+            switch (p) {
+              case 'darwin':
+                platformName = a === 'arm64' ? 'macos-arm64' : 'macos';
+                break;
+              case 'win32':
+                platformName = a === 'arm64' ? 'windows-arm64' : 'windows';
+                break;
+              default:
+                platformName = a === 'arm64' ? 'linux-arm64' : 'linux';
+            }
+            
+            return join(__dirname, '..', 'binaries', `kuuzuki-tui-${platformName}`);
+          }
+          
+          const binaryPath = getBinaryPath();
+          
+          const child = spawn(binaryPath, process.argv.slice(2), {
+            stdio: 'inherit',
+            cwd: process.cwd(),
+            env: {
+              ...process.env,
+              KUUZUKI_NPM_INSTALL: 'true'
+            }
+          });
+          
+          child.on('exit', (code) => {
+            process.exit(code || 0);
+          });
+          
+          child.on('error', (err) => {
+            console.error('Failed to start kuuzuki:', err.message);
+            console.error('Binary path:', binaryPath);
+            console.error('Please ensure the binary exists and is executable.');
+            process.exit(1);
+          });
+          EOF
+          
+          chmod +x bin/kuuzuki.js
+          chmod +x binaries/*
+      
+      # 8. Run tests
       - name: Run tests
         run: bun test
         continue-on-error: true  # Don't fail on test errors for now
+      
+      # 9. Test npm package
+      - name: Test npm package
+        working-directory: packages/kuuzuki
+        run: |
+          npm pack --dry-run
+          node bin/kuuzuki.js --help
       
       # 10. Publish to NPM
       - name: Publish kuuzuki package
@@ -63,8 +144,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            packages/tui/kuuzuki-tui
-            packages/kuuzuki/binaries/*
+            packages/kuuzuki/binaries/kuuzuki-tui-macos
+            packages/kuuzuki/binaries/kuuzuki-tui-macos-arm64
+            packages/kuuzuki/binaries/kuuzuki-tui-linux
+            packages/kuuzuki/binaries/kuuzuki-tui-linux-arm64
+            packages/kuuzuki/binaries/kuuzuki-tui-windows
+            packages/kuuzuki/binaries/kuuzuki-tui-windows-arm64
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
