@@ -79,7 +79,7 @@ jobs:
         working-directory: packages/kuuzuki
         run: |
           npm pack --dry-run
-          # Test that the bin script is valid Node.js
+          # Test that the bin script has valid syntax (doesn't execute)
           node -c bin/kuuzuki.js
       
       # 10. Publish to NPM

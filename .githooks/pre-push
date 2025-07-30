@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# Pre-push hook to validate kuuzuki package before pushing version tags
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Get the remote and URL
+remote="$1"
+url="$2"
+
+# Check if we're pushing any kuuzuki version tags
+pushing_version_tag=false
+while read local_ref local_sha remote_ref remote_sha; do
+    # Check if this is a tag push
+    if [[ "$local_ref" =~ ^refs/tags/kuuzuki-v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+        pushing_version_tag=true
+        tag_name=$(echo "$local_ref" | sed 's|refs/tags/||')
+        break
+    fi
+done
+
+# If not pushing a version tag, allow the push
+if [ "$pushing_version_tag" = false ]; then
+    exit 0
+fi
+
+echo -e "${YELLOW}🔍 Detected kuuzuki version tag push: $tag_name${NC}"
+echo "Running pre-publish validation..."
+
+# Change to kuuzuki package directory
+cd packages/kuuzuki || exit 1
+
+# Run validation
+if npm run validate; then
+    echo -e "${GREEN}✅ All validation checks passed!${NC}"
+    exit 0
+else
+    echo -e "${RED}❌ Validation failed! Fix the errors above before pushing the version tag.${NC}"
+    echo -e "${YELLOW}Tip: Run 'npm run validate' in packages/kuuzuki to see the issues.${NC}"
+    exit 1
+fi
