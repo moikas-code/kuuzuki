@@ -31,12 +31,12 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "dev": "bun run ./src/index.ts",
-    "build": "tsc --noEmit false --skipLibCheck",
-    "prepublishOnly": "bun run build && node scripts/prepublish.js"
+    "build": "echo 'Using Bun runtime - no build needed'",
+    "prepublishOnly": "node scripts/prepublish.js"
   },
   "bin": {
-    "opencode": "./bin/kuuzuki",
-    "kuuzuki": "./bin/kuuzuki"
+    "opencode": "./bin/kuuzuki.js",
+    "kuuzuki": "./bin/kuuzuki.js"
   },
   "exports": {
     "./*": "./src/*.ts"
