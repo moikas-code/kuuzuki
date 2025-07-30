@@ -55,10 +55,11 @@
     "zod-to-json-schema": "3.24.5"
   },
   "files": [
-    "bin",
-    "binaries",
-    "scripts",
-    "README.md"
+    "bin/**/*",
+    "binaries/**/*",
+    "scripts/**/*",
+    "README.md",
+    "src/**/*.ts"
   ],
   "dependencies": {
     "@actions/core": "1.11.1",

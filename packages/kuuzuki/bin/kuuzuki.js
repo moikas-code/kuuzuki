@@ -16,7 +16,7 @@ function getBinaryName() {
       platformName = a === 'arm64' ? 'macos-arm64' : 'macos';
       break;
     case 'win32':
-      platformName = a === 'arm64' ? 'windows-arm64' : 'windows';
+      platformName = a === 'arm64' ? 'windows-arm64.exe' : 'windows.exe';
       break;
     default:
       platformName = a === 'arm64' ? 'linux-arm64' : 'linux';

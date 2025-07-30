@@ -16,7 +16,7 @@ async function makeBinariesExecutable() {
       platformName = a === 'arm64' ? 'macos-arm64' : 'macos';
       break;
     case 'win32':
-      platformName = a === 'arm64' ? 'windows-arm64' : 'windows';
+      platformName = a === 'arm64' ? 'windows-arm64.exe' : 'windows.exe';
       break;
     default:
       platformName = a === 'arm64' ? 'linux-arm64' : 'linux';
@@ -32,10 +32,10 @@ async function makeBinariesExecutable() {
     // Make executable (755 permissions) - skip on Windows as it doesn't use chmod
     if (process.platform !== 'win32') {
       await chmod(binaryPath, 0o755);
-      console.log(`✅ Made ${binaryName} executable`);
     }
+    console.log(`✓ Kuuzuki binary ready for ${platform()}`);
   } catch (error) {
-    console.log(`⚠️  Binary ${binaryName} not found, this is normal for cross-platform packages`);
+    console.warn(`⚠ Binary not found: ${binaryPath}`);
   }
 }
 
