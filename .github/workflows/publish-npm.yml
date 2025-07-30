@@ -50,13 +50,36 @@ jobs:
       - name: Fix catalog dependencies
         run: |
           cd packages/kuuzuki
+          echo "Running fix-catalog-deps.js..."
           node scripts/fix-catalog-deps.js
+          echo "Checking package.json after fix..."
+          grep -c "catalog:" package.json || echo "No catalog: references found"
+          
+          # Also remove catalog field from root package.json for npm compatibility
+          cd ../..
+          if grep -q '"catalog":' package.json; then
+            echo "Removing catalog field from root package.json..."
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+              delete pkg.catalog;
+              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+              console.log('Removed catalog field from root package.json');
+            "
+          fi
 
       # 8. Update version in package.json
       - name: Update package version
         run: |
           cd packages/kuuzuki
-          npm version ${{ steps.extract_version.outputs.version }} --no-git-tag-version
+          # Manually update version to avoid npm catalog issues
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '${{ steps.extract_version.outputs.version }}';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\\n');
+            console.log('Updated version to:', pkg.version);
+          "
       
       # 9. Prepare source for npm (fix Bun macros)
       - name: Prepare source files
