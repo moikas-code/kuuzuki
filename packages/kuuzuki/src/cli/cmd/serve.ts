@@ -43,9 +43,26 @@ export const ServeCommand = cmd({
         writeServerInfo({ port: server.port!, hostname: server.hostname || "127.0.0.1" })
       )
 
+      // Setup signal handlers for graceful shutdown
+      const cleanup = () => {
+        server.stop()
+        // Clean up server info file
+        import("../../server/server-info").then(({ clearServerInfo }) =>
+          clearServerInfo()
+        ).catch(() => {})
+        process.exit(0)
+      }
+      
+      process.on('SIGINT', cleanup)
+      process.on('SIGTERM', cleanup)
+
       await new Promise(() => {})
 
       server.stop()
+      // Clean up server info file
+      await import("../../server/server-info").then(({ clearServerInfo }) =>
+        clearServerInfo()
+      )
     })
   },
 })

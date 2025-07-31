@@ -145,9 +145,13 @@ export const TuiCommand = cmd({
         const tuiLocations = [
           // 1. Production npm package: TUI binary alongside main binary
           path.join(path.dirname(process.execPath), tuiBinaryName),
-          // 2. Development: pre-built binary in tui directory
+          // 2. NPX or local node_modules: look in platform package
+          path.join(__dirname, "..", "..", "..", "..", `kuuzuki-${process.platform === "win32" ? "windows" : process.platform}-${process.arch === "x64" ? "x64" : "arm64"}`, "bin", tuiBinaryName),
+          // 3. Global npm/yarn/pnpm: look in sibling package
+          path.join(__dirname, "..", "..", "..", "..", "..", `kuuzuki-${process.platform === "win32" ? "windows" : process.platform}-${process.arch === "x64" ? "x64" : "arm64"}`, "bin", tuiBinaryName),
+          // 4. Development: pre-built binary in tui directory
           path.join(__dirname, "../../../../tui", tuiBinaryName),
-          // 3. Development: binary in project root binaries
+          // 5. Development: binary in project root binaries
           path.join(__dirname, "../../../binaries", tuiBinaryName),
         ]
         
@@ -343,6 +347,10 @@ export const TuiCommand = cmd({
             proc.kill()
           }
           server.stop()
+          // Clear server info asynchronously
+          import("../../server/server-info").then(({ clearServerInfo }) =>
+            clearServerInfo()
+          ).catch(() => {})
           process.exit(0)
         }
         
@@ -356,6 +364,11 @@ export const TuiCommand = cmd({
         process.removeListener('SIGTERM', cleanup)
         
         server.stop()
+        
+        // Clean up server info file
+        await import("../../server/server-info").then(({ clearServerInfo }) =>
+          clearServerInfo()
+        )
 
         return "done"
       })
