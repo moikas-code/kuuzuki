@@ -30,9 +30,10 @@ async function buildMainPackage() {
   
   // Create package.json
   const mainPkg = await Bun.file("package.json").json()
+  const version = process.env.VERSION || mainPkg.version
   const npmPkg = {
     name: "kuuzuki",
-    version: mainPkg.version,
+    version: version,
     description: mainPkg.description,
     license: mainPkg.license,
     repository: mainPkg.repository,
@@ -48,7 +49,7 @@ async function buildMainPackage() {
       node: ">=18.0.0"
     },
     optionalDependencies: platforms.reduce((deps, p) => {
-      deps[`kuuzuki-${p.os}-${p.arch}`] = mainPkg.version
+      deps[`kuuzuki-${p.os}-${p.arch}`] = version
       return deps
     }, {} as Record<string, string>)
   }
@@ -109,9 +110,10 @@ async function buildPlatformPackage(platform: typeof platforms[0]) {
   
   // Create package.json
   const mainPkg = await Bun.file("package.json").json()
+  const version = process.env.VERSION || mainPkg.version
   const platformPkg = {
     name: pkgName,
-    version: mainPkg.version,
+    version: version,
     description: `Kuuzuki CLI binary for ${platform.os} ${platform.arch}`,
     license: mainPkg.license,
     repository: mainPkg.repository,
@@ -137,7 +139,11 @@ async function buildPlatformPackage(platform: typeof platforms[0]) {
 }
 
 async function main() {
+  const version = process.env.VERSION
   console.log("🔨 Building npm packages...")
+  if (version) {
+    console.log(`📌 Using version from environment: ${version}`)
+  }
   
   // Clean dist directory
   await rm("dist/npm", { recursive: true, force: true })
