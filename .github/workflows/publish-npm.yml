@@ -7,7 +7,7 @@ on:
       - 'kuuzuki-v*'
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -169,8 +169,17 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            packages/kuuzuki/dist/npm/*/kuuzuki*.tgz
           generate_release_notes: true
+          name: ${{ github.ref_name }}
+          body: |
+            ## 📦 NPM Packages Published
+            
+            Install with:
+            ```bash
+            npm install -g kuuzuki
+            ```
+            
+            View on npm: https://www.npmjs.com/package/kuuzuki
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.ref_name }}
