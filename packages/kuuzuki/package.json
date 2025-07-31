@@ -30,7 +30,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "dev": "bun run ./src/index.ts",
-    "build": "echo 'Using Bun runtime - no build needed'",
+    "build": "node scripts/build-typescript.js",
+    "build:tsc": "tsc",
+    "build:watch": "tsc --watch",
     "validate": "node scripts/validate-package.js",
     "prepublishOnly": "npm run validate && node scripts/prepublish.js",
     "postinstall": "node scripts/postinstall.js"
