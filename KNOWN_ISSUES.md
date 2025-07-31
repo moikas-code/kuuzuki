@@ -11,16 +11,24 @@ error: Top-level return cannot be used inside an ECMAScript module
 
 This error points to the `export namespace Session {` declaration, which is valid TypeScript but seems to trigger a bug in Bun.
 
-### Status
+### Comprehensive Analysis
 - The code is syntactically correct and passes TypeScript validation
-- The issue appears to be a Bun runtime bug with namespace handling
+- The issue appears to be a Bun parser/transpiler bug with namespace handling
 - No top-level return statements exist in the code
+- **All Bun compilation modes affected**: runtime execution, bundling (`Bun.build()`), and standalone compilation (`--compile`)
+- This is a fundamental issue in Bun's TypeScript namespace handling
 
-### Workaround
-Until this Bun issue is resolved, consider:
-1. Using an older version of Bun
-2. Compiling with TypeScript first, then running the compiled output
-3. Refactoring from namespace to modern ES modules (major change)
+### Tested Workarounds
+1. ✅ **TypeScript Compilation**: Compiling with `tsc` and running with Node.js works
+2. ❌ **Bun.build() API**: Still fails with same namespace error
+3. ❌ **Bun CLI bundling**: Still fails with same namespace error  
+4. ❌ **Bun --compile**: Still fails with same namespace error
+5. ❌ **Custom plugins**: Cannot be applied due to bundler failure
+
+### Current Solution
+The TypeScript compilation approach is the only viable workaround:
+1. Use `npm run build:tsc` to compile TypeScript to JavaScript
+2. Run with Node.js or the compiled output via `bin/kuuzuki.js`
 
 ### Related Changes
 This issue was discovered after simplifying the context management system in commit b86ebda8, which:

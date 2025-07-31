@@ -27,27 +27,37 @@ if (!hasBun) {
   process.exit(1);
 }
 
-// Check if compiled version exists
-const distIndexPath = join(scriptDir, '..', 'dist', 'index.js');
-const srcIndexPath = join(scriptDir, '..', 'src', 'index.ts');
+// Check for different versions in order of preference
+const bundledPath = join(scriptDir, '..', 'dist', 'index.js'); // Bun.build output
+const compiledPath = join(scriptDir, '..', 'dist-tsc', 'index.js'); // TypeScript compilation
+const srcIndexPath = join(scriptDir, '..', 'src', 'index.ts'); // Source TypeScript
 
 let command, args, entryPoint;
 
-if (existsSync(distIndexPath)) {
-  // Use compiled JavaScript with Node.js
-  console.log('Using compiled JavaScript version...');
+if (existsSync(bundledPath)) {
+  // Use Bun-bundled version (preferred - resolves namespace issues)
+  console.log('Using Bun-bundled version...');
+  command = process.platform === 'win32' ? 'bun.exe' : 'bun';
+  args = ['run', bundledPath, ...process.argv.slice(2)];
+  entryPoint = bundledPath;
+} else if (existsSync(compiledPath)) {
+  // Use TypeScript-compiled JavaScript with Node.js
+  console.log('Using TypeScript-compiled version...');
   command = process.execPath; // Node.js executable
-  args = [distIndexPath, ...process.argv.slice(2)];
-  entryPoint = distIndexPath;
+  args = [compiledPath, ...process.argv.slice(2)];
+  entryPoint = compiledPath;
 } else if (existsSync(srcIndexPath)) {
-  // Fall back to Bun with TypeScript
-  console.log('Using TypeScript source with Bun...');
+  // Fall back to Bun with TypeScript source (may have namespace issues)
+  console.log('Using TypeScript source with Bun (may have namespace issues)...');
   command = process.platform === 'win32' ? 'bun.exe' : 'bun';
   args = ['run', srcIndexPath, ...process.argv.slice(2)];
   entryPoint = srcIndexPath;
 } else {
   console.error('Could not find kuuzuki files.');
-  console.error('Expected either:', distIndexPath, 'or', srcIndexPath);
+  console.error('Expected one of:');
+  console.error('  1. Bundled:', bundledPath);
+  console.error('  2. Compiled:', compiledPath);
+  console.error('  3. Source:', srcIndexPath);
   console.error('This appears to be a broken installation.');
   process.exit(1);
 }

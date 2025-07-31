@@ -51,9 +51,19 @@ This branch implements a simplified context management system to fix the issue w
 ## Next Steps
 
 1. **Option A**: Wait for Bun fix or try different Bun version
-2. **Option B**: Add TypeScript compilation step to generate JavaScript
+2. ✅ **Option B**: Add TypeScript compilation step to generate JavaScript (IMPLEMENTED)
 3. **Option C**: Refactor from namespace to ES modules (major change)
 4. **Option D**: Test with alternative runtime (Node.js with tsx)
+
+### Bun API Investigation Results
+
+We explored using Bun's own APIs to handle the namespace issue:
+- **Bun.build() API**: Failed with same namespace error
+- **Bun CLI bundling**: Failed with same namespace error  
+- **Bun --compile**: Failed with same namespace error
+- **Custom plugins**: Cannot be applied due to bundler failure
+
+**Conclusion**: This is a fundamental bug in Bun v1.2.19's TypeScript namespace handling that affects all compilation modes. The TypeScript-to-JavaScript compilation workaround remains the only viable solution.
 
 ## Test Results
 
