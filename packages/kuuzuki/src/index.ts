@@ -3,7 +3,6 @@ import yargs from "yargs"
 import { hideBin } from "yargs/helpers"
 import { RunCommand } from "./cli/cmd/run"
 import { GenerateCommand } from "./cli/cmd/generate"
-import { SchemaCommand } from "./cli/cmd/schema"
 import { Log } from "./util/log"
 import { AuthCommand } from "./cli/cmd/auth"
 import { BillingCommand } from "./cli/cmd/billing"
@@ -17,7 +16,6 @@ import { NamedError } from "./util/error"
 import { FormatError } from "./cli/error"
 import { ServeCommand } from "./cli/cmd/serve"
 import { TuiCommand } from "./cli/cmd/tui"
-import { DebugCommand } from "./cli/cmd/debug"
 import { StatsCommand } from "./cli/cmd/stats"
 import { McpCommand } from "./cli/cmd/mcp"
 import { GithubCommand } from "./cli/cmd/github"
@@ -28,7 +26,6 @@ import {
   GitPermissionsResetCommand,
   GitPermissionsConfigureCommand,
 } from "./cli/cmd/git-permissions"
-import { HybridCommand } from "./cli/cmd/hybrid"
 import { Trace } from "./trace"
 import { ensureInitialized } from "./global"
 
@@ -85,8 +82,6 @@ const cli = yargs(hideBin(process.argv))
   .command(TuiCommand)
   .command(RunCommand)
   .command(GenerateCommand)
-  .command(SchemaCommand)
-  .command(DebugCommand)
   .command(AuthCommand)
   .command(BillingCommand)
   .command(ApiKeyCommand)
@@ -101,7 +96,6 @@ const cli = yargs(hideBin(process.argv))
   .command(GitPermissionsDenyCommand)
   .command(GitPermissionsResetCommand)
   .command(GitPermissionsConfigureCommand)
-  .command(HybridCommand)
   .fail((msg) => {
     if (msg.startsWith("Unknown argument") || msg.startsWith("Not enough non-option arguments")) {
       cli.showHelp("log")

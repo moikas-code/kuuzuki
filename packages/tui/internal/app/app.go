@@ -116,21 +116,6 @@ func New(
 		appState.Theme = themeEnv
 	}
 
-	// Initialize hybrid context state from environment
-	hybridContextEnv := os.Getenv("KUUZUKI_HYBRID_CONTEXT_ENABLED")
-	if hybridContextEnv == "true" {
-		appState.HybridContextEnabled = true
-	} else if hybridContextEnv == "false" {
-		appState.HybridContextEnabled = false
-	}
-	// If env var is not set, use the value from state file
-
-	// Set the environment variable based on state so it's passed to the server
-	if appState.HybridContextEnabled {
-		os.Setenv("KUUZUKI_HYBRID_CONTEXT_ENABLED", "true")
-	} else {
-		os.Setenv("KUUZUKI_HYBRID_CONTEXT_ENABLED", "false")
-	}
 
 	var modeIndex int
 	var mode *opencode.Mode

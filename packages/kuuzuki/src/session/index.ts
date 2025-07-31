@@ -812,11 +812,6 @@ export namespace Session {
     system.push(...(await SystemPrompt.environment()))
     system.push(...(await SystemPrompt.custom()))
 
-    // Add semantic facts if we have them from hybrid context
-    if (semanticFactsText) {
-      system.push(`Previous conversation context:\n${semanticFactsText}`)
-    }
-
     // max 2 system prompt messages for caching purposes
     const [first, ...rest] = system
     system = [first, rest.join("\n")]

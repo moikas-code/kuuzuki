@@ -29,13 +29,12 @@ const bunCmd = process.platform === 'win32' ? 'bun.exe' : 'bun';
 const args = [
   'build',
   entryPoint,
-  '--outfile',
-  outputFile,
+  '--outdir',
+  distDir,
   '--target',
   'bun',
   '--format',
-  'esm',
-  '--sourcemap=external'
+  'esm'
 ];
 
 const child = spawn(bunCmd, args, {

@@ -36,13 +36,6 @@ export namespace SessionPersistence {
       compressed: z.boolean().optional(),
       tags: z.array(z.string()).optional(),
     }),
-    hybridContext: z
-      .object({
-        semanticFacts: z.array(z.any()).optional(),
-        compressedMessages: z.array(z.any()).optional(),
-        metrics: z.any().optional(),
-      })
-      .optional(),
   })
   export type SessionState = z.infer<typeof SessionState>
 
