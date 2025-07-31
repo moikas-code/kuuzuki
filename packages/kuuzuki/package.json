@@ -36,7 +36,7 @@
     "postinstall": "node scripts/postinstall.js"
   },
   "bin": {
-    "kuuzuki": "./bin/kuuzuki-launcher.js"
+    "kuuzuki": "./bin/kuuzuki.js"
   },
   "exports": {
     "./*": "./src/*.ts"

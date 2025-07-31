@@ -1,152 +1,72 @@
 #!/usr/bin/env node
+const { spawn, spawnSync } = require('child_process');
+const { join, dirname, resolve } = require('path');
+const { existsSync, realpathSync } = require('fs');
+const os = require('os');
 
-const { spawn } = require('child_process');
-const { platform, arch } = require('os');
-const { join } = require('path');
-const { createServer } = require('http');
-const net = require('net');
+// Resolve the real path of this script
+const scriptPath = realpathSync(__filename);
+const scriptDir = dirname(scriptPath);
 
-function getBinaryName() {
-  const p = platform();
-  const a = arch();
-  
-  let platformName;
-  switch (p) {
-    case 'darwin':
-      platformName = a === 'arm64' ? 'macos-arm64' : 'macos';
-      break;
-    case 'win32':
-      platformName = a === 'arm64' ? 'windows-arm64.exe' : 'windows.exe';
-      break;
-    default:
-      platformName = a === 'arm64' ? 'linux-arm64' : 'linux';
+// Check if bun is available
+const hasBun = (() => {
+  try {
+    const result = spawnSync(process.platform === 'win32' ? 'bun.exe' : 'bun', ['--version'], { 
+      stdio: 'pipe',
+      shell: false
+    });
+    return result.status === 0;
+  } catch {
+    return false;
   }
-  
-  return `kuuzuki-tui-${platformName}`;
+})();
+
+if (!hasBun) {
+  console.error('Bun runtime is required to run kuuzuki');
+  console.error('Install it from: https://bun.sh');
+  process.exit(1);
 }
 
-// Find an available port
-function findAvailablePort(startPort = 12275) {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.listen(startPort, () => {
-      const port = server.address().port;
-      server.close(() => resolve(port));
-    });
-    server.on('error', () => {
-      // Port is in use, try next one
-      resolve(findAvailablePort(startPort + 1));
-    });
-  });
+// ALWAYS run through TypeScript entry point
+// This ensures proper initialization and environment setup
+const indexPath = join(scriptDir, '..', 'src', 'index.ts');
+
+if (!existsSync(indexPath)) {
+  console.error('Could not find kuuzuki source files at:', indexPath);
+  console.error('This appears to be a broken installation.');
+  process.exit(1);
 }
 
-// Create a minimal server that responds to /config
-function createMinimalServer(port) {
-  const server = createServer((req, res) => {
-    res.setHeader('Content-Type', 'application/json');
-    
-    if (req.url === '/config') {
-      res.writeHead(200);
-      res.end(JSON.stringify({
-        providers: {
-          'demo': {
-            id: 'demo',
-            name: 'Demo Provider',
-            models: [{
-              id: 'demo',
-              name: 'Demo Model (No API Key Required)',
-              contextLength: 4096
-            }]
-          }
-        },
-        defaultProvider: 'demo',
-        defaultModel: 'demo'
-      }));
-    } else if (req.url === '/health') {
-      res.writeHead(200);
-      res.end(JSON.stringify({ status: 'ok', mode: 'standalone' }));
-    } else {
-      res.writeHead(404);
-      res.end(JSON.stringify({ error: 'Not found' }));
-    }
-  });
-  
-  server.listen(port, '127.0.0.1');
-  return server;
-}
+const bunCmd = process.platform === 'win32' ? 'bun.exe' : 'bun';
+const child = spawn(bunCmd, ['run', indexPath, ...process.argv.slice(2)], {
+  stdio: 'inherit',
+  env: process.env,
+  cwd: process.cwd(),
+  shell: false
+});
 
-async function main() {
-  const args = process.argv.slice(2);
-  const command = args[0];
-
-  // For v0.1.x, only TUI mode is supported via npm
-  if (!command || command === 'tui') {
-    console.log('Starting Kuuzuki in standalone mode...');
-    
-    // Find available port and start minimal server
-    const port = await findAvailablePort();
-    const server = createMinimalServer(port);
-    console.log(`Local server started on port ${port}`);
-    
-    const binaryPath = join(__dirname, '..', 'binaries', getBinaryName());
-    
-    const child = spawn(binaryPath, args.slice(command === 'tui' ? 1 : 0), {
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        KUUZUKI_NPM_INSTALL: 'true',
-        KUUZUKI_SERVER: `http://127.0.0.1:${port}`,
-        KUUZUKI_APP_INFO: JSON.stringify({
-          name: 'kuuzuki',
-          version: require('../package.json').version,
-          npmMode: true,
-          standalone: true
-        }),
-        KUUZUKI_MODES: JSON.stringify([{
-          id: 'default',
-          name: 'Default',
-          description: 'Standalone mode - Limited functionality without API keys'
-        }])
-      }
-    });
-    
-    child.on('error', (err) => {
-      server.close();
-      if (err.code === 'ENOENT') {
-        console.error(`Error: Could not find the kuuzuki binary for your platform.`);
-        console.error(`Expected binary at: ${binaryPath}`);
-        console.error(`\nPlease report this issue at: https://github.com/moikas-code/kuuzuki/issues`);
-      } else {
-        console.error('Failed to start kuuzuki:', err.message);
-      }
-      process.exit(1);
-    });
-    
-    child.on('exit', (code) => {
-      server.close();
-      process.exit(code || 0);
-    });
-    
-    // Handle cleanup
-    process.on('SIGINT', () => {
-      server.close();
-      process.exit(0);
-    });
-    process.on('SIGTERM', () => {
-      server.close();
-      process.exit(0);
-    });
-    
+child.on('error', (err) => {
+  if (err.code === 'ENOENT') {
+    console.error('Could not find bun. Please install it from https://bun.sh');
   } else {
-    console.log(`Kuuzuki v0.1.x currently supports TUI mode only when installed via npm.`);
-    console.log(`\nUsage: kuuzuki tui [options]`);
-    console.log(`\nOther commands (${command}) will be available in v0.2.0.`);
-    console.log(`\nFor full functionality now, clone the repository and run with Bun.`);
-    process.exit(1);
+    console.error('Failed to start kuuzuki:', err.message);
   }
-}
-
-main().catch(err => {
-  console.error('Failed to start:', err);
   process.exit(1);
 });
+
+child.on('exit', (code, signal) => {
+  if (signal) {
+    process.exit(1);
+  } else {
+    process.exit(code || 0);
+  }
+});
+
+// Handle signals properly
+if (process.platform !== 'win32') {
+  process.on('SIGINT', () => child.kill('SIGINT'));
+  process.on('SIGTERM', () => child.kill('SIGTERM'));
+} else {
+  process.on('SIGINT', () => child.kill());
+  process.on('SIGTERM', () => child.kill());
+}

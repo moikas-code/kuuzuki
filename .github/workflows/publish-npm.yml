@@ -1,408 +1,167 @@
 name: Publish Kuuzuki to NPM
+
 on:
   push:
     tags:
       - 'v*'
       - 'kuuzuki-v*'
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
-  publish:
-    runs-on: ubuntu-latest
+  build-binaries:
+    name: Build binaries for ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: linux-x64
+            runner: ubuntu-latest
+            target: bun-linux-x64
+          - name: linux-arm64
+            runner: ubuntu-latest
+            target: bun-linux-arm64
+          - name: darwin-x64
+            runner: macos-13
+            target: bun-darwin-x64
+          - name: darwin-arm64
+            runner: macos-latest
+            target: bun-darwin-arm64
+          - name: windows-x64
+            runner: windows-latest
+            target: bun-windows-x64
+    
     steps:
-      # 1. Checkout code
       - uses: actions/checkout@v4
       
-      # 2. Setup Node.js
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      
+      - name: Build TUI
+        working-directory: packages/tui
+        run: |
+          if [[ "${{ matrix.platform.name }}" == "windows-x64" ]]; then
+            GOOS=windows GOARCH=amd64 go build -o kuuzuki-tui.exe ./cmd/kuuzuki
+          elif [[ "${{ matrix.platform.name }}" == "darwin-arm64" ]]; then
+            GOOS=darwin GOARCH=arm64 go build -o kuuzuki-tui ./cmd/kuuzuki
+          elif [[ "${{ matrix.platform.name }}" == "darwin-x64" ]]; then
+            GOOS=darwin GOARCH=amd64 go build -o kuuzuki-tui ./cmd/kuuzuki
+          elif [[ "${{ matrix.platform.name }}" == "linux-arm64" ]]; then
+            GOOS=linux GOARCH=arm64 go build -o kuuzuki-tui ./cmd/kuuzuki
+          else
+            GOOS=linux GOARCH=amd64 go build -o kuuzuki-tui ./cmd/kuuzuki
+          fi
+        shell: bash
+      
+      - name: Build CLI binary
+        working-directory: packages/kuuzuki
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#kuuzuki-v}"
+          
+          bun build --compile \
+            --target=${{ matrix.platform.target }} \
+            --outfile=dist/binaries/${{ matrix.platform.name }}/kuuzuki${{ matrix.platform.name == 'windows-x64' && '.exe' || '' }} \
+            --define KUUZUKI_VERSION="'${VERSION}'" \
+            ./src/index.ts
+      
+      - name: Upload CLI binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-binary-${{ matrix.platform.name }}
+          path: packages/kuuzuki/dist/binaries/${{ matrix.platform.name }}/*
+          retention-days: 1
+      
+      - name: Upload TUI binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: tui-binary-${{ matrix.platform.name }}
+          path: packages/tui/kuuzuki-tui${{ matrix.platform.name == 'windows-x64' && '.exe' || '' }}
+          retention-days: 1
+
+  publish-packages:
+    name: Publish npm packages
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
       
-      # 3. Setup Bun
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      
-      # 4. Setup Go for TUI
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.21'
-      
-      # 5. Install dependencies
       - name: Install dependencies
-        shell: bash
-        run: |
-          set -x
-          which bun
-          bun install
+        run: bun install --frozen-lockfile
       
-      # 6. Extract version from tag
-      - name: Extract version
-        id: extract_version
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          VERSION=${VERSION#v}
-          VERSION=${VERSION#kuuzuki-v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Publishing version: $VERSION"
-      
-      # 7. Fix catalog dependencies
-      - name: Fix catalog dependencies
-        run: |
-          cd packages/kuuzuki
-          echo "Running fix-catalog-deps.js..."
-          node scripts/fix-catalog-deps.js
-          echo "Checking package.json after fix..."
-          grep -c "catalog:" package.json || echo "No catalog: references found"
-          
-          # Also remove catalog field from root package.json for npm compatibility
-          cd ../..
-          if grep -q '"catalog":' package.json; then
-            echo "Removing catalog field from root package.json..."
-            node -e "
-              const fs = require('fs');
-              const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-              delete pkg.catalog;
-              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-              console.log('Removed catalog field from root package.json');
-            "
-          fi
-
-      # 8. Update version in package.json
-      - name: Update package version
-        run: |
-          cd packages/kuuzuki
-          # Manually update version to avoid npm catalog issues
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            pkg.version = '${{ steps.extract_version.outputs.version }}';
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\\n');
-            console.log('Updated version to:', pkg.version);
-          "
-      
-      # 9. Prepare source for npm (fix Bun macros)
-      - name: Prepare source files
-        run: |
-          cd packages/kuuzuki
-          bun run scripts/prepare-npm.ts
-      
-      # 9. Build cross-platform TUI binaries and packages
-      - name: Build all platform packages
-        run: |
-          cd packages/kuuzuki
-          
-          # Clean dist directory
-          rm -rf dist
-          mkdir -p dist/npm
-          
-          # Define platforms
-          platforms=(
-            "linux:amd64:linux-x64"
-            "linux:arm64:linux-arm64"
-            "darwin:amd64:darwin-x64"
-            "darwin:arm64:darwin-arm64"
-            "windows:amd64:windows-x64"
-          )
-          
-          echo "Building TUI binaries for all platforms..."
-          
-          for platform in "${platforms[@]}"; do
-            IFS=':' read -r goos goarch pkgname <<< "$platform"
-            
-            echo "Building $pkgname (GOOS=$goos GOARCH=$goarch)..."
-            
-            # Create package directory
-            mkdir -p "dist/npm/kuuzuki-$pkgname/bin"
-            
-            # Determine binary name
-            binary_name="kuuzuki-tui"
-            if [ "$goos" = "windows" ]; then
-              binary_name="kuuzuki-tui.exe"
-            fi
-            
-            # Build TUI binary
-            cd ../../packages/tui
-            GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 \
-              go build -ldflags="-s -w -X main.Version=${{ steps.extract_version.outputs.version }}" \
-              -o "../kuuzuki/dist/npm/kuuzuki-$pkgname/bin/$binary_name" \
-              ./cmd/kuuzuki
-            
-            cd ../../packages/kuuzuki
-            
-            # Copy README to platform package
-            cp README.md "dist/npm/kuuzuki-$pkgname/"
-            
-            # Create package.json for platform package
-            cat > "dist/npm/kuuzuki-$pkgname/package.json" << EOF
-          {
-            "name": "kuuzuki-$pkgname",
-            "version": "${{ steps.extract_version.outputs.version }}",
-            "description": "Kuuzuki binaries for $pkgname",
-            "license": "MIT",
-            "repository": {
-              "type": "git",
-              "url": "git+https://github.com/moikas-code/kuuzuki.git"
-            },
-            "files": ["bin"],
-            "os": ["${goos/darwin/darwin}"],
-            "cpu": ["${goarch/amd64/x64}"]
-          }
-          EOF
-            
-            echo "✓ Built $pkgname"
-          done
-          
-          echo "All platform binaries built successfully!"
-      
-      # 10. Create main package
-      - name: Create main kuuzuki package
-        run: |
-          cd packages/kuuzuki
-          
-          # Create main package structure
-          mkdir -p dist/npm/kuuzuki/{bin,src}
-          
-          # Copy source files
-          cp -r src/* dist/npm/kuuzuki/src/
-          
-          # Copy README
-          cp README.md dist/npm/kuuzuki/
-          
-          # Create launcher script
-          cat > dist/npm/kuuzuki/bin/kuuzuki << 'EOF'
-          #!/usr/bin/env node
-          const { spawn, spawnSync } = require('child_process');
-          const { join, dirname, resolve } = require('path');
-          const { existsSync, realpathSync } = require('fs');
-          const os = require('os');
-          
-          // Resolve the real path of this script
-          const scriptPath = realpathSync(__filename);
-          const scriptDir = dirname(scriptPath);
-          
-          // Check if bun is available
-          const hasBun = (() => {
-            try {
-              const result = spawnSync(process.platform === 'win32' ? 'bun.exe' : 'bun', ['--version'], { 
-                stdio: 'pipe',
-                shell: false
-              });
-              return result.status === 0;
-            } catch {
-              return false;
-            }
-          })();
-          
-          if (!hasBun) {
-            console.error('Bun runtime is required to run kuuzuki');
-            console.error('Install it from: https://bun.sh');
-            process.exit(1);
-          }
-          
-          // Map platform/arch
-          const platform = process.platform === 'darwin' ? 'darwin' : 
-                          process.platform === 'win32' ? 'windows' : 'linux';
-          const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
-          const platformPackage = `kuuzuki-${platform}-${arch}`;
-          
-          // Check if this is a TUI command
-          const args = process.argv.slice(2);
-          const isTui = args.length === 0 || args[0] === 'tui';
-          
-          if (isTui) {
-            // Find TUI binary
-            const tuiBinary = `kuuzuki-tui${platform === 'windows' ? '.exe' : ''}`;
-            
-            // Search paths
-            const searchPaths = [
-              join(scriptDir, '..', '..', platformPackage, 'bin', tuiBinary),
-              join(scriptDir, '..', 'node_modules', platformPackage, 'bin', tuiBinary),
-              join(scriptDir, '..', '..', '..', platformPackage, 'bin', tuiBinary),
-              join(process.cwd(), 'node_modules', platformPackage, 'bin', tuiBinary),
-            ];
-            
-            // Global paths
-            if (process.platform === 'win32') {
-              const appData = process.env.APPDATA || join(os.homedir(), 'AppData', 'Roaming');
-              searchPaths.push(join(appData, 'npm', 'node_modules', platformPackage, 'bin', tuiBinary));
-            } else {
-              searchPaths.push(join('/usr/local/lib/node_modules', platformPackage, 'bin', tuiBinary));
-              searchPaths.push(join(os.homedir(), '.npm-global/lib/node_modules', platformPackage, 'bin', tuiBinary));
-            }
-            
-            const tuiPath = searchPaths.find(p => existsSync(p));
-            
-            if (!tuiPath) {
-              console.error(`Could not find TUI binary. Make sure ${platformPackage} is installed.`);
-              console.error('Try: npm install -g ' + platformPackage);
-              process.exit(1);
-            }
-            
-            // Run TUI
-            const child = spawn(tuiPath, args.slice(1), {
-              stdio: 'inherit',
-              env: process.env,
-              shell: false
-            });
-            
-            child.on('error', (err) => {
-              console.error('Failed to start TUI:', err.message);
-              process.exit(1);
-            });
-            
-            child.on('exit', code => process.exit(code || 0));
-            
-            // Handle signals
-            if (process.platform !== 'win32') {
-              process.on('SIGINT', () => child.kill('SIGINT'));
-              process.on('SIGTERM', () => child.kill('SIGTERM'));
-            } else {
-              process.on('SIGINT', () => child.kill());
-              process.on('SIGTERM', () => child.kill());
-            }
-          } else {
-            // Run TypeScript CLI with bun
-            const indexPath = join(scriptDir, '..', 'src', 'index.ts');
-            
-            const bunCmd = process.platform === 'win32' ? 'bun.exe' : 'bun';
-            const child = spawn(bunCmd, ['run', indexPath, ...args], {
-              stdio: 'inherit',
-              env: process.env,
-              cwd: process.cwd(),
-              shell: false
-            });
-            
-            child.on('error', (err) => {
-              console.error('Failed to start kuuzuki:', err.message);
-              process.exit(1);
-            });
-            
-            child.on('exit', code => process.exit(code || 0));
-            
-            // Handle signals
-            if (process.platform !== 'win32') {
-              process.on('SIGINT', () => child.kill('SIGINT'));
-              process.on('SIGTERM', () => child.kill('SIGTERM'));
-            } else {
-              process.on('SIGINT', () => child.kill());
-              process.on('SIGTERM', () => child.kill());
-            }
-          }
-          EOF
-          
-          chmod +x dist/npm/kuuzuki/bin/kuuzuki
-          
-          # Create Windows batch file
-          cat > dist/npm/kuuzuki/bin/kuuzuki.cmd << 'EOF'
-          @echo off
-          node "%~dp0\kuuzuki" %*
-          EOF
-          
-          # Create package.json for main package
-          cat > dist/npm/kuuzuki/package.json << EOF
-          {
-            "name": "kuuzuki",
-            "version": "${{ steps.extract_version.outputs.version }}",
-            "description": "AI-powered terminal assistant",
-            "keywords": ["ai", "terminal", "cli", "assistant", "claude"],
-            "homepage": "https://github.com/moikas-code/kuuzuki",
-            "repository": {
-              "type": "git",
-              "url": "git+https://github.com/moikas-code/kuuzuki.git"
-            },
-            "bugs": {
-              "url": "https://github.com/moikas-code/kuuzuki/issues"
-            },
-            "author": "Kuuzuki Team",
-            "license": "MIT",
-            "bin": {
-              "kuuzuki": "./bin/kuuzuki"
-            },
-            "engines": {
-              "node": ">=18.0.0"
-            },
-            "files": ["bin", "src"],
-            "optionalDependencies": {
-              "kuuzuki-linux-x64": "^${{ steps.extract_version.outputs.version }}",
-              "kuuzuki-linux-arm64": "^${{ steps.extract_version.outputs.version }}",
-              "kuuzuki-darwin-x64": "^${{ steps.extract_version.outputs.version }}",
-              "kuuzuki-darwin-arm64": "^${{ steps.extract_version.outputs.version }}",
-              "kuuzuki-windows-x64": "^${{ steps.extract_version.outputs.version }}"
-            },
-            "dependencies": $(cat package.json | jq .dependencies)
-          }
-          EOF
-          
-          echo "Main package created successfully!"
-      
-      # 11. Test packages
-      - name: Test built packages
-        run: |
-          cd packages/kuuzuki/dist/npm/kuuzuki
-          echo "Testing main package..."
-          node bin/kuuzuki --version || echo "Version command needs bun runtime"
-          
-          echo "Package contents:"
-          ls -la bin/
-          echo "Source files:"
-          ls -la src/ | head -20
-      
-      # 12. Publish platform packages
-      - name: Publish platform packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-        run: |
-          cd packages/kuuzuki
-          
-          platforms=(
-            "linux-x64"
-            "linux-arm64"
-            "darwin-x64"
-            "darwin-arm64"
-            "windows-x64"
-          )
-          
-          for platform in "${platforms[@]}"; do
-            echo "Publishing kuuzuki-$platform..."
-            cd "dist/npm/kuuzuki-$platform"
-            npm publish --access public || echo "Package may already exist"
-            cd ../../..
-          done
-      
-      # 13. Wait for platform packages to be available
-      - name: Wait for npm propagation
-        run: sleep 30
-      
-      # 14. Publish main package
-      - name: Publish main kuuzuki package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-        run: |
-          cd packages/kuuzuki/dist/npm/kuuzuki
-          npm publish --access public
-      
-      # 15. Create GitHub Release
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+      - name: Download all binaries
+        uses: actions/download-artifact@v4
         with:
+          path: artifacts
+      
+      - name: Organize binaries
+        run: |
+          # Create directories
+          mkdir -p packages/kuuzuki/dist/binaries
+          mkdir -p packages/kuuzuki/binaries
+          
+          # Move CLI binaries
+          for platform in linux-x64 linux-arm64 darwin-x64 darwin-arm64 windows-x64; do
+            if [ -d "artifacts/cli-binary-${platform}" ]; then
+              mkdir -p "packages/kuuzuki/dist/binaries/${platform}"
+              cp -r artifacts/cli-binary-${platform}/* "packages/kuuzuki/dist/binaries/${platform}/"
+            fi
+          done
+          
+          # Move TUI binaries
+          for platform in linux-x64 linux-arm64 darwin-x64 darwin-arm64 windows-x64; do
+            if [ -d "artifacts/tui-binary-${platform}" ]; then
+              cp artifacts/tui-binary-${platform}/* packages/kuuzuki/binaries/kuuzuki-tui-${platform}
+            fi
+          done
+      
+      - name: Build npm packages
+        working-directory: packages/kuuzuki
+        run: |
+          # Create all npm packages
+          bun scripts/build-npm-packages.ts
+      
+      - name: Publish packages
+        working-directory: packages/kuuzuki
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+        run: |
+          # Publish main package
+          cd dist/npm/kuuzuki
+          npm publish --access public
+          cd ../../..
+          
+          # Publish platform packages
+          for platform in linux-x64 linux-arm64 darwin-x64 darwin-arm64 windows-x64; do
+            if [ -d "dist/npm/kuuzuki-${platform}" ]; then
+              cd "dist/npm/kuuzuki-${platform}"
+              npm publish --access public
+              cd ../../..
+            fi
+          done
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            packages/kuuzuki/dist/npm/*/kuuzuki*.tgz
           generate_release_notes: true
-          body: |
-            ## Kuuzuki ${{ steps.extract_version.outputs.version }}
-            
-            ### Installation
-            ```bash
-            npm install -g kuuzuki
-            ```
-            
-            ### Platform Support
-            - ✅ Linux x64
-            - ✅ Linux ARM64
-            - ✅ macOS x64 (Intel)
-            - ✅ macOS ARM64 (Apple Silicon)
-            - ✅ Windows x64
-            
-            ### What's New
-            See generated release notes below for changes.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
