@@ -21,9 +21,9 @@ async function buildBinary(platform: typeof platforms[0]) {
   await mkdir(outDir, { recursive: true })
   
   try {
-    // Get version from package.json
+    // Get version from environment variable (for CI) or package.json
     const pkg = await Bun.file("package.json").json()
-    const version = pkg.version || "0.0.0"
+    const version = process.env.VERSION || pkg.version || "0.0.0"
     
     // Build the standalone binary with version
     await $`bun build --compile --target=${platform.target} --outfile=${outFile} --define KUUZUKI_VERSION="'${version}'" ./src/index.ts`
