@@ -5,12 +5,49 @@ import { UI } from "../ui"
 import { cmd } from "./cmd"
 import path from "path"
 import fs from "fs/promises"
+import { spawn } from "child_process"
+import { promisify } from "util"
 import { Installation } from "../../installation"
 import { Config } from "../../config/config"
 import { Bus } from "../../bus"
 import { Log } from "../../util/log"
 import { FileWatcher } from "../../file/watch"
 import { Mode } from "../../session/mode"
+
+// Helper function to replace Bun.spawn
+function spawnAsync(command: string, args: string[], options: any = {}) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(command, args, {
+      cwd: options.cwd || process.cwd(),
+      stdio: [
+        options.stdin || 'pipe',
+        options.stdout || 'pipe', 
+        options.stderr || 'pipe'
+      ],
+      env: { ...process.env, ...options.env }
+    })
+    
+    if (options.stdout === 'inherit' && options.stderr === 'inherit') {
+      proc.on('exit', (code) => resolve({ exited: code }))
+    } else {
+      let stdout = ''
+      let stderr = ''
+      
+      if (proc.stdout) proc.stdout.on('data', (data) => stdout += data)
+      if (proc.stderr) proc.stderr.on('data', (data) => stderr += data)
+      
+      proc.on('exit', (code) => {
+        resolve({ 
+          exited: code,
+          stdout: stdout,
+          stderr: stderr
+        })
+      })
+    }
+    
+    proc.on('error', reject)
+  })
+}
 
 export const TuiCommand = cmd({
   command: "tui [project]",
@@ -101,41 +138,62 @@ export const TuiCommand = cmd({
         let cmd: string[]
         let cwd: string = process.cwd()
 
-        // Check for pre-built binary first
-        const prebuiltBinary = path.join(__dirname, "../../../../tui/kuuzuki-tui")
-        if (await Bun.file(prebuiltBinary).exists()) {
-          cmd = [prebuiltBinary]
+        // Check for TUI binary in multiple locations
+        const tuiBinaryName = process.platform === "win32" ? "kuuzuki-tui.exe" : "kuuzuki-tui"
+        
+        // Potential TUI binary locations
+        const tuiLocations = [
+          // 1. Production npm package: TUI binary alongside main binary
+          path.join(path.dirname(process.execPath), tuiBinaryName),
+          // 2. Development: pre-built binary in tui directory
+          path.join(__dirname, "../../../../tui", tuiBinaryName),
+          // 3. Development: binary in project root binaries
+          path.join(__dirname, "../../../binaries", tuiBinaryName),
+        ]
+        
+        let tuiBinaryPath: string | null = null
+        for (const location of tuiLocations) {
+          try {
+            await fs.access(location, fs.constants.X_OK)
+            tuiBinaryPath = location
+            break
+          } catch {
+            // Continue checking other locations
+          }
+        }
+        
+        if (tuiBinaryPath) {
+          cmd = [tuiBinaryPath]
         } else {
           // Fallback to go run for development
           cmd = ["go", "run", "./main.go"]
-          cwd = Bun.fileURLToPath(new URL("../../../../tui/cmd/kuuzuki", import.meta.url))
+          
+          // Try to determine the correct cwd for Go source
+          let goCwd: string
+          if (typeof import.meta !== 'undefined' && import.meta.url) {
+            // ES module environment - use fileURLToPath from url module
+            const { fileURLToPath } = await import('url')
+            goCwd = path.join(path.dirname(fileURLToPath(import.meta.url)), "../../../../tui/cmd/kuuzuki")
+          } else {
+            // CommonJS or compiled binary fallback
+            goCwd = path.join(__dirname, "../../../../tui/cmd/kuuzuki")
+          }
+          cwd = goCwd
           
           // Check if the Go source exists
           const mainGoPath = path.join(cwd, "main.go")
           try {
             await fs.access(mainGoPath)
           } catch (e) {
-            UI.error(`TUI source not found at ${mainGoPath}`)
-            UI.error("Please ensure the TUI source code exists.")
+            UI.error(`TUI binary not found in any of these locations:`)
+            tuiLocations.forEach(loc => UI.error(`  - ${loc}`))
+            UI.error(`\nAlso tried Go source at: ${mainGoPath}`)
+            UI.error("\nPlease ensure kuuzuki is properly installed.")
             server.stop()
             return "done"
           }
         }
-        if (Bun.embeddedFiles.length > 0) {
-          const blob = Bun.embeddedFiles[0] as File
-          let binaryName = blob.name
-          if (process.platform === "win32" && !binaryName.endsWith(".exe")) {
-            binaryName += ".exe"
-          }
-          const binary = path.join(__dirname, "../../../binaries", binaryName)
-          const file = Bun.file(binary)
-          if (!(await file.exists())) {
-            await Bun.write(file, blob, { mode: 0o755 })
-            await fs.chmod(binary, 0o755)
-          }
-          cwd = process.cwd()
-          cmd = [binary]
-        }
+        // Note: Removed Bun.embeddedFiles handling as it's not used in npm distribution
         Log.Default.info("tui", {
           cmd,
           cwd,
@@ -148,13 +206,12 @@ export const TuiCommand = cmd({
           // In development mode, check if go is available
           if (cmd[0] === "go") {
             try {
-              const goVersion = await Bun.spawn({
-                cmd: ["go", "version"],
+              const result = await spawnAsync("go", ["version"], {
                 stdout: "pipe",
                 stderr: "pipe",
-              }).exited
+              }) as any
               
-              if (goVersion !== 0) {
+              if (result.exited !== 0) {
                 UI.error("Go is not installed or not in PATH. Please install Go to run in development mode.")
                 server.stop()
                 return "done"
@@ -176,62 +233,61 @@ export const TuiCommand = cmd({
           // For development mode with Go, capture stderr to debug issues
           const isGoRun = cmd[0] === "go"
           
-          proc = Bun.spawn({
-            cmd: [
-              ...cmd,
-              ...(args.model ? ["--model", args.model] : []),
-              ...(args.prompt ? ["--prompt", args.prompt] : []),
-              ...(args.mode ? ["--mode", args.mode] : []),
-            ],
-            cwd,
-            stdout: "inherit",
-            stderr: isGoRun ? "pipe" : "inherit",  // Capture stderr for go run
-            stdin: "inherit",
-            env: {
-              ...process.env,
-              CGO_ENABLED: "0",
-              KUUZUKI_SERVER: server.url.toString(),
-              KUUZUKI_APP_INFO: JSON.stringify(app),
-              KUUZUKI_MODES: JSON.stringify(await Mode.list()),
-            },
-            onExit: (proc, exitCode, signalCode, error) => {
-              Log.Default.info("TUI process exited", { exitCode, signalCode, error: error?.message })
-              if (error) {
-                Log.Default.error("TUI process error", { error: error.message })
+          // Prepare arguments
+          const tuiArgs = cmd.slice(1).concat([
+            ...(args.model ? ["--model", args.model] : []),
+            ...(args.prompt ? ["--prompt", args.prompt] : []),
+            ...(args.mode ? ["--mode", args.mode] : []),
+          ])
+          
+          proc = spawn(
+            cmd[0],
+            tuiArgs,
+            {
+              cwd,
+              stdio: ["inherit", "inherit", isGoRun ? "pipe" : "inherit"],
+              env: {
+                ...process.env,
+                CGO_ENABLED: "0",
+                KUUZUKI_SERVER: server.url.toString(),
+                KUUZUKI_APP_INFO: JSON.stringify(app),
+                KUUZUKI_MODES: JSON.stringify(await Mode.list()),
               }
-              if (exitCode !== 0 && exitCode !== null) {
-                Log.Default.error("TUI exited with error", { exitCode, signalCode })
-              }
-              server.stop()
-              // Force exit to prevent terminal lock
-              process.exit(exitCode || 0)
-            },
+            }
+          )
+          
+          proc.on('exit', (exitCode, signalCode) => {
+            Log.Default.info("TUI process exited", { exitCode, signalCode })
+            if (exitCode !== 0 && exitCode !== null) {
+              Log.Default.error("TUI exited with error", { exitCode, signalCode })
+            }
+            server.stop()
+            // Force exit to prevent terminal lock
+            process.exit(exitCode || 0)
+          })
+          
+          proc.on('error', (error) => {
+            Log.Default.error("TUI process error", { error: error.message })
+            server.stop()
+            process.exit(1)
           })
           
           // For go run, monitor stderr for compilation errors
           if (isGoRun && proc.stderr) {
-            const reader = proc.stderr.getReader()
-            const decoder = new TextDecoder()
             let errorBuffer = ""
             
-            ;(async () => {
-              try {
-                while (true) {
-                  const { done, value } = await reader.read()
-                  if (done) break
-                  const text = decoder.decode(value)
-                  errorBuffer += text
-                  // Print Go compilation errors immediately
-                  process.stderr.write(text)
-                }
-              } catch (e) {
-                // Reader closed
-              }
-              
+            proc.stderr.on('data', (data) => {
+              const text = data.toString()
+              errorBuffer += text
+              // Print Go compilation errors immediately
+              process.stderr.write(text)
+            })
+            
+            proc.stderr.on('end', () => {
               if (errorBuffer.length > 0) {
                 Log.Default.error("Go compilation errors", { errors: errorBuffer })
               }
-            })()
+            })
           }
           
           // Add a small delay to allow TUI to initialize and potentially fail fast
@@ -307,14 +363,13 @@ export const TuiCommand = cmd({
       if (result === "needs_provider") {
         UI.empty()
         UI.println(UI.logo("   "))
-        const result = await Bun.spawn({
-          cmd: [...getOpencodeCommand(), "auth", "login"],
+        const result = await spawnAsync(getOpencodeCommand()[0], [...getOpencodeCommand().slice(1), "auth", "login"], {
           cwd: process.cwd(),
           stdout: "inherit",
           stderr: "inherit",
           stdin: "inherit",
-        }).exited
-        if (result !== 0) return
+        }) as any
+        if (result.exited !== 0) return
         UI.empty()
       }
     }
