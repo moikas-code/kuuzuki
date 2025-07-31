@@ -119,6 +119,9 @@ async function buildPlatformPackage(platform: typeof platforms[0]) {
     repository: mainPkg.repository,
     bugs: mainPkg.bugs,
     homepage: mainPkg.homepage,
+    scripts: {
+      postinstall: "node ./postinstall.mjs"
+    },
     os: [platform.os === "darwin" ? "darwin" : platform.os === "windows" ? "win32" : platform.os],
     cpu: [platform.arch],
     bin: {
@@ -130,6 +133,9 @@ async function buildPlatformPackage(platform: typeof platforms[0]) {
     join(distDir, "package.json"),
     JSON.stringify(platformPkg, null, 2)
   )
+  
+  // Copy postinstall script
+  await copyFile("scripts/postinstall-platform.mjs", join(distDir, "postinstall.mjs"))
   
   // Copy README
   await copyFile("../../README.md", join(distDir, "README.md"))
