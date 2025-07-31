@@ -201,7 +201,7 @@ export const TuiCommand = cmd({
         Log.Default.info("tui", {
           cmd,
           cwd,
-          server: server.url.toString(),
+          server: serverUrl,
         })
         
         // Add error handling for TUI spawn
@@ -231,7 +231,7 @@ export const TuiCommand = cmd({
           Log.Default.info("Spawning TUI process", {
             cmd: cmd.join(" "),
             cwd,
-            server: server.url.toString()
+            server: serverUrl
           })
           
           // For development mode with Go, capture stderr to debug issues
@@ -253,7 +253,7 @@ export const TuiCommand = cmd({
               env: {
                 ...process.env,
                 CGO_ENABLED: "0",
-                KUUZUKI_SERVER: server.url.toString(),
+                KUUZUKI_SERVER: serverUrl,
                 KUUZUKI_APP_INFO: JSON.stringify(app),
                 KUUZUKI_MODES: JSON.stringify(await Mode.list()),
               }
