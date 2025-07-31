@@ -70,12 +70,9 @@ jobs:
         run: |
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#kuuzuki-v}"
+          export VERSION
           
-          bun build --compile \
-            --target=${{ matrix.platform.target }} \
-            --outfile=dist/binaries/${{ matrix.platform.name }}/kuuzuki${{ matrix.platform.name == 'windows-x64' && '.exe' || '' }} \
-            --define KUUZUKI_VERSION="'${VERSION}'" \
-            ./src/index.ts
+          bun run scripts/build-binary.ts --platform ${{ matrix.platform.name }}
         shell: bash
       
       - name: Upload CLI binary
