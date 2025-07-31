@@ -76,6 +76,7 @@ jobs:
             --outfile=dist/binaries/${{ matrix.platform.name }}/kuuzuki${{ matrix.platform.name == 'windows-x64' && '.exe' || '' }} \
             --define KUUZUKI_VERSION="'${VERSION}'" \
             ./src/index.ts
+        shell: bash
       
       - name: Upload CLI binary
         uses: actions/upload-artifact@v4
