@@ -382,7 +382,7 @@ export namespace Session {
   }
 
   export async function children(parentID: string) {
-    const result = [] as Session.Info[]
+    const result = [] as Info[]
     for (const item of await Storage.list("session/info")) {
       const sessionID = path.basename(item, ".json")
       const session = await get(sessionID)
@@ -793,7 +793,7 @@ export namespace Session {
       })
         .then((result) => {
           if (result.text)
-            return Session.update(input.sessionID, (draft) => {
+            return update(input.sessionID, (draft) => {
               draft.title = result.text
             })
         })
