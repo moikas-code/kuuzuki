@@ -28,7 +28,7 @@ function spawnAsync(command: string, args: string[], options: any = {}) {
     })
     
     if (options.stdout === 'inherit' && options.stderr === 'inherit') {
-      proc.on('exit', (code) => resolve({ exited: code }))
+      proc.on('exit', (code) => resolve({ exitCode: code }))
     } else {
       let stdout = ''
       let stderr = ''
@@ -158,11 +158,22 @@ export const TuiCommand = cmd({
         let tuiBinaryPath: string | null = null
         for (const location of tuiLocations) {
           try {
-            await fs.access(location, fs.constants.X_OK)
+            // First check if file exists
+            await fs.access(location, fs.constants.F_OK)
+            
+            // Try to access with execute permission
+            try {
+              await fs.access(location, fs.constants.X_OK)
+            } catch {
+              // File exists but not executable - fix permissions (Bun global install issue)
+              Log.Default.info("Fixing TUI binary permissions", { path: location })
+              await fs.chmod(location, 0o755)
+            }
+            
             tuiBinaryPath = location
             break
           } catch {
-            // Continue checking other locations
+            // File doesn't exist, continue checking other locations
           }
         }
         
@@ -215,7 +226,7 @@ export const TuiCommand = cmd({
                 stderr: "pipe",
               }) as any
               
-              if (result.exited !== 0) {
+              if (result.exitCode !== 0) {
                 UI.error("Go is not installed or not in PATH. Please install Go to run in development mode.")
                 server.stop()
                 return "done"
@@ -357,7 +368,10 @@ export const TuiCommand = cmd({
         process.on('SIGINT', cleanup)
         process.on('SIGTERM', cleanup)
         
-        await proc.exited
+        // Wait for process to exit
+        await new Promise((resolve) => {
+          proc.on('exit', resolve)
+        })
         
         // Remove signal handlers
         process.removeListener('SIGINT', cleanup)
@@ -382,7 +396,7 @@ export const TuiCommand = cmd({
           stderr: "inherit",
           stdin: "inherit",
         }) as any
-        if (result.exited !== 0) return
+        if (result.exitCode !== 0) return
         UI.empty()
       }
     }
