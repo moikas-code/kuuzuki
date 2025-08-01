@@ -5,7 +5,7 @@
         "args": ["serve"]
       },
       "weather": {
-        "command": "kuucode",
+        "command": "kuuzuki",
         "args": ["x", "@h1deya/mcp-server-weather"]
       },
       "sequential-thinking": {

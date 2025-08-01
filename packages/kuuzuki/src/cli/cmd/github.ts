@@ -394,11 +394,11 @@ export const GithubRunCommand = cmd({
         await assertPermissions()
 
         const comment = await createComment()
-        commentId = comment.data.id
+        commentId = comment.data.id!
 
         // Setup kuuzuki session
         const repoData = await fetchRepo()
-        session = await Session.create()
+        session = await Session.create() as { id: string; title: string; version: string }
         subscribeSessionEvents()
         shareId = await (async () => {
           if (share === false) return

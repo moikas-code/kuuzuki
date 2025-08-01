@@ -22,7 +22,7 @@ export function errorMiddleware() {
       // Format error for HTTP response
       const response = ErrorHandler.formatForHttp(kuuzukiError)
 
-      return c.json(response, { status: statusCode })
+      return c.json(response, statusCode as any)
     }
   }
 }
@@ -43,7 +43,7 @@ export function globalErrorHandler(err: Error, c: Context) {
   // Format error for HTTP response
   const response = ErrorHandler.formatForHttp(kuuzukiError)
 
-  return c.json(response, { status: statusCode })
+  return c.json(response, statusCode as any)
 }
 
 /**
@@ -77,7 +77,7 @@ export function validationErrorHandler(error: any, c: Context) {
     const statusCode = ErrorHandler.getHttpStatusCode(validationError)
     const response = ErrorHandler.formatForHttp(validationError)
 
-    return c.json(response, { status: statusCode })
+    return c.json(response, statusCode as any)
   }
 
   // Fall back to global error handler

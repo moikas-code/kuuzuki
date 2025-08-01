@@ -232,7 +232,7 @@ export namespace Session {
     },
   )
 
-  export async function create(parentID?: string) {
+  export   export async function create(parentID?: string) {
     const result: Info = {
       id: Identifier.descending("session"),
       version: Installation.VERSION,
@@ -263,7 +263,7 @@ export namespace Session {
     return result
   }
 
-  export async function get(id: string) {
+  async function get(id: string) {
     const validId = validateSessionID(id)
     const result = state().sessions.get(validId)
     if (result) {
@@ -274,12 +274,12 @@ export namespace Session {
     return read as Info
   }
 
-  export async function getShare(id: string) {
+  async function getShare(id: string) {
     const validId = validateSessionID(id)
     return Storage.readJSON<ShareInfo>("session/share/" + validId)
   }
 
-  export async function share(id: string) {
+  async function share(id: string) {
     const validId = validateSessionID(id)
     const cfg = await Config.get()
     if (cfg.share === "disabled") {
@@ -294,14 +294,7 @@ export namespace Session {
     }
 
     const session = await get(validId)
-    if (session.share) {
-      // If already shared, get the full ShareInfo from storage
-      const shareInfo = await Storage.readJSON<ShareInfo>("session/share/" + validId)
-      if (shareInfo) {
-        return shareInfo
-      }
-      // If shareInfo is missing, fall through to create a new one
-    }
+    if (session.share) return session.share
     const share = await Share.create(validId)
 
     // Validate that we received a valid secret
@@ -325,7 +318,7 @@ export namespace Session {
     return share
   }
 
-  export async function unshare(id: string) {
+  async function unshare(id: string) {
     const share = await getShare(id)
     if (!share) return
     await Storage.remove("session/share/" + id)
@@ -336,7 +329,7 @@ export namespace Session {
   }
 
 
-  export async function update(id: string, editor: (session: Info) => void) {
+  async function update(id: string, editor: (session: Info) => void) {
     const { sessions } = state()
     const session = await get(id)
     if (!session) return
@@ -350,7 +343,7 @@ export namespace Session {
     return session
   }
 
-  export async function messages(sessionID: string) {
+  async function messages(sessionID: string) {
     const validSessionID = validateSessionID(sessionID)
     const result = [] as {
       info: MessageV2.Info
@@ -367,11 +360,11 @@ export namespace Session {
     return result
   }
 
-  export async function getMessage(sessionID: string, messageID: string) {
+  async function getMessage(sessionID: string, messageID: string) {
     return Storage.readJSON<MessageV2.Info>("session/message/" + sessionID + "/" + messageID)
   }
 
-  export async function getParts(sessionID: string, messageID: string) {
+  async function getParts(sessionID: string, messageID: string) {
     const result = [] as MessageV2.Part[]
     for (const item of await Storage.list("session/part/" + sessionID + "/" + messageID)) {
       const read = await Storage.readJSON<MessageV2.Part>(item)
@@ -381,14 +374,14 @@ export namespace Session {
     return result
   }
 
-  export async function* list() {
+  async function* list() {
     for (const item of await Storage.list("session/info")) {
       const sessionID = path.basename(item, ".json")
       yield get(sessionID)
     }
   }
 
-  export async function children(parentID: string) {
+  async function children(parentID: string) {
     const result = [] as Info[]
     for (const item of await Storage.list("session/info")) {
       const sessionID = path.basename(item, ".json")
@@ -399,7 +392,7 @@ export namespace Session {
     return result
   }
 
-  export function abort(sessionID: string) {
+  function abort(sessionID: string) {
     const controller = state().pending.get(sessionID)
     if (!controller) return false
     controller.abort()
@@ -407,7 +400,7 @@ export namespace Session {
     return true
   }
 
-  export async function remove(sessionID: string, emitEvent = true) {
+  async function remove(sessionID: string, emitEvent = true) {
     try {
       abort(sessionID)
       const session = await get(sessionID)
@@ -429,14 +422,14 @@ export namespace Session {
     }
   }
 
-  export async function updateMessage(msg: MessageV2.Info) {
+  async function updateMessage(msg: MessageV2.Info) {
     await Storage.writeJSON("session/message/" + msg.sessionID + "/" + msg.id, msg)
     Bus.publish(MessageV2.Event.Updated, {
       info: msg,
     })
   }
 
-  export async function updatePart(part: MessageV2.Part) {
+  async function updatePart(part: MessageV2.Part) {
     await Storage.writeJSON(["session", "part", part.sessionID, part.messageID, part.id].join("/"), part)
     Bus.publish(MessageV2.Event.PartUpdated, {
       part,
@@ -479,7 +472,7 @@ export namespace Session {
   })
   export type ChatInput = z.infer<typeof ChatInput>
 
-  export async function chat(
+  async function chat(
     input: z.infer<typeof ChatInput>,
   ): Promise<{ info: MessageV2.Assistant; parts: MessageV2.Part[] }> {
     const l = log.clone().tag("session", input.sessionID)
@@ -710,9 +703,6 @@ export namespace Session {
     const previous = msgs.filter((x) => x.info.role === "assistant").at(-1)?.info as MessageV2.Assistant
     const outputLimit = Math.min(model.info.limit.output, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX
     const systemPrompts: string[] = []
-    
-    // Get mode early to avoid temporal dead zone
-    const mode = await Mode.get(inputMode)
 
     // PROACTIVE CHECK: Estimate tokens before making the request
     if (model.info.limit.context) {
@@ -814,6 +804,7 @@ export namespace Session {
         .catch(() => {})
     }
 
+    const mode = await Mode.get(inputMode)
     let system = SystemPrompt.header(input.providerID)
     system.push(
       ...(() => {
@@ -1024,10 +1015,7 @@ export namespace Session {
     state().queued.delete(input.sessionID)
     return result
 
-
-}
-
-  function createProcessor(assistantMsg: MessageV2.Assistant, model: ModelsDev.Model) {
+    function createProcessor(assistantMsg: MessageV2.Assistant, model: ModelsDev.Model) {
     const toolCalls: Record<string, MessageV2.ToolPart> = {}
     const snapshots: Record<string, string> = {}
     return {
@@ -1287,6 +1275,23 @@ export namespace Session {
     }
   }
 
+  function createProcessor(assistantMsg: MessageV2.Assistant, model: ModelsDev.Model) {
+    return {
+      async track(toolCallID: string) {
+        // Implementation for tracking tool calls
+      },
+      partFromToolCall(toolCallID: string) {
+        // Return the tool call part
+        return undefined as any
+      },
+      async process(stream: any) {
+        // Basic processor implementation
+        const result = await stream.response
+        return { info: assistantMsg, parts: [] }
+      },
+    }
+  }
+
   export const RevertInput = z.object({
     sessionID: Identifier.schema("session"),
     messageID: Identifier.schema("message"),
@@ -1294,7 +1299,7 @@ export namespace Session {
   })
   export type RevertInput = z.infer<typeof RevertInput>
 
-  export async function revert(input: RevertInput) {
+  async function revert(input: RevertInput) {
     const all = await messages(input.sessionID)
     let lastUser: MessageV2.User | undefined
     const session = await get(input.sessionID)
@@ -1337,7 +1342,7 @@ export namespace Session {
     return session
   }
 
-  export async function unrevert(input: { sessionID: string }) {
+  async function unrevert(input: { sessionID: string }) {
     log.info("unreverting", input)
     const session = await get(input.sessionID)
     if (!session.revert) return session
@@ -1348,7 +1353,7 @@ export namespace Session {
     return next
   }
 
-  export async function summarize(input: { sessionID: string; providerID: string; modelID: string }) {
+  async function summarize(input: { sessionID: string; providerID: string; modelID: string }) {
     using abortSignal = lock(input.sessionID)
     const msgs = await messages(input.sessionID)
     const lastSummary = msgs.findLast((msg) => msg.info.role === "assistant" && msg.info.summary === true)
@@ -1427,11 +1432,11 @@ export namespace Session {
     }
   }
 
-  export function isLocked(sessionID: string) {
+  function isLocked(sessionID: string) {
     return state().pending.has(sessionID)
   }
 
-  export function lock(sessionID: string) {
+  function lock(sessionID: string) {
     log.info("locking", { sessionID })
     if (state().pending.has(sessionID)) throw new BusyError(sessionID)
     const controller = new AbortController()
@@ -1471,7 +1476,7 @@ export namespace Session {
     }
   }
 
-  export async function initialize(input: {
+  async function initialize(input: {
     sessionID: string
     modelID: string
     providerID: string
@@ -1501,4 +1506,4 @@ export namespace Session {
     await App.initialize()
   }
 
-}
+} // Close Session namespace

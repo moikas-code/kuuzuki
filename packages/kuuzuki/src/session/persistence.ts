@@ -266,7 +266,7 @@ export namespace SessionPersistence {
     const hasMore = offset + limit < total
 
     return {
-      messages: paginatedMessages,
+      messages: paginatedMessages as Array<{ info: MessageV2.Info; parts: MessageV2.Part[] }>,
       total,
       hasMore,
     }

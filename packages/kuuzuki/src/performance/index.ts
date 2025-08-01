@@ -3,9 +3,15 @@ export { Cache } from "./cache"
 export { Monitor } from "./monitor"
 
 // Re-export commonly used types
-export type { PerformanceMetric, MonitorStats, BottleneckInfo, PerformanceAlert, ResourceUsage } from "./monitor"
+// Re-export types from Monitor namespace
+export type PerformanceMetric = import("./monitor").Monitor.PerformanceMetric
+export type MonitorStats = import("./monitor").Monitor.MonitorStats
+export type BottleneckInfo = import("./monitor").Monitor.BottleneckInfo
+export type PerformanceAlert = import("./monitor").Monitor.PerformanceAlert
+export type ResourceUsage = import("./monitor").Monitor.ResourceUsage
 
-export type { CacheStats } from "./cache"
+// Re-export types from Cache namespace
+export type CacheStats = import("./cache").Cache.CacheStats
 
 // Performance utilities namespace
 export namespace Performance {

@@ -1,5 +1,6 @@
 import { Log } from "../util/log"
 import { Bus } from "../bus"
+import { z } from "zod"
 import {
   KuuzukiError,
   ErrorSeverity,
@@ -17,6 +18,12 @@ import {
   isKuuzukiError,
 } from "./types"
 import type { ErrorContext } from "./types"
+
+// Define error event for the bus
+const ErrorOccurredEvent = Bus.event("error.occurred", z.object({
+  error: z.record(z.any()),
+  timestamp: z.number(),
+}))
 
 export interface ErrorRecoveryStrategy {
   canRecover: boolean
@@ -392,12 +399,9 @@ export class ErrorHandler {
    * Emit error event through the bus
    */
   private static emitErrorEvent(error: KuuzukiError) {
-    Bus.publish({
-      type: "error.occurred",
-      properties: {
-        error: error.toJSON(),
-        timestamp: Date.now(),
-      },
+    Bus.publish(ErrorOccurredEvent, {
+      error: error.toJSON(),
+      timestamp: Date.now(),
     })
   }
 

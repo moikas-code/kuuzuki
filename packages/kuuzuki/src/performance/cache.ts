@@ -271,7 +271,7 @@ export namespace Cache {
 
       // Compress large responses if enabled
       if (config.response.compressionEnabled && size > 1024) {
-        finalValue = compressValue(value)
+        finalValue = compressValue(value) as T
         const compressedSize = estimateSize(finalValue)
         if (compressedSize < size * 0.8) {
           // Only use compression if it saves at least 20%

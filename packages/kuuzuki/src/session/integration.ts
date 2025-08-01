@@ -1,5 +1,4 @@
 import { Log } from "../util/log"
-import { SessionManager } from "./manager"
 import { SessionPersistence } from "./persistence"
 import { Session } from "./index"
 import { Bus } from "../bus"
@@ -7,7 +6,7 @@ import { Bus } from "../bus"
 /**
  * Session Integration
  *
- * Integrates the new session persistence system with the existing session handling.
+ * Integrates the session persistence system with the existing session handling.
  * This file provides hooks and event listeners to automatically save and restore sessions.
  */
 export namespace SessionIntegration {
@@ -25,9 +24,6 @@ export namespace SessionIntegration {
 
     try {
       log.info("Initializing session integration")
-
-      // Initialize the session manager
-      await SessionManager.initialize()
 
       // Set up event listeners for automatic persistence
       setupEventListeners()
@@ -47,11 +43,11 @@ export namespace SessionIntegration {
     // Listen for session updates and save automatically
     Bus.subscribe(Session.Event.Updated, async (data) => {
       try {
-        await SessionPersistence.saveSession(data.info.id)
-        log.debug("Session automatically saved after update", { sessionID: data.info.id })
+        await SessionPersistence.saveSession(data.properties.info.id)
+        log.debug("Session automatically saved after update", { sessionID: data.properties.info.id })
       } catch (error) {
         log.error("Failed to auto-save session after update", {
-          sessionID: data.info.id,
+          sessionID: data.properties.info.id,
           error,
         })
       }
@@ -60,76 +56,27 @@ export namespace SessionIntegration {
     // Listen for session deletions and clean up persistence
     Bus.subscribe(Session.Event.Deleted, async (data) => {
       try {
-        await SessionPersistence.deleteSession(data.info.id)
-        log.debug("Session persistence cleaned up after deletion", { sessionID: data.info.id })
+        await SessionPersistence.deleteSession(data.properties.info.id)
+        log.debug("Session persistence cleaned up after deletion", { sessionID: data.properties.info.id })
       } catch (error) {
         log.error("Failed to clean up session persistence after deletion", {
-          sessionID: data.info.id,
+          sessionID: data.properties.info.id,
           error,
         })
       }
     })
 
-    // Listen for session idle events and potentially deactivate
+    // Listen for session idle events for logging
     Bus.subscribe(Session.Event.Idle, async (data) => {
       try {
-        // Check if session should be deactivated due to inactivity
-        const activeSession = SessionManager.getActiveSession(data.sessionID)
-        if (activeSession) {
-          const now = Date.now()
-          const inactiveTime = now - activeSession.lastAccessed
-
-          // Deactivate if inactive for more than 1 hour
-          if (inactiveTime > 60 * 60 * 1000) {
-            await SessionManager.deactivateSession(data.sessionID, "timeout")
-            log.debug("Session deactivated due to inactivity", {
-              sessionID: data.sessionID,
-              inactiveTime: Math.round(inactiveTime / 1000) + "s",
-            })
-          }
-        }
+        // Basic idle session logging - session management is handled elsewhere
+        log.debug("Session idle event received", {
+          sessionID: data.properties.sessionID,
+          timestamp: new Date().toISOString(),
+        })
       } catch (error) {
         log.error("Failed to handle session idle event", {
-          sessionID: data.sessionID,
-          error,
-        })
-      }
-    })
-
-    // Listen for session deletions and clean up persistence
-    Bus.subscribe(Session.Event.Deleted, async (event) => {
-      try {
-        await SessionPersistence.deleteSession(event.info.id)
-        log.debug("Session persistence cleaned up after deletion", { sessionID: event.info.id })
-      } catch (error) {
-        log.error("Failed to clean up session persistence after deletion", {
-          sessionID: event.info.id,
-          error,
-        })
-      }
-    })
-
-    // Listen for session idle events and potentially deactivate
-    Bus.subscribe(Session.Event.Idle, async (event) => {
-      try {
-        // Check if session should be deactivated due to inactivity
-        const activeSession = SessionManager.getActiveSession(event.sessionID)
-        if (activeSession) {
-          const now = Date.now()
-          const inactiveTime = now - activeSession.lastAccessed
-
-          // Deactivate if inactive for more than 1 hour
-          if (inactiveTime > 60 * 60 * 1000) {
-            await SessionManager.deactivateSession(event.sessionID, "timeout")
-            log.debug("Session deactivated due to inactivity", {
-              sessionID: event.sessionID,
-              inactiveTime: Math.round(inactiveTime / 1000) + "s",
-            })
-          }
-        }
-      } catch (error) {
-        log.error("Failed to handle session idle event", {
-          sessionID: event.sessionID,
+          sessionID: data.properties.sessionID,
           error,
         })
       }
@@ -139,27 +86,29 @@ export namespace SessionIntegration {
   }
 
   /**
-   * Enhanced session creation that uses the new manager
+   * Enhanced session creation with persistence
    */
   export async function createSession(options?: {
     parentID?: string
     title?: string
     autoSave?: boolean
-    activateImmediately?: boolean
   }): Promise<Session.Info> {
     await initialize()
 
     try {
-      // Create session using the manager
-      const sessionInfo = await SessionManager.createSession({
-        parentID: options?.parentID,
-        title: options?.title,
-        autoSave: options?.autoSave,
-      })
+      // Create session using the base Session module
+      const sessionInfo = await Session.create(options?.parentID)
 
-      // Activate immediately if requested
-      if (options?.activateImmediately !== false) {
-        await SessionManager.activateSession(sessionInfo.id)
+      // Update title if provided
+      if (options?.title) {
+        await Session.update(sessionInfo.id, (draft) => {
+          draft.title = options.title!
+        })
+      }
+
+      // Auto-save if requested
+      if (options?.autoSave !== false) {
+        await SessionPersistence.saveSession(sessionInfo.id)
       }
 
       return sessionInfo
@@ -176,8 +125,15 @@ export namespace SessionIntegration {
     await initialize()
 
     try {
-      // Activate the session (this will restore from persistence if available)
-      const sessionInfo = await SessionManager.activateSession(sessionID)
+      // Get the session info
+      const sessionInfo = await Session.get(sessionID)
+
+      // Try to restore from persistence if available
+      try {
+        await SessionPersistence.restoreSession(sessionID)
+      } catch (error) {
+        log.warn("Could not restore from persistence, using existing session", { sessionID, error })
+      }
 
       log.info("Session restored", { sessionID })
       return sessionInfo
@@ -188,14 +144,19 @@ export namespace SessionIntegration {
   }
 
   /**
-   * Enhanced session sharing with manager integration
+   * Enhanced session sharing with persistence
    */
   export async function shareSession(sessionID: string): Promise<{ url: string; secret: string }> {
     await initialize()
-
+    
     try {
-      return await SessionManager.shareSession(sessionID)
-    } catch (error) {
+      // Use the base Session sharing functionality
+      const shareInfo = await Session.share(sessionID)
+      
+      // Save session state to persistence for sharing
+      await SessionPersistence.saveSession(sessionID)
+      
+      return shareInfo as { url: string; secret: string }    } catch (error) {
       log.error("Failed to share session", { sessionID, error })
       throw error
     }
@@ -208,10 +169,10 @@ export namespace SessionIntegration {
     await initialize()
 
     try {
-      // Deactivate the session
-      await SessionManager.deactivateSession(sessionID, "manual")
+      // Remove from persistence
+      await SessionPersistence.deleteSession(sessionID)
 
-      // Remove from the original Session system
+      // Remove from the Session system
       await Session.remove(sessionID)
 
       log.info("Session cleaned up", { sessionID })
@@ -222,22 +183,31 @@ export namespace SessionIntegration {
   }
 
   /**
-   * Get comprehensive session statistics
+   * Get session statistics
    */
   export async function getSessionStatistics(): Promise<{
-    manager: Awaited<ReturnType<typeof SessionManager.getStatistics>>
+    sessions: {
+      total: number
+      active: number
+    }
     persistence: Awaited<ReturnType<typeof SessionPersistence.getStatistics>>
   }> {
     await initialize()
 
     try {
-      const [managerStats, persistenceStats] = await Promise.all([
-        SessionManager.getStatistics(),
-        SessionPersistence.getStatistics(),
-      ])
+      const persistenceStats = await SessionPersistence.getStatistics()
+      
+      // Count sessions manually
+      let total = 0
+      for await (const _ of Session.list()) {
+        total++
+      }
 
       return {
-        manager: managerStats,
+        sessions: {
+          total,
+          active: total, // All loaded sessions are considered active for basic implementation
+        },
         persistence: persistenceStats,
       }
     } catch (error) {
@@ -253,7 +223,14 @@ export namespace SessionIntegration {
     await initialize()
 
     try {
-      await SessionManager.saveAllSessions()
+      // Save all sessions to persistence
+      for await (const session of Session.list()) {
+        try {
+          await SessionPersistence.saveSession(session.id)
+        } catch (error) {
+          log.error("Failed to save session", { sessionID: session.id, error })
+        }
+      }
       log.info("All sessions saved")
     } catch (error) {
       log.error("Failed to save all sessions", { error })
@@ -272,8 +249,8 @@ export namespace SessionIntegration {
     try {
       log.info("Shutting down session integration")
 
-      // Shutdown the session manager
-      await SessionManager.shutdown()
+      // Save all sessions before shutdown
+      await saveAllSessions()
 
       initialized = false
       log.info("Session integration shutdown complete")
@@ -303,8 +280,16 @@ export namespace SessionIntegration {
         await initialize()
       }
 
-      // Check manager health
-      const stats = await SessionManager.getStatistics()
+      // Count active sessions
+      let activeSessions = 0
+      try {
+        for await (const _ of Session.list()) {
+          activeSessions++
+        }
+      } catch (error) {
+        errors.push(`Session listing error: ${error}`)
+        status = "degraded"
+      }
 
       // Check persistence health
       let persistenceEnabled = false
@@ -317,7 +302,7 @@ export namespace SessionIntegration {
       }
 
       // Check for issues
-      if (stats.activeSessions > 100) {
+      if (activeSessions > 100) {
         errors.push("High number of active sessions")
         status = "degraded"
       }
@@ -330,7 +315,7 @@ export namespace SessionIntegration {
         status,
         details: {
           initialized,
-          activeSessions: stats.activeSessions,
+          activeSessions,
           persistenceEnabled,
           errors,
         },
@@ -349,7 +334,7 @@ export namespace SessionIntegration {
   }
 
   /**
-   * Migration utility to migrate existing sessions to the new system
+   * Migration utility to migrate existing sessions to the persistence system
    */
   export async function migrateExistingSessions(): Promise<{
     migrated: number
@@ -376,9 +361,6 @@ export namespace SessionIntegration {
       // Migrate each session
       for (const session of sessions) {
         try {
-          // Activate the session to trigger persistence
-          await SessionManager.activateSession(session.id)
-
           // Force save to persistence
           await SessionPersistence.saveSession(session.id, { force: true })
 

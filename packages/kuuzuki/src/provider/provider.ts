@@ -239,7 +239,17 @@ export namespace Provider {
 
     const configProviders = Object.entries(config.provider ?? {})
 
-    for (const [providerID, provider] of configProviders) {
+    for (const [providerID, providerConfig] of configProviders) {
+      // Type assertion to ensure providerConfig conforms to expected provider config structure
+      const provider = providerConfig as {
+        npm?: string
+        name?: string
+        env?: string[]
+        api?: string
+        models?: Record<string, any>
+        options?: Record<string, any>
+      }
+      
       const existing = database[providerID]
       const parsed: ModelsDev.Provider = {
         id: providerID,
@@ -250,7 +260,27 @@ export namespace Provider {
         models: existing?.models ?? {},
       }
 
-      for (const [modelID, model] of Object.entries(provider.models ?? {})) {
+      for (const [modelID, modelConfig] of Object.entries(provider.models ?? {})) {
+        // Type assertion for model config
+        const model = modelConfig as {
+          name?: string
+          release_date?: string
+          attachment?: boolean
+          reasoning?: boolean
+          temperature?: boolean
+          tool_call?: boolean
+          cost?: {
+            input?: number
+            output?: number
+            cache_read?: number
+            cache_write?: number
+          }
+          options?: Record<string, any>
+          limit?: {
+            context?: number
+            output?: number
+          }
+        }
         const existing = parsed.models[modelID]
         const parsedModel: ModelsDev.Model = {
           id: modelID,
@@ -289,7 +319,7 @@ export namespace Provider {
       database[providerID] = parsed
     }
 
-    const cfg = Config.get()
+    const cfg = await Config.get()
     const disabled = new Set(cfg.disabled_providers ?? [])
     // load env
     for (const [providerID, provider] of Object.entries(database)) {
@@ -305,10 +335,15 @@ export namespace Provider {
     }
 
     // load apikeys
-    for (const [providerID, provider] of Object.entries(await Auth.all())) {
+    for (const [providerID, authProvider] of Object.entries(await Auth.all())) {
       if (disabled.has(providerID)) continue
+      // Type assertion for auth provider structure
+      const provider = authProvider as {
+        type: string
+        key?: string
+      }
       if (provider.type === "api") {
-        mergeProvider(providerID, { apiKey: provider.key }, "api")
+        mergeProvider(providerID, { apiKey: provider.key! }, "api")
       }
     }
 
@@ -322,7 +357,11 @@ export namespace Provider {
     }
 
     // load config
-    for (const [providerID, provider] of configProviders) {
+    for (const [providerID, providerConfig] of configProviders) {
+      // Type assertion for provider config structure
+      const provider = providerConfig as {
+        options?: Record<string, any>
+      }
       mergeProvider(providerID, provider.options ?? {}, "config")
     }
 
