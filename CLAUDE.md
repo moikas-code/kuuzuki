@@ -33,6 +33,7 @@ Kuuzuki is a community-driven fork of OpenCode, focused on providing an npm-inst
 
 - **NPM Distribution**: Install globally with `npm install -g kuuzuki`
 - **AI Integration**: Built-in Claude support via API keys
+- **Enhanced Context Management**: Improved context handling with proactive summarization at 85% threshold, better token estimation (3.5 chars/token), and dual-layer protection (see [Context Handling Documentation](docs/CONTEXT_HANDLING.md))
 - **Multiple Modes**: TUI, CLI commands, and server mode
 - **Community Focus**: Open to contributions and enhancements
 - **Cross-Platform**: Works on macOS, Linux, and Windows
