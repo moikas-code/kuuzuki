@@ -303,91 +303,54 @@
   "mcp": {
     "servers": {
       "moidvk": {
-        "description": "Development tools and code analysis server",
-        "command": "moidvk",
-        "args": ["serve"],
-        "tools": [
-          "check_code_practices",
-          "rust_code_practices",
-          "python_code_analyzer",
-          "format_code",
-          "rust_formatter",
-          "python_formatter",
-          "scan_security_vulnerabilities",
-          "check_safety_rules",
-          "rust_safety_checker",
-          "python_security_scanner",
-          "check_production_readiness",
-          "rust_production_readiness",
-          "rust_performance_analyzer",
-          "python_test_analyzer",
-          "check_accessibility",
-          "check_graphql_schema",
-          "check_graphql_query",
-          "check_redux_patterns",
-          "intelligent_development_analysis",
-          "semantic_development_search",
-          "development_session_manager",
-          "js_test_analyzer",
-          "bundle_size_analyzer",
-          "container_security_scanner",
-          "documentation_quality_checker",
-          "openapi_rest_validator",
-          "js_performance_analyzer",
-          "python_performance_analyzer",
-          "cicd_configuration_analyzer",
-          "license_compliance_scanner",
-          "environment_config_validator"
-        ]
-      },
-      "kb-mcp": {
-        "description": "Knowledge base and documentation management",
-        "command": "kb",
-        "args": ["serve", "--local"],
-        "tools": [
-          "kb_read",
-          "kb_update",
-          "kb_search",
-          "kb_semantic_search",
-          "kb_graph_query",
-          "kb_status",
-          "kb_issues"
-        ]
-      },
-      "sequential-thinking": {
-        "description": "Complex problem solving and analysis",
-        "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
-        "tools": [
-          "sequential_thinking"
-        ]
+        "transport": "stdio",
+        "command": ["moidvk", "serve"],
+        "enabled": true,
+        "notes": "Development tools and code analysis server"
       },
       "weather": {
-        "description": "Weather information server",
-        "command": "kuucode",
-        "args": ["x", "@h1deya/mcp-server-weather"]
+        "transport": "stdio", 
+        "command": ["kuuzuki", "x", "@h1deya/mcp-server-weather"],
+        "enabled": true,
+        "notes": "Weather information server"
+      },
+      "sequential-thinking": {
+        "transport": "stdio",
+        "command": ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"],
+        "enabled": true,
+        "notes": "Complex problem solving and analysis"
+      },
+      "kb-mcp": {
+        "transport": "stdio",
+        "command": ["kb", "serve", "--local"],
+        "enabled": true,
+        "notes": "Knowledge base and documentation management"
       },
       "fork-parity": {
-        "description": "Fork parity tracking",
-        "command": "fork-parity-mcp",
+        "transport": "stdio",
+        "command": ["fork-parity-mcp"],
         "env": {
           "UPSTREAM_REMOTE_NAME": "upstream",
-          "UPSTREAM_BRANCH": "dev",
+          "UPSTREAM_BRANCH": "dev", 
           "LOCAL_BRANCH": "master"
-        }
+        },
+        "enabled": true,
+        "notes": "Fork parity tracking"
       },
       "image-analysis": {
-        "description": "Image analysis server",
-        "command": "mcp-image-server",
-        "args": ["serve"],
+        "transport": "stdio",
+        "command": ["mcp-image-server", "serve"],
         "env": {
           "NODE_ENV": "production"
-        }
+        },
+        "enabled": true,
+        "notes": "Image analysis server"
       },
       "svg-generator": {
-        "description": "SVG generation server",
-        "command": "mcp-svg-server",
-        "args": ["serve"]
+        "transport": "stdio",
+        "command": ["mcp-svg-server", "serve"],
+        "enabled": true,
+        "notes": "SVG generation server"
       }
     },
     "workflow": [
