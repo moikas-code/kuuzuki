@@ -55,7 +55,7 @@ kuuzuki --version
 - **Simplified Deployment**: Streamlined for terminal/CLI usage
 - **Community Plugins**: (Coming soon) Extended functionality through plugins
 - **Cross-Platform**: Works on macOS, Linux, and Windows
-- **Hybrid Context Management**: (v0.1.0) Intelligent conversation compression for 50-70% more context
+- **Enhanced Context Management**: (v0.1.7+) Proactive context handling with 85% threshold, improved token estimation, and dual-layer protection - see [Context Documentation](docs/CONTEXT_HANDLING.md)
 
 ## 🛠️ Development
 

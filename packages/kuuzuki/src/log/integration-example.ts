@@ -126,22 +126,21 @@ export namespace ToolLogging {
     })
   }
 
-  export function logToolExecution<T>(toolName: string, args: any, executor: () => Promise<T>): Promise<T> {
+  export async function logToolExecution<T>(toolName: string, args: any, executor: () => Promise<T>): Promise<T> {
     const logger = createToolLogger(toolName)
+    const timer = logger.time(`Tool ${toolName} execution`, { args })
 
-    return logger.time(`Tool ${toolName} execution`, { args }).then(async (timer) => {
-      try {
-        logger.debug("Tool execution started", { args })
-        const result = await executor()
-        logger.info("Tool execution completed successfully")
-        return result
-      } catch (error) {
-        logger.error("Tool execution failed", error as Error, { args })
-        throw error
-      } finally {
-        timer.stop()
-      }
-    })
+    try {
+      logger.debug("Tool execution started", { args })
+      const result = await executor()
+      logger.info("Tool execution completed successfully")
+      return result
+    } catch (error) {
+      logger.error("Tool execution failed", error as Error, { args })
+      throw error
+    } finally {
+      timer.stop()
+    }
   }
 }
 

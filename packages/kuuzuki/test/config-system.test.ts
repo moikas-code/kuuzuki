@@ -66,7 +66,6 @@ describe("Configuration System", () => {
         },
         experimental: {
           features: {
-            hybridContext: true,
           },
         },
       }
@@ -78,7 +77,6 @@ describe("Configuration System", () => {
       expect(validated.provider?.["anthropic"]?.enabled).toBe(true)
       expect(validated.mcp?.["test-server"]?.type).toBe("local")
       expect(validated.keybinds?.leader).toBe("ctrl+space")
-      expect(validated.experimental?.features?.hybridContext).toBe(true)
     })
 
     test("should parse environment variables", () => {

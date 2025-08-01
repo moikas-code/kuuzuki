@@ -50,6 +50,15 @@ export namespace Server {
 
     const result = app
       .onError((err, c) => {
+        // Enhanced error logging for debugging
+        log.error("Request error", {
+          error: err,
+          path: c.req.path,
+          method: c.req.method,
+          errorMessage: err.message,
+          errorStack: err.stack,
+        })
+        
         if (err instanceof NamedError) {
           return c.json(err.toObject(), {
             status: 400,
@@ -291,7 +300,12 @@ export namespace Server {
         async (c) => {
           const sessionID = c.req.valid("param").id
           const body = c.req.valid("json")
-          await Session.initialize({ ...body, sessionID })
+          await Session.initialize({ 
+            sessionID,
+            messageID: body.messageID,
+            providerID: body.providerID,
+            modelID: body.modelID
+          })
           return c.json(true)
         },
       )
@@ -407,7 +421,11 @@ export namespace Server {
         async (c) => {
           const id = c.req.valid("param").id
           const body = c.req.valid("json")
-          await Session.summarize({ ...body, sessionID: id })
+          await Session.summarize({ 
+            sessionID: id,
+            providerID: body.providerID,
+            modelID: body.modelID
+          })
           return c.json(true)
         },
       )
@@ -459,6 +477,26 @@ export namespace Server {
             },
           },
         }),
+        // Add raw body logging middleware
+        async (c, next) => {
+          try {
+            const rawBody = await c.req.text()
+            log.info("Raw chat request body", {
+              path: c.req.path,
+              rawBody,
+              contentType: c.req.header("content-type"),
+            })
+            // Restore body for subsequent middleware
+            c.req.raw = new Request(c.req.raw.url, {
+              ...c.req.raw,
+              body: rawBody,
+              headers: c.req.raw.headers,
+            })
+          } catch (e) {
+            log.error("Failed to log raw body", { error: e })
+          }
+          await next()
+        },
         zValidator(
           "param",
           z.object({
@@ -469,6 +507,16 @@ export namespace Server {
         async (c) => {
           const sessionID = c.req.valid("param").id
           const body = c.req.valid("json")
+          
+          // Debug logging for chat request
+          log.info("Chat request received", {
+            sessionID,
+            body: JSON.stringify(body),
+            bodyKeys: Object.keys(body),
+            partsCount: body.parts?.length,
+            firstPartType: body.parts?.[0]?.type,
+          })
+          
           const msg = await Session.chat({ ...body, sessionID })
           return c.json(msg)
         },
@@ -769,8 +817,10 @@ export namespace Server {
           },
         }),
         async (c) => {
-          const modes = await Mode.list()
-          return c.json(modes)
+          return App.provide({ cwd: process.cwd() }, async () => {
+            const modes = await Mode.list()
+            return c.json(modes)
+          })
         },
       )
       .post(

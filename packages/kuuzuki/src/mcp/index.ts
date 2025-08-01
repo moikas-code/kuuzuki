@@ -27,7 +27,17 @@ export namespace MCP {
       const clients: {
         [name: string]: Awaited<ReturnType<typeof experimental_createMCPClient>>
       } = {}
-      for (const [key, mcp] of Object.entries(cfg.mcp ?? {})) {
+      for (const [key, mcpConfig] of Object.entries(cfg.mcp ?? {})) {
+        // Type assertion to ensure mcpConfig conforms to expected MCP config structure
+        const mcp = mcpConfig as {
+          enabled?: boolean
+          type: "remote" | "local"
+          url?: string
+          headers?: Record<string, string>
+          command?: string[]
+          environment?: Record<string, string>
+        }
+        
         if (mcp.enabled === false) {
           log.info("mcp server disabled", { key })
           continue
@@ -35,12 +45,12 @@ export namespace MCP {
         log.info("found", { key, type: mcp.type })
         if (mcp.type === "remote") {
           const transports = [
-            new StreamableHTTPClientTransport(new URL(mcp.url), {
+            new StreamableHTTPClientTransport(new URL(mcp.url!), {
               requestInit: {
                 headers: mcp.headers,
               },
             }),
-            new SSEClientTransport(new URL(mcp.url), {
+            new SSEClientTransport(new URL(mcp.url!), {
               requestInit: {
                 headers: mcp.headers,
               },
@@ -67,7 +77,7 @@ export namespace MCP {
         }
 
         if (mcp.type === "local") {
-          const [cmd, ...args] = mcp.command
+          const [cmd, ...args] = mcp.command!
           const client = await experimental_createMCPClient({
             name: key,
             transport: new StdioClientTransport({

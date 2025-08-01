@@ -32,7 +32,6 @@ type State struct {
 	MessagesRight        bool                 `toml:"messages_right"`
 	SplitDiff            bool                 `toml:"split_diff"`
 	MessageHistory       []Prompt             `toml:"message_history"`
-	HybridContextEnabled bool                 `toml:"hybrid_context_enabled"`
 }
 
 func NewState() *State {
@@ -42,7 +41,6 @@ func NewState() *State {
 		ModeModel:            make(map[string]ModeModel),
 		RecentlyUsedModels:   make([]ModelUsage, 0),
 		MessageHistory:       make([]Prompt, 0),
-		HybridContextEnabled: true, // Default to enabled
 	}
 }
 

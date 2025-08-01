@@ -301,7 +301,6 @@ export namespace ConfigSchema {
         .describe("Event hook configurations"),
       features: z
         .object({
-          hybridContext: z.boolean().default(false).describe("Enable hybrid context management"),
           taskAwareCompression: z.boolean().default(false).describe("Enable task-aware compression"),
           semanticSearch: z.boolean().default(false).describe("Enable semantic search capabilities"),
           advancedGitIntegration: z.boolean().default(false).describe("Enable advanced git integration"),

@@ -71,3 +71,4 @@ app.log
 .claude-daemon-state.json
 organize-root.sh
 cleanup-root.sh
+dist-tsc/

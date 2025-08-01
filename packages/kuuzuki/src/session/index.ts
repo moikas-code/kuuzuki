@@ -44,17 +44,12 @@ import { LSP } from "../lsp"
 import { ReadTool } from "../tool/read"
 import { mergeDeep, pipe, splitWhen } from "remeda"
 import { ToolRegistry } from "../tool/registry"
-import { HybridContextManager } from "./hybrid-context-manager"
-import { HybridContext } from "./hybrid-context"
-import { HybridContextConfig } from "./hybrid-context-config"
+import { validateSessionID, validateMessageID } from "../util/id-validation"
 
 export namespace Session {
   const log = Log.create({ service: "session" })
 
   const OUTPUT_TOKEN_MAX = 32_000
-
-  // Feature flag for hybrid context management
-  const HYBRID_CONTEXT_ENABLED = HybridContextConfig.isEnabled()
 
   // Message validation utility to prevent empty message arrays
   function validateMessages(messages: ModelMessage[], context: string, sessionID?: string): ModelMessage[] {
@@ -269,20 +264,23 @@ export namespace Session {
   }
 
   export async function get(id: string) {
-    const result = state().sessions.get(id)
+    const validId = validateSessionID(id)
+    const result = state().sessions.get(validId)
     if (result) {
       return result
     }
-    const read = await Storage.readJSON<Info>("session/info/" + id)
-    state().sessions.set(id, read)
+    const read = await Storage.readJSON<Info>("session/info/" + validId)
+    state().sessions.set(validId, read)
     return read as Info
   }
 
   export async function getShare(id: string) {
-    return Storage.readJSON<ShareInfo>("session/share/" + id)
+    const validId = validateSessionID(id)
+    return Storage.readJSON<ShareInfo>("session/share/" + validId)
   }
 
   export async function share(id: string) {
+    const validId = validateSessionID(id)
     const cfg = await Config.get()
     if (cfg.share === "disabled") {
       throw new Error("Sharing is disabled in configuration")
@@ -295,9 +293,22 @@ export namespace Session {
       throw new Error(subscription.message || "Kuuzuki Pro subscription required for sharing")
     }
 
-    const session = await get(id)
-    if (session.share) return session.share
-    const share = await Share.create(id)
+    const session = await get(validId)
+    if (session.share) {
+      // If already shared, get the full ShareInfo from storage
+      const shareInfo = await Storage.readJSON<ShareInfo>("session/share/" + validId)
+      if (shareInfo) {
+        return shareInfo
+      }
+      // If shareInfo is missing, fall through to create a new one
+    }
+    const share = await Share.create(validId)
+
+    // Validate that we received a valid secret
+    if (!share.secret || share.secret.trim() === "") {
+      throw new Error("Session share failed: empty secret key received")
+    }
+
     await update(id, (draft) => {
       draft.share = {
         url: share.url,
@@ -324,39 +335,6 @@ export namespace Session {
     await Share.remove(id, share.secret)
   }
 
-  /**
-   * Migrate an existing session to use hybrid context management
-   */
-  export async function migrateToHybridContext(sessionID: string): Promise<void> {
-    if (!HYBRID_CONTEXT_ENABLED) {
-      log.warn("hybrid context not enabled, skipping migration", { sessionID })
-      return
-    }
-
-    try {
-      log.info("migrating session to hybrid context", { sessionID })
-
-      const contextManager = await HybridContextManager.forSession(sessionID)
-      const msgs = await messages(sessionID)
-
-      // Process existing messages to build initial context
-      for (const msg of msgs) {
-        await contextManager.addMessage(msg.info, { skipCompression: true })
-      }
-
-      // Perform initial compression if needed
-      await contextManager.performCompression()
-
-      log.info("session migrated to hybrid context", {
-        sessionID,
-        messageCount: msgs.length,
-        metrics: contextManager.getMetrics(),
-      })
-    } catch (error) {
-      log.error("failed to migrate session to hybrid context", { error, sessionID })
-      throw error
-    }
-  }
 
   export async function update(id: string, editor: (session: Info) => void) {
     const { sessions } = state()
@@ -373,15 +351,16 @@ export namespace Session {
   }
 
   export async function messages(sessionID: string) {
+    const validSessionID = validateSessionID(sessionID)
     const result = [] as {
       info: MessageV2.Info
       parts: MessageV2.Part[]
     }[]
-    for (const p of await Storage.list("session/message/" + sessionID)) {
+    for (const p of await Storage.list("session/message/" + validSessionID)) {
       const read = await Storage.readJSON<MessageV2.Info>(p)
       result.push({
         info: read,
-        parts: await getParts(sessionID, read.id),
+        parts: await getParts(validSessionID, read.id),
       })
     }
     result.sort((a, b) => (a.info.id > b.info.id ? 1 : -1))
@@ -410,7 +389,7 @@ export namespace Session {
   }
 
   export async function children(parentID: string) {
-    const result = [] as Session.Info[]
+    const result = [] as Info[]
     for (const item of await Storage.list("session/info")) {
       const sessionID = path.basename(item, ".json")
       const session = await get(sessionID)
@@ -450,25 +429,14 @@ export namespace Session {
     }
   }
 
-  async function updateMessage(msg: MessageV2.Info) {
+  export async function updateMessage(msg: MessageV2.Info) {
     await Storage.writeJSON("session/message/" + msg.sessionID + "/" + msg.id, msg)
-
-    // Update hybrid context if enabled
-    if (HYBRID_CONTEXT_ENABLED && msg.role === "assistant") {
-      try {
-        const contextManager = await HybridContextManager.forSession(msg.sessionID)
-        await contextManager.addMessage(msg)
-      } catch (error) {
-        log.warn("failed to update hybrid context", { error, messageId: msg.id })
-      }
-    }
-
     Bus.publish(MessageV2.Event.Updated, {
       info: msg,
     })
   }
 
-  async function updatePart(part: MessageV2.Part) {
+  export async function updatePart(part: MessageV2.Part) {
     await Storage.writeJSON(["session", "part", part.sessionID, part.messageID, part.id].join("/"), part)
     Bus.publish(MessageV2.Event.PartUpdated, {
       part,
@@ -741,121 +709,13 @@ export namespace Session {
 
     const previous = msgs.filter((x) => x.info.role === "assistant").at(-1)?.info as MessageV2.Assistant
     const outputLimit = Math.min(model.info.limit.output, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX
+    const systemPrompts: string[] = []
+    
+    // Get mode early to avoid temporal dead zone
+    const mode = await Mode.get(inputMode)
 
-    // Use hybrid context management if enabled
-    let hybridContextUsed = false
-    let optimizedMessages: { info: MessageV2.Info; parts: MessageV2.Part[] }[] = []
-    let semanticFactsText: string | null = null
-
-    if (HYBRID_CONTEXT_ENABLED) {
-      try {
-        const contextManager = await HybridContextManager.forSession(input.sessionID)
-
-        // Add the new user message to the context manager
-        await contextManager.addMessage(userMsg)
-
-        // Check if compression is needed
-        const contextRequest: HybridContext.ContextRequest = {
-          sessionID: input.sessionID,
-          includeRecent: true,
-          includeCompressed: true,
-          includeSemantic: true,
-          includePinned: true,
-          prioritizeTypes: [],
-          maxTokens: model.info.limit.context ? model.info.limit.context - outputLimit : undefined,
-        }
-
-        const optimizedContext = await contextManager.buildContextForRequest(contextRequest)
-
-        // Log context optimization results
-        log.info("hybrid context optimization", {
-          sessionId: input.sessionID,
-          originalMessages: msgs.length,
-          optimizedMessages: optimizedContext.messages.length,
-          semanticFacts: optimizedContext.semanticFacts.length,
-          totalTokens: optimizedContext.totalTokens,
-          tokenLimit: model.info.limit.context,
-          utilizationPercent: Math.round((optimizedContext.totalTokens / model.info.limit.context) * 100),
-          compressionSummary: optimizedContext.compressionSummary,
-          enabled: true,
-        })
-
-        // Convert optimized context to message format
-        if (optimizedContext.totalTokens < model.info.limit.context * 0.85) {
-          hybridContextUsed = true
-
-          // Build optimized message list
-          for (const item of optimizedContext.messages) {
-            if ("semanticSummary" in item) {
-              // Compressed message - create a synthetic assistant message
-              optimizedMessages.push({
-                info: {
-                  id: item.originalId,
-                  role: "assistant",
-                  sessionID: item.sessionID,
-                  time: { created: item.compressedAt },
-                  path: { cwd: app.path.cwd, root: app.path.root },
-                  providerID: input.providerID,
-                  modelID: input.modelID,
-                  mode: inputMode,
-                  system: [],
-                  cost: 0,
-                  tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-                } as MessageV2.Assistant,
-                parts: [
-                  {
-                    id: Identifier.ascending("part"),
-                    messageID: item.originalId,
-                    sessionID: item.sessionID,
-                    type: "text",
-                    text: `[Compressed] ${item.semanticSummary}`,
-                  },
-                ],
-              })
-            } else {
-              // Regular message - find it in msgs
-              const found = msgs.find((m) => m.info.id === item.id)
-              if (found) {
-                optimizedMessages.push(found)
-              }
-            }
-          }
-
-          // Add semantic facts to the system prompt later
-          if (optimizedContext.semanticFacts.length > 0) {
-            semanticFactsText = optimizedContext.semanticFacts.map((f) => `[${f.type}] ${f.content}`).join("\n")
-          }
-        }
-      } catch (hybridError) {
-        log.error("hybrid context failed, falling back to standard context", {
-          error: hybridError,
-          sessionID: input.sessionID,
-          originalMessagesCount: msgs.length,
-          fallbackWillUse: msgs.length,
-        })
-
-        // Ensure fallback has valid messages
-        if (msgs.length === 0) {
-          log.error("Both hybrid context and fallback produced empty messages", {
-            sessionID: input.sessionID,
-            error: hybridError,
-          })
-          throw new Error(
-            `No messages available for session ${input.sessionID}. Hybrid context failed and no fallback messages exist.`,
-          )
-        }
-
-        // Continue with standard context processing
-        hybridContextUsed = false
-        optimizedMessages = []
-      }
-    }
-
-    // PROACTIVE CHECK: Estimate tokens before making request
+    // PROACTIVE CHECK: Estimate tokens before making the request
     if (model.info.limit.context) {
-      const inputMode = input.mode ?? "build"
-      const mode = await Mode.get(inputMode)
-      let systemPrompts = SystemPrompt.header(input.providerID)
       systemPrompts.push(
         ...(() => {
           if (input.system) return [input.system]
@@ -905,7 +765,7 @@ export namespace Session {
       }
     }
 
-    using abort = lock(input.sessionID)
+    using abortSignal = lock(input.sessionID)
 
     const lastSummary = msgs.findLast((msg) => msg.info.role === "assistant" && msg.info.summary === true)
     if (lastSummary) msgs = msgs.filter((msg) => msg.info.id >= lastSummary.info.id)
@@ -947,14 +807,13 @@ export namespace Session {
       })
         .then((result) => {
           if (result.text)
-            return Session.update(input.sessionID, (draft) => {
+            return update(input.sessionID, (draft) => {
               draft.title = result.text
             })
         })
         .catch(() => {})
     }
 
-    const mode = await Mode.get(inputMode)
     let system = SystemPrompt.header(input.providerID)
     system.push(
       ...(() => {
@@ -965,11 +824,6 @@ export namespace Session {
     )
     system.push(...(await SystemPrompt.environment()))
     system.push(...(await SystemPrompt.custom()))
-
-    // Add semantic facts if we have them from hybrid context
-    if (semanticFactsText) {
-      system.push(`Previous conversation context:\n${semanticFactsText}`)
-    }
 
     // max 2 system prompt messages for caching purposes
     const [first, ...rest] = system
@@ -1016,9 +870,59 @@ export namespace Session {
         inputSchema: item.parameters as ZodSchema,
         async execute(args, options) {
           await processor.track(options.toolCallId)
-          const result = await item.execute(args, {
+          
+          // Add validation error handling for tool parameters
+          let validatedArgs = args
+          try {
+            // If the tool has parameters schema, validate and potentially fix
+            if (item.parameters && 'parse' in item.parameters) {
+              validatedArgs = item.parameters.parse(args)
+            }
+          } catch (validationError: any) {
+            log.warn(`Tool parameter validation error for ${item.id}:`, {
+              error: validationError.message,
+              args,
+              tool: item.id
+            })
+            
+            // For TodoWrite tool, handle common validation errors gracefully
+            if (item.id === 'TodoWrite' && validationError.message?.includes('Invalid enum value')) {
+              // Try to fix common issues like invalid priority values
+              if (args.todos && Array.isArray(args.todos)) {
+                validatedArgs = {
+                  ...args,
+                  todos: args.todos.map((todo: any) => ({
+                    ...todo,
+                    // Default invalid priority to 'medium'
+                    priority: ['high', 'medium', 'low', 'critical'].includes(todo.priority) 
+                      ? todo.priority 
+                      : 'medium'
+                  }))
+                }
+                
+                // Try parsing again with fixed values
+                try {
+                  validatedArgs = item.parameters.parse(validatedArgs)
+                } catch (e) {
+                  // If still failing, return error to AI
+                  return {
+                    error: `Tool validation failed: ${validationError.message}. Please check your parameters.`,
+                    suggestion: "For TodoWrite, use priority values: 'high', 'medium', 'low', or 'critical'"
+                  }
+                }
+              }
+            } else {
+              // For other validation errors, return helpful message
+              return {
+                error: `Tool validation failed: ${validationError.message}`,
+                suggestion: "Please check the tool parameters and try again."
+              }
+            }
+          }
+          
+          const result = await item.execute(validatedArgs, {
             sessionID: input.sessionID,
-            abort: abort.signal,
+            abort: abortSignal.signal,
             messageID: assistantMsg.id,
             metadata: async (val) => {
               const match = processor.partFromToolCall(options.toolCallId)
@@ -1124,84 +1028,20 @@ export namespace Session {
       },
       maxRetries: 10,
       maxOutputTokens: outputLimit,
-      abortSignal: abort.signal,
+      abortSignal: abortSignal.signal,
       stopWhen: stepCountIs(1000),
       providerOptions: {
         [input.providerID]: model.info.options,
       },
-      messages: (() => {
-        const systemMessages = system.map(
+      messages: [
+        ...system.map(
           (x): ModelMessage => ({
             role: "system",
             content: x,
           }),
-        )
-        const userMessages = MessageV2.toModelMessage(hybridContextUsed ? optimizedMessages : msgs)
-
-        // Enhanced logging for debugging
-        log.debug("Building messages for streamText", {
-          sessionID: input.sessionID,
-          systemMessagesCount: systemMessages.length,
-          userMessagesCount: userMessages.length,
-          hybridContextUsed,
-          originalMsgsCount: msgs.length,
-          optimizedMsgsCount: hybridContextUsed ? optimizedMessages.length : 0,
-        })
-
-        // Check if we have any user messages
-        if (userMessages.length === 0) {
-          log.warn("No messages found, attempting to recover from session history", {
-            sessionID: input.sessionID,
-            totalMsgsAvailable: msgs.length,
-            hybridContextUsed,
-          })
-
-          // Try to recover the last user and assistant messages
-          const allMessages = msgs
-          const lastUserMsg = [...allMessages]
-            .reverse()
-            .find((m) => m.parts.some((p) => p.type === "text" && m.info.role === "user"))
-          const lastAssistantMsg = [...allMessages]
-            .reverse()
-            .find((m) => m.parts.some((p) => p.type === "text" && m.info.role === "assistant"))
-
-          const recoveredMessages: ModelMessage[] = []
-
-          if (lastUserMsg) {
-            recoveredMessages.push(...MessageV2.toModelMessage([lastUserMsg]))
-
-            // Include assistant message if it came after the user message
-            if (lastAssistantMsg && lastAssistantMsg.info.time.created > lastUserMsg.info.time.created) {
-              recoveredMessages.push(...MessageV2.toModelMessage([lastAssistantMsg]))
-            }
-          }
-
-          if (recoveredMessages.length > 0) {
-            log.info("Recovered messages for context", {
-              sessionID: input.sessionID,
-              count: recoveredMessages.length,
-            })
-            const finalMessages = [...systemMessages, ...recoveredMessages]
-            return validateMessages(finalMessages, "streamText-recovered", input.sessionID)
-          }
-
-          // Fallback: Add a minimal message to prevent empty array
-          log.warn("No messages could be recovered, adding fallback message", {
-            sessionID: input.sessionID,
-          })
-          const fallbackMessages = [
-            ...systemMessages,
-            {
-              role: "user" as const,
-              content: "Continue from where we left off. If you need more context, please ask.",
-            },
-          ]
-          return validateMessages(fallbackMessages, "streamText-fallback", input.sessionID)
-        }
-
-        const finalMessages = [...systemMessages, ...userMessages]
-        return validateMessages(finalMessages, "streamText-main", input.sessionID)
-      })(),
+        ),
+        ...MessageV2.toModelMessage(msgs),
+      ],
       temperature: model.info.temperature
         ? (mode.temperature ?? ProviderTransform.temperature(input.providerID, input.modelID))
         : undefined,
@@ -1233,7 +1073,9 @@ export namespace Session {
     }
     state().queued.delete(input.sessionID)
     return result
-  }
+
+
+}
 
   function createProcessor(assistantMsg: MessageV2.Assistant, model: ModelsDev.Model) {
     const toolCalls: Record<string, MessageV2.ToolPart> = {}
@@ -1557,7 +1399,7 @@ export namespace Session {
   }
 
   export async function summarize(input: { sessionID: string; providerID: string; modelID: string }) {
-    using abort = lock(input.sessionID)
+    using abortSignal = lock(input.sessionID)
     const msgs = await messages(input.sessionID)
     const lastSummary = msgs.findLast((msg) => msg.info.role === "assistant" && msg.info.summary === true)
     const filtered = msgs.filter((msg) => !lastSummary || msg.info.id >= lastSummary.info.id)
@@ -1620,7 +1462,7 @@ export namespace Session {
 
     const stream = streamText({
       maxRetries: 10,
-      abortSignal: abort.signal,
+      abortSignal: abortSignal.signal,
       model: model.language,
       messages: validatedSummaryMessages,
     })
@@ -1629,11 +1471,17 @@ export namespace Session {
     return result
   }
 
-  function isLocked(sessionID: string) {
+  export class BusyError extends Error {
+    constructor(public readonly sessionID: string) {
+      super(`Session ${sessionID} is busy`)
+    }
+  }
+
+  export function isLocked(sessionID: string) {
     return state().pending.has(sessionID)
   }
 
-  function lock(sessionID: string) {
+  export function lock(sessionID: string) {
     log.info("locking", { sessionID })
     if (state().pending.has(sessionID)) throw new BusyError(sessionID)
     const controller = new AbortController()
@@ -1657,7 +1505,6 @@ export namespace Session {
       reasoning: 0,
       cache: {
         write: (metadata?.["anthropic"]?.["cacheCreationInputTokens"] ??
-          // @ts-expect-error
           metadata?.["bedrock"]?.["usage"]?.["cacheWriteInputTokens"] ??
           0) as number,
         read: usage.cachedInputTokens ?? 0,
@@ -1671,12 +1518,6 @@ export namespace Session {
         .add(new Decimal(tokens.cache.write).mul(model.cost.cache_write ?? 0).div(1_000_000))
         .toNumber(),
       tokens,
-    }
-  }
-
-  export class BusyError extends Error {
-    constructor(public readonly sessionID: string) {
-      super(`Session ${sessionID} is busy`)
     }
   }
 
@@ -1694,7 +1535,7 @@ export namespace Session {
     // Combine the base prompt with legacy file context
     const fullPrompt = [PROMPT_INITIALIZE.replace("${path}", app.path.root), legacyContext].filter(Boolean).join("\n\n")
 
-    await Session.chat({
+    await chat({
       sessionID: input.sessionID,
       messageID: input.messageID,
       providerID: input.providerID,
@@ -1710,9 +1551,4 @@ export namespace Session {
     await App.initialize()
   }
 
-  // Export functions for server usage
-  Session.initialize = initialize
-  Session.revert = revert
-  Session.unrevert = unrevert
-  Session.summarize = summarize
 }

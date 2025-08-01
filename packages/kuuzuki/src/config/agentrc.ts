@@ -221,40 +221,6 @@ export const AgentrcSchema = z.object({
     .optional()
     .describe("MCP server configurations"),
 
-  /**
-   * Git operation permissions and safety settings
-   */
-  git: z
-    .object({
-      commitMode: z
-        .enum(["never", "ask", "session", "project"])
-        .optional()
-        .default("ask")
-        .describe("Permission level for Git commits"),
-      pushMode: z
-        .enum(["never", "ask", "session", "project"])
-        .optional()
-        .default("never")
-        .describe("Permission level for Git pushes"),
-      configMode: z
-        .enum(["never", "ask", "session", "project"])
-        .optional()
-        .default("never")
-        .describe("Permission level for Git config changes"),
-      preserveAuthor: z.boolean().optional().default(true).describe("Preserve existing Git author settings"),
-      allowedBranches: z
-        .array(z.string())
-        .optional()
-        .describe("Branches where commits are allowed (empty = all branches)"),
-      requireConfirmation: z
-        .boolean()
-        .optional()
-        .default(true)
-        .describe("Always show commit preview before committing"),
-      maxCommitSize: z.number().optional().default(100).describe("Maximum number of files in a single commit"),
-    })
-    .optional()
-    .describe("Git operation permissions and safety settings"),
 
   /**
    * AI agent specific settings
@@ -291,14 +257,6 @@ export type AgentrcConfig = z.infer<typeof AgentrcSchema>
  * Default .agentrc configuration
  */
 export const DEFAULT_AGENTRC: Partial<AgentrcConfig> = {
-  git: {
-    commitMode: "ask",
-    pushMode: "never",
-    configMode: "never",
-    preserveAuthor: true,
-    requireConfirmation: true,
-    maxCommitSize: 100,
-  },
   metadata: {
     version: "1.0.0",
     generator: "kuuzuki-init",
@@ -437,19 +395,6 @@ export function agentrcToPrompt(config: AgentrcConfig): string {
     }
   }
 
-  // Git configuration
-  if (config.git) {
-    sections.push("## Git Permissions")
-    sections.push(`- **Commit mode**: ${config.git.commitMode || "ask"}`)
-    sections.push(`- **Push mode**: ${config.git.pushMode || "never"}`)
-    sections.push(`- **Config mode**: ${config.git.configMode || "never"}`)
-    sections.push(`- **Preserve author**: ${config.git.preserveAuthor !== false ? "yes" : "no"}`)
-    if (config.git.allowedBranches?.length) {
-      sections.push(`- **Allowed branches**: ${config.git.allowedBranches.join(", ")}`)
-    }
-    sections.push(`- **Require confirmation**: ${config.git.requireConfirmation !== false ? "yes" : "no"}`)
-    sections.push("")
-  }
 
   // Agent settings
   if (config.agent) {
@@ -544,10 +489,6 @@ export function mergeAgentrcConfigs(...configs: Partial<AgentrcConfig>[]): Agent
       }
     }
 
-    // Merge git settings
-    if (config.git) {
-      merged.git = { ...merged.git, ...config.git }
-    }
 
     // Merge agent settings
     if (config.agent) {
@@ -560,4 +501,53 @@ export function mergeAgentrcConfigs(...configs: Partial<AgentrcConfig>[]): Agent
   }
 
   return AgentrcSchema.parse(merged)
+}
+
+/**
+ * Translates .agentrc MCP server configuration to the format expected by the MCP interpreter
+ */
+export function translateAgentrcMcpToConfig(agentrcMcp: AgentrcConfig["mcp"]): Record<string, any> {
+  if (!agentrcMcp?.servers) {
+    return {}
+  }
+
+  const translatedServers: Record<string, any> = {}
+
+  for (const [serverName, serverConfig] of Object.entries(agentrcMcp.servers)) {
+    // Handle discriminated union types
+    if (serverConfig.transport === "stdio") {
+      translatedServers[serverName] = {
+        type: "local",
+        command: serverConfig.command,
+        environment: serverConfig.env || {},
+        enabled: serverConfig.enabled ?? true,
+      }
+    } else if (serverConfig.transport === "http") {
+      translatedServers[serverName] = {
+        type: "remote",
+        url: serverConfig.url,
+        headers: serverConfig.headers || {},
+        enabled: serverConfig.enabled ?? true,
+      }
+    }
+  }
+
+  return translatedServers
+}
+
+/**
+ * Merges .agentrc MCP configuration with existing kuuzuki.json MCP configuration
+ * kuuzuki.json takes precedence over .agentrc for conflicting server names
+ */
+export function mergeAgentrcMcpWithConfig(
+  agentrcMcp: AgentrcConfig["mcp"],
+  existingMcp: Record<string, any> = {}
+): Record<string, any> {
+  const translatedAgentrcMcp = translateAgentrcMcpToConfig(agentrcMcp)
+  
+  // Merge with existing config, giving precedence to existing config
+  return {
+    ...translatedAgentrcMcp,
+    ...existingMcp,
+  }
 }

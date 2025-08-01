@@ -17,8 +17,9 @@ export const LspHoverTool = Tool.define("lsp_hover", {
     const file = path.isAbsolute(args.file) ? args.file : path.join(app.path.cwd, args.file)
     await LSP.touchFile(file, true)
     const result = await LSP.hover({
-      ...args,
       file,
+      line: args.line,
+      character: args.character,
     })
 
     return {

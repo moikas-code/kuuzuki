@@ -19,8 +19,6 @@ Created `util/tui-safe-prompt.ts` that:
 
 ### 3. Updated All Prompt Usage
 Updated files to use TUI-safe wrapper:
-- `git/prompts.ts` - Git permission requests
-- `cli/cmd/git-permissions.ts` - Git permission configuration  
 - `cli/cmd/mcp.ts` - MCP tool selection
 - `cli/cmd/auth.ts` - Authentication prompts
 - `cli/cmd/upgrade.ts` - Upgrade confirmation
@@ -38,7 +36,6 @@ Updated files to use TUI-safe wrapper:
 ## Testing Instructions
 1. Start TUI: `bun dev`
 2. Trigger scenarios that would show prompts:
-   - Git operations requiring permissions
    - Tool approvals
    - Any interactive prompts
 3. Verify no terminal corruption occurs

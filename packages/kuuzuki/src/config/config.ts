@@ -13,6 +13,7 @@ import matter from "gray-matter"
 import { ApiKeyManager } from "../auth/apikey"
 import { ConfigSchema } from "./schema"
 import { ConfigMigration } from "./migration"
+import { parseAgentrc, mergeAgentrcMcpWithConfig } from "./agentrc"
 
 export namespace Config {
   const log = Log.create({ service: "config" })
@@ -31,6 +32,27 @@ export namespace Config {
       for (const resolved of found.toReversed()) {
         const projectConfig = await load(resolved)
         result = mergeDeep(result, projectConfig)
+      }
+    }
+
+    // Load and merge .agentrc configurations
+    const agentrcFiles = await Filesystem.findUp(".agentrc", app.path.cwd, app.path.root)
+    for (const agentrcPath of agentrcFiles.toReversed()) {
+      try {
+        const agentrcContent = await Bun.file(agentrcPath).text()
+        const agentrcConfig = parseAgentrc(agentrcContent)
+        
+        // Merge MCP configuration from .agentrc
+        if (agentrcConfig.mcp) {
+          result.mcp = mergeAgentrcMcpWithConfig(agentrcConfig.mcp, result.mcp)
+          log.info("Merged MCP configuration from .agentrc", { 
+            path: agentrcPath,
+            servers: Object.keys(agentrcConfig.mcp.servers || {})
+          })
+        }
+      } catch (error) {
+        log.warn("Failed to load .agentrc file", { path: agentrcPath, error })
+        // Continue loading other configs even if one .agentrc fails
       }
     }
 
@@ -324,6 +346,27 @@ export namespace Config {
           continue
         }
         throw error
+      }
+    }
+
+    // Load global .agentrc configuration
+    const globalAgentrcPath = path.join(Global.Path.config, ".agentrc")
+    try {
+      const agentrcContent = await Bun.file(globalAgentrcPath).text()
+      const agentrcConfig = parseAgentrc(agentrcContent)
+      
+      // Merge MCP configuration from global .agentrc
+      if (agentrcConfig.mcp) {
+        result.mcp = mergeAgentrcMcpWithConfig(agentrcConfig.mcp, result.mcp)
+        log.info("Merged global MCP configuration from .agentrc", { 
+          path: globalAgentrcPath,
+          servers: Object.keys(agentrcConfig.mcp.servers || {})
+        })
+      }
+    } catch (error) {
+      // Ignore if global .agentrc doesn't exist
+      if ((error as any)?.code !== "ENOENT") {
+        log.warn("Failed to load global .agentrc file", { path: globalAgentrcPath, error })
       }
     }
 

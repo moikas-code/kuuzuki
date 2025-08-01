@@ -38,7 +38,16 @@ export namespace Agent {
       },
     }
     for (const [key, value] of Object.entries(cfg.agent ?? {})) {
-      if (value.disable) continue
+      // Type assertion to ensure value conforms to expected agent config structure
+      const agentValue = value as {
+        disable?: boolean
+        model?: string
+        prompt?: string
+        tools?: Record<string, boolean>
+        description?: string
+      }
+      
+      if (agentValue.disable) continue
       let item = result[key]
       if (!item)
         item = result[key] = {
@@ -49,15 +58,15 @@ export namespace Agent {
             todoread: false,
           },
         }
-      const model = value.model ?? cfg.model
+      const model = agentValue.model ?? cfg.model
       if (model) item.model = Provider.parseModel(model)
-      if (value.prompt) item.prompt = value.prompt
-      if (value.tools)
+      if (agentValue.prompt) item.prompt = agentValue.prompt
+      if (agentValue.tools)
         item.tools = {
           ...item.tools,
-          ...value.tools,
+          ...agentValue.tools,
         }
-      if (value.description) item.description = value.description
+      if (agentValue.description) item.description = agentValue.description
     }
     return result
   })

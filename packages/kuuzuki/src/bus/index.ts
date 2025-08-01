@@ -30,8 +30,7 @@ export namespace Bus {
   export function payloads() {
     return z.discriminatedUnion(
       "type",
-      registry
-        .entries()
+      Array.from(registry.entries())
         .map(([type, def]) =>
           z
             .object({
@@ -41,8 +40,7 @@ export namespace Bus {
             .openapi({
               ref: "Event" + "." + def.type,
             }),
-        )
-        .toArray() as any,
+        ) as any,
     )
   }
 

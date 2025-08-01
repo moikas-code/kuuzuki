@@ -52,7 +52,16 @@ export namespace Mode {
       },
     }
     for (const [key, value] of Object.entries(cfg.mode ?? {})) {
-      if (value.disable) continue
+      // Type assertion to ensure value conforms to expected mode config structure
+      const modeValue = value as {
+        disable?: boolean
+        model?: string
+        prompt?: string
+        temperature?: number
+        tools?: Record<string, boolean>
+      }
+      
+      if (modeValue.disable) continue
       let item = result[key]
       if (!item)
         item = result[key] = {
@@ -60,12 +69,12 @@ export namespace Mode {
           tools: {},
         }
       item.name = key
-      if (value.model) item.model = Provider.parseModel(value.model)
-      if (value.prompt) item.prompt = value.prompt
-      if (value.temperature) item.temperature = value.temperature
-      if (value.tools)
+      if (modeValue.model) item.model = Provider.parseModel(modeValue.model)
+      if (modeValue.prompt) item.prompt = modeValue.prompt
+      if (modeValue.temperature) item.temperature = modeValue.temperature
+      if (modeValue.tools)
         item.tools = {
-          ...value.tools,
+          ...modeValue.tools,
           ...item.tools,
         }
     }

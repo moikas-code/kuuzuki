@@ -1,5 +1,7 @@
 # **Implementation Plan: Kuuzuki CLI Documentation Improvements**
 
+**UPDATE - January 2025**: Phase 1 OpenCode Parity Cleanup has been completed successfully. Command count reduced from 22 → 13 commands. Removed: hybrid, debug (6 subcommands), tui-dev, and schema commands. See `kb/active/phase1-opencode-parity-cleanup.md` for complete details.
+
 ## **Phase 1: Content Structure & Organization (High Priority)**
 
 ### **1.1 Restructure the Document Layout**
@@ -11,7 +13,7 @@
   - Core Commands (run, serve, tui)
   - Management Commands (auth, agent, models)
   - Integration Commands (github, mcp)
-  - Utility Commands (debug, stats, generate)
+  - Utility Commands (stats)
   - Global Flags & Configuration
   - Practical Examples & Workflows
   - Troubleshooting
@@ -25,7 +27,7 @@
 3. **`github`** - Important integration feature
 4. **`models`** - Essential for model management
 5. **`mcp`** - Advanced feature
-6. **`debug`**, **`stats`**, **`generate`** - Utility commands
+6. **`stats`** - Utility commands
 
 ## **Phase 2: Content Development (High Priority)**
 
