@@ -2,8 +2,6 @@ import { z } from "zod"
 import { Tool } from "./tool"
 import DESCRIPTION from "./bash.txt"
 import { App } from "../app/app"
-import { createGitSafetySystem } from "../git/index.js"
-import { parseAgentrc, DEFAULT_AGENTRC, type AgentrcConfig } from "../config/agentrc.js"
 
 const MAX_OUTPUT_LENGTH = 30000
 const DEFAULT_TIMEOUT = 1 * 60 * 1000
@@ -23,8 +21,6 @@ export const BashTool = Tool.define("bash", {
   async execute(params, ctx) {
     const timeout = Math.min(params.timeout ?? DEFAULT_TIMEOUT, MAX_TIMEOUT)
 
-    // Check for Git commands that require permission
-    await checkGitPermissions(params.command)
 
     const process = Bun.spawn({
       cmd: ["bash", "-c", params.command],
@@ -52,154 +48,3 @@ export const BashTool = Tool.define("bash", {
   },
 })
 
-/**
- * Check if a command contains Git operations that require permission
- */
-async function checkGitPermissions(command: string): Promise<void> {
-  // Git command patterns that require permission
-  const gitCommitPattern = /git\s+commit/i
-  const gitPushPattern = /git\s+push/i
-  const gitConfigUserPattern = /git\s+config\s+.*user\./i
-
-  // Check if command contains restricted Git operations
-  if (gitCommitPattern.test(command) || gitPushPattern.test(command) || gitConfigUserPattern.test(command)) {
-    try {
-      // Load .agentrc configuration
-      let config
-      try {
-        const file = Bun.file(".agentrc")
-        if (await file.exists()) {
-          const content = await file.text()
-          config = parseAgentrc(content)
-        } else {
-          config = DEFAULT_AGENTRC
-        }
-      } catch {
-        config = DEFAULT_AGENTRC
-      }
-
-      // Create Git safety system
-      const gitSafety = createGitSafetySystem({
-        project: { name: "bash-tool" },
-        ...config,
-      } as any)
-
-      // Determine operation type
-      let operation: "commit" | "push" | "config"
-      if (gitCommitPattern.test(command)) {
-        operation = "commit"
-      } else if (gitPushPattern.test(command)) {
-        operation = "push"
-      } else {
-        operation = "config"
-      }
-
-      // Check permissions
-      const permission = await gitSafety.permissionManager.checkPermission({
-        operation,
-        files: [],
-        message: `Command: ${command}`,
-      })
-
-      if (!permission.allowed) {
-        if (permission.reason === "User confirmation required") {
-          // Prompt user for permission
-          const promptResult = await gitSafety.promptSystem.promptForPermission({
-            operation,
-            files: [],
-            message: `Command: ${command}`,
-          })
-
-          if (!promptResult.allowed) {
-            throw new Error(
-              `Git ${operation} operation cancelled by user. Use 'kuuzuki git allow ${operation}s' to enable.`,
-            )
-          }
-
-          // Handle permission scope
-          if (promptResult.scope === "session") {
-            gitSafety.permissionManager.grantSessionPermission(operation)
-          } else if (promptResult.scope === "project" && promptResult.updateConfig) {
-            // Update .agentrc for project-wide permission
-            // Load current .agentrc to preserve existing configuration
-            let currentConfig: AgentrcConfig
-            try {
-              const file = Bun.file(".agentrc")
-              if (await file.exists()) {
-                const content = await file.text()
-                currentConfig = parseAgentrc(content)
-              } else {
-                // Create minimal config preserving the original config structure
-                currentConfig = {
-                  ...config,
-                  project: config.project || { name: "project" },
-                  git: config.git || {
-                    commitMode: "ask",
-                    pushMode: "never",
-                    configMode: "never",
-                    preserveAuthor: true,
-                    requireConfirmation: true,
-                    maxCommitSize: 100,
-                  },
-                }
-              }
-            } catch (error) {
-              // Fallback to current config if parsing fails
-              currentConfig = {
-                ...config,
-                project: config.project || { name: "project" },
-                git: config.git || {
-                  commitMode: "ask",
-                  pushMode: "never",
-                  configMode: "never",
-                  preserveAuthor: true,
-                  requireConfirmation: true,
-                  maxCommitSize: 100,
-                },
-              }
-            }
-
-            // Ensure git config exists
-            if (!currentConfig.git) {
-              currentConfig.git = {
-                commitMode: "ask",
-                pushMode: "never",
-                configMode: "never",
-                preserveAuthor: true,
-                requireConfirmation: true,
-                maxCommitSize: 100,
-              }
-            }
-
-            // Update the specific operation permission
-            switch (operation) {
-              case "commit":
-                currentConfig.git.commitMode = "project"
-                break
-              case "push":
-                currentConfig.git.pushMode = "project"
-                break
-              case "config":
-                currentConfig.git.configMode = "project"
-                break
-            }
-
-            const content = JSON.stringify(currentConfig, null, 2)
-            await Bun.write(".agentrc", content)
-          }
-        } else {
-          throw new Error(
-            `Git ${operation} operation denied: ${permission.reason}. Use 'kuuzuki git allow ${operation}s' to enable.`,
-          )
-        }
-      }
-    } catch (error) {
-      // Re-throw permission errors
-      if (error instanceof Error && (error.message.includes("cancelled") || error.message.includes("denied"))) {
-        throw error
-      }
-      // Log other errors but don't block execution
-      console.warn(`Warning: Git permission check failed: ${error}`)
-    }
-  }
-}

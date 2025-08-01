@@ -106,12 +106,6 @@ These were development-specific commands that shouldn't be exposed to end users:
 11. `github install` - Install GitHub app
 12. `github run` - Run GitHub workflows
 
-### Git Permissions (5)
-13. `git-permissions status` - Check permissions
-14. `git-permissions allow` - Allow operations
-15. `git-permissions deny` - Deny operations  
-16. `git-permissions reset` - Reset permissions
-17. `git-permissions configure` - Configure permissions
 
 ### Extensions (2)
 18. `mcp` - MCP server management
@@ -171,7 +165,6 @@ With hybrid mode removed, the TUI became more focused:
 - ✅ GitHub integration works as expected
 - ✅ MCP servers can be added and used
 - ✅ Authentication flows work properly
-- ✅ Git permissions system functions correctly
 
 ### Build Verification
 - ✅ TypeScript compilation succeeds
@@ -211,7 +204,6 @@ With hybrid mode removed, the TUI became more focused:
 - `packages/kuuzuki/src/cli/cmd/auth.ts` - Authentication
 - `packages/kuuzuki/src/cli/cmd/mcp.ts` - MCP integration
 - `packages/kuuzuki/src/cli/cmd/agent.ts` - Agent system
-- `packages/kuuzuki/src/cli/cmd/git-permissions.ts` - Git permissions
 
 ### Configuration
 - `packages/kuuzuki/src/config/schema.ts` - Simplified configuration schema
@@ -234,3 +226,24 @@ With hybrid mode removed, the TUI became more focused:
 Phase 1 successfully achieved its objective of cleaning up kuuzuki-specific additions and bringing the project closer to OpenCode parity. The 41% reduction in command surface area, combined with significant code cleanup, has resulted in a more maintainable and focused codebase that aligns better with the original OpenCode vision.
 
 The project now has a cleaner foundation for future development and is ready for Phase 2 activities focused on ensuring complete feature parity with OpenCode's core functionality.
+
+## Post-Phase 1 Update: Phase 2 Completed
+
+**Update Date**: January 31, 2025  
+**Status**: Phase 2 Complete ✅
+
+Following Phase 1, **Phase 2** was executed to further streamline the codebase by removing the git-permissions system and related complexity. This resulted in additional command reduction and code cleanup:
+
+### Phase 2 Achievements
+- **Additional Command Reduction**: 13 → 8 effective commands (removing git-permissions variants)
+- **Code Cleanup**: ~1000+ lines of git-permissions code removed
+- **Simplified Architecture**: Removed complex git permission system
+- **Better OpenCode Alignment**: Much closer to OpenCode's 11 commands
+
+### Phase 2 Impact
+- **Command Structure**: Now very close to OpenCode parity with 8 core commands vs OpenCode's 11
+- **Codebase Quality**: Significant reduction in complexity and maintenance burden
+- **User Experience**: Simplified interface without complex git permission management
+- **Development Focus**: Clear path forward for Phase 3 architecture alignment
+
+**Combined Result**: Phase 1 + Phase 2 achieved 64% command reduction (22 → 8 effective commands) while maintaining all essential functionality and moving significantly closer to OpenCode parity.

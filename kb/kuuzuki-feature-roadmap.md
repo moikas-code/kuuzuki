@@ -20,7 +20,6 @@ This roadmap outlines the planned features and enhancements for kuuzuki, priorit
 ### 🚧 In Progress
 
 - **Hybrid Context System**: Advanced context management and optimization
-- **Git Permissions**: Enhanced git operation safety and validation
 - **Documentation Improvements**: Better CLI documentation and examples
 - **TUI Dialog System Fix**: Resolving overlay corruption during chat interactions (0.1.0)
 

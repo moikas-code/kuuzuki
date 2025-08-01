@@ -13,7 +13,7 @@
   - Core Commands (run, serve, tui)
   - Management Commands (auth, agent, models)
   - Integration Commands (github, mcp)
-  - Utility Commands (stats, git-permissions)
+  - Utility Commands (stats)
   - Global Flags & Configuration
   - Practical Examples & Workflows
   - Troubleshooting
@@ -27,7 +27,7 @@
 3. **`github`** - Important integration feature
 4. **`models`** - Essential for model management
 5. **`mcp`** - Advanced feature
-6. **`stats`**, **`git-permissions`** - Utility commands
+6. **`stats`** - Utility commands
 
 ## **Phase 2: Content Development (High Priority)**
 

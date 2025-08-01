@@ -19,13 +19,6 @@ import { TuiCommand } from "./cli/cmd/tui"
 import { StatsCommand } from "./cli/cmd/stats"
 import { McpCommand } from "./cli/cmd/mcp"
 import { GithubCommand } from "./cli/cmd/github"
-import {
-  GitPermissionsStatusCommand,
-  GitPermissionsAllowCommand,
-  GitPermissionsDenyCommand,
-  GitPermissionsResetCommand,
-  GitPermissionsConfigureCommand,
-} from "./cli/cmd/git-permissions"
 import { Trace } from "./trace"
 import { ensureInitialized } from "./global"
 
@@ -91,11 +84,6 @@ const cli = yargs(hideBin(process.argv))
   .command(ModelsCommand)
   .command(StatsCommand)
   .command(GithubCommand)
-  .command(GitPermissionsStatusCommand)
-  .command(GitPermissionsAllowCommand)
-  .command(GitPermissionsDenyCommand)
-  .command(GitPermissionsResetCommand)
-  .command(GitPermissionsConfigureCommand)
   .fail((msg) => {
     if (msg.startsWith("Unknown argument") || msg.startsWith("Not enough non-option arguments")) {
       cli.showHelp("log")
