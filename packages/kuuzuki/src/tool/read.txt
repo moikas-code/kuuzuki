@@ -1,7 +1,7 @@
-Reads a file from the local filesystem. You can access any file directly by using this tool.
+Reads a file from the local filesystem with intelligent handling of large files. You can access any file directly by using this tool.
 Assume this tool is able to read all files on the machine. If the User provides a path to a file assume that path is valid. It is okay to read a file that does not exist; an error will be returned.
 
-Usage:
+## Basic Usage:
 - The filePath parameter must be an absolute path, not a relative path
 - By default, it reads up to 2000 lines starting from the beginning of the file
 - You can optionally specify a line offset and limit (especially handy for long files), but it's recommended to read the whole file by not providing these parameters
@@ -11,3 +11,51 @@ Usage:
 - You have the capability to call multiple tools in a single response. It is always better to speculatively read multiple files as a batch that are potentially useful. 
 - You will regularly be asked to read screenshots. If the user provides a path to a screenshot ALWAYS use this tool to view the file at the path. This tool will work with all temporary file paths like /var/folders/123/abc/T/TemporaryItems/NSIRD_screencaptureui_ZfB1tD/Screenshot.png
 - If you read a file that exists but has empty contents you will receive a system reminder warning in place of file contents.
+
+## Large File Handling:
+When files exceed the context token limit (~140K tokens), the tool automatically provides intelligent chunking:
+
+### Automatic Chunking:
+- Files are automatically chunked when they exceed safe token limits
+- The first chunk is returned by default with navigation instructions
+- Smart content detection chooses optimal chunking strategy
+
+### Chunking Strategies:
+- **auto** (default): Automatically chooses the best strategy based on content type
+  - Markdown files: Split by headers and sections
+  - Code files: Split by functions and classes  
+  - JSON files: Split by token count
+  - Text files: Split by paragraphs and token count
+- **sections**: Split by natural content boundaries (headers, functions, etc.)
+- **tokens**: Split by token count with smart line boundaries
+- **lines**: Split by line count (legacy method)
+
+### Large File Parameters:
+- **chunkStrategy**: Choose chunking method ("auto", "sections", "tokens", "lines")
+- **maxTokens**: Set maximum tokens per chunk (defaults to 60% of context limit)
+- **chunkIndex**: Read a specific chunk (0-based index)
+- **showSummary**: Get file overview with all available chunks
+- **preserveContext**: Include context lines from adjacent chunks
+
+### Navigation Examples:
+```
+# Get file summary first
+showSummary=true
+
+# Read specific chunk
+chunkIndex=0
+
+# Use different chunking strategy
+chunkStrategy=sections maxTokens=30000
+
+# Include context from adjacent chunks
+chunkIndex=1 preserveContext=true
+```
+
+### Error Handling:
+- Files exceeding context limits are automatically chunked
+- Clear error messages explain available options
+- Navigation instructions provided for multi-chunk files
+- Graceful fallback to standard reading for small files
+
+The tool seamlessly handles both small and large files, providing the best reading experience based on file size and content type.
