@@ -62,11 +62,11 @@
   },
   "files": [
     "bin/**/*",
+    "dist/**/*",
+    "dist-tsc/**/*",
     "binaries/**/*",
     "scripts/**/*",
-    "README.md",
-    "src/**/*.ts",
-    "src/**/*.txt"
+    "README.md"
   ],
   "dependencies": {
     "@actions/core": "1.11.1",
