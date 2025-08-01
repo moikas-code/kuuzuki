@@ -1,0 +1,34 @@
+{
+  "project": {
+    "name": "kuuzuki",
+    "type": "typescript-monorepo",
+    "description": "Community-driven fork of OpenCode - AI-powered terminal assistant"
+  },
+  "mcp": {
+    "servers": {
+      "kb-mcp": {
+        "transport": "stdio",
+        "command": ["kb", "serve", "--local"],
+        "env": {
+          "DEBUG": "1"
+        },
+        "enabled": true,
+        "notes": "Knowledge base and documentation management"
+      },
+      "weather": {
+        "transport": "stdio", 
+        "command": ["kuuzuki", "x", "@h1deya/mcp-server-weather"],
+        "enabled": true,
+        "notes": "Weather information server"
+      },
+      "sequential-thinking": {
+        "transport": "stdio",
+        "command": ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"],
+        "enabled": true,
+        "notes": "Complex problem solving and analysis"
+      }
+    },
+    "preferredServers": ["kb-mcp", "sequential-thinking"],
+    "disabledServers": []
+  }
+}

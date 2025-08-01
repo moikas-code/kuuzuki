@@ -870,7 +870,57 @@ export namespace Session {
         inputSchema: item.parameters as ZodSchema,
         async execute(args, options) {
           await processor.track(options.toolCallId)
-          const result = await item.execute(args, {
+          
+          // Add validation error handling for tool parameters
+          let validatedArgs = args
+          try {
+            // If the tool has parameters schema, validate and potentially fix
+            if (item.parameters && 'parse' in item.parameters) {
+              validatedArgs = item.parameters.parse(args)
+            }
+          } catch (validationError: any) {
+            log.warn(`Tool parameter validation error for ${item.id}:`, {
+              error: validationError.message,
+              args,
+              tool: item.id
+            })
+            
+            // For TodoWrite tool, handle common validation errors gracefully
+            if (item.id === 'TodoWrite' && validationError.message?.includes('Invalid enum value')) {
+              // Try to fix common issues like invalid priority values
+              if (args.todos && Array.isArray(args.todos)) {
+                validatedArgs = {
+                  ...args,
+                  todos: args.todos.map((todo: any) => ({
+                    ...todo,
+                    // Default invalid priority to 'medium'
+                    priority: ['high', 'medium', 'low', 'critical'].includes(todo.priority) 
+                      ? todo.priority 
+                      : 'medium'
+                  }))
+                }
+                
+                // Try parsing again with fixed values
+                try {
+                  validatedArgs = item.parameters.parse(validatedArgs)
+                } catch (e) {
+                  // If still failing, return error to AI
+                  return {
+                    error: `Tool validation failed: ${validationError.message}. Please check your parameters.`,
+                    suggestion: "For TodoWrite, use priority values: 'high', 'medium', 'low', or 'critical'"
+                  }
+                }
+              }
+            } else {
+              // For other validation errors, return helpful message
+              return {
+                error: `Tool validation failed: ${validationError.message}`,
+                suggestion: "Please check the tool parameters and try again."
+              }
+            }
+          }
+          
+          const result = await item.execute(validatedArgs, {
             sessionID: input.sessionID,
             abort: abortSignal.signal,
             messageID: assistantMsg.id,

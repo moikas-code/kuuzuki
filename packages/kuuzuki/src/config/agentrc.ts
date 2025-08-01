@@ -502,3 +502,52 @@ export function mergeAgentrcConfigs(...configs: Partial<AgentrcConfig>[]): Agent
 
   return AgentrcSchema.parse(merged)
 }
+
+/**
+ * Translates .agentrc MCP server configuration to the format expected by the MCP interpreter
+ */
+export function translateAgentrcMcpToConfig(agentrcMcp: AgentrcConfig["mcp"]): Record<string, any> {
+  if (!agentrcMcp?.servers) {
+    return {}
+  }
+
+  const translatedServers: Record<string, any> = {}
+
+  for (const [serverName, serverConfig] of Object.entries(agentrcMcp.servers)) {
+    // Handle discriminated union types
+    if (serverConfig.transport === "stdio") {
+      translatedServers[serverName] = {
+        type: "local",
+        command: serverConfig.command,
+        environment: serverConfig.env || {},
+        enabled: serverConfig.enabled ?? true,
+      }
+    } else if (serverConfig.transport === "http") {
+      translatedServers[serverName] = {
+        type: "remote",
+        url: serverConfig.url,
+        headers: serverConfig.headers || {},
+        enabled: serverConfig.enabled ?? true,
+      }
+    }
+  }
+
+  return translatedServers
+}
+
+/**
+ * Merges .agentrc MCP configuration with existing kuuzuki.json MCP configuration
+ * kuuzuki.json takes precedence over .agentrc for conflicting server names
+ */
+export function mergeAgentrcMcpWithConfig(
+  agentrcMcp: AgentrcConfig["mcp"],
+  existingMcp: Record<string, any> = {}
+): Record<string, any> {
+  const translatedAgentrcMcp = translateAgentrcMcpToConfig(agentrcMcp)
+  
+  // Merge with existing config, giving precedence to existing config
+  return {
+    ...translatedAgentrcMcp,
+    ...existingMcp,
+  }
+}

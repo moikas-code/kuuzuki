@@ -22,6 +22,24 @@ Skip using this tool when:
 
 NOTE that you should not use this tool if there is only one trivial task to do. In this case you are better off just doing the task directly.
 
+## Todo Item Parameters
+
+### Structure Example
+```json
+{
+  "id": "unique-id-123",
+  "content": "Implement user authentication",
+  "status": "pending",    // Options: "pending", "in_progress", "completed", "cancelled"
+  "priority": "high"      // Options: "high", "medium", "low", "critical"
+}
+```
+
+**Priority Levels**:
+- `"critical"`: Urgent issues blocking progress
+- `"high"`: Important tasks that should be done soon
+- `"medium"`: Standard priority tasks
+- `"low"`: Nice-to-have or cleanup tasks
+
 ## Examples of When to Use the Todo List
 
 <example>
@@ -157,6 +175,7 @@ The assistant did not use the todo list because this is a single command executi
    - Only have ONE task in_progress at any time
    - Complete current tasks before starting new ones
    - Cancel tasks that become irrelevant
+   - Use priority values: "high", "medium", "low", or "critical"
 
 3. **Task Breakdown**:
    - Create specific, actionable items
