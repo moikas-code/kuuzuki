@@ -380,6 +380,10 @@ func renderToolDetails(
 			if stdout != nil {
 				body += ansi.Strip(fmt.Sprintf("%s", stdout))
 			}
+			stderr := metadata["stderr"]
+			if stderr != nil {
+				body += ansi.Strip(fmt.Sprintf("%s", stderr))
+			}
 			body += "```"
 			body = util.ToMarkdown(body, width, backgroundColor)
 		case "webfetch":
