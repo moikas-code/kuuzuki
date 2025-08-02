@@ -1,0 +1,185 @@
+{
+  "summary": {
+    "total_commits": 80,
+    "integrated_count": 0,
+    "skipped_count": 0,
+    "pending_count": 0,
+    "critical_count": 0,
+    "high_count": 0,
+    "avg_conflict_risk": 0.173625
+  },
+  "actionableItems": [
+    {
+      "hash": "71cd84dbbb59c3655ef9647e9cb1280eb16e73cb",
+      "message": "force models.dev refresh on auth login",
+      "author": "Dax Raad",
+      "commit_date": "2025-08-01T21:48:01.000Z",
+      "priority": "critical",
+      "category": "security",
+      "reasoning": "Categorized as security based on commit message, affects auth, database areas, estimated small effort"
+    },
+    {
+      "hash": "022c979d287a21e341adaa1fe8bab77a8f40eb39",
+      "message": "tweak: sanitize mcp server names (#831)",
+      "author": "Aiden Cline",
+      "commit_date": "2025-08-01T14:11:40.000Z",
+      "priority": "critical",
+      "category": "security",
+      "reasoning": "Categorized as security based on commit message, estimated trivial effort"
+    },
+    {
+      "hash": "52f9b3757629828fd63798e80c8c075451b10460",
+      "message": "docs(permissions): add wildcard example (#1494)",
+      "author": "Timo Clasen",
+      "commit_date": "2025-08-01T10:24:32.000Z",
+      "priority": "critical",
+      "category": "security",
+      "reasoning": "Categorized as security based on commit message, affects auth, docs areas, estimated trivial effort"
+    },
+    {
+      "hash": "12f84f198fa3285e4e6dfdf73ecac7cc488818c7",
+      "message": "improve wildcard matching for permissions",
+      "author": "Dax Raad",
+      "commit_date": "2025-08-01T00:40:05.000Z",
+      "priority": "critical",
+      "category": "security",
+      "reasoning": "Categorized as security based on commit message, estimated trivial effort"
+    },
+    {
+      "hash": "f07f04d96901617f4cfa5744a2ae2f05e1b3eb4b",
+      "message": "fix escape button not canceling if retry in progress",
+      "author": "Dax Raad",
+      "commit_date": "2025-07-31T23:55:57.000Z",
+      "priority": "critical",
+      "category": "security",
+      "reasoning": "Categorized as security based on commit message, affects build areas, estimated trivial effort"
+    },
+    {
+      "hash": "4273714a6202d4be62a98e46916b0ce4398d0047",
+      "message": "fix issue with some bash commands asking for permission",
+      "author": "Dax Raad",
+      "commit_date": "2025-07-31T22:35:51.000Z",
+      "priority": "critical",
+      "category": "security",
+      "reasoning": "Categorized as security based on commit message, affects build areas, estimated small effort"
+    },
+    {
+      "hash": "aa9105649d15b6f792eb41524d9ddb6c602d0f3b",
+      "message": "docs: permissions",
+      "author": "Dax Raad",
+      "commit_date": "2025-07-31T21:38:48.000Z",
+      "priority": "critical",
+      "category": "security",
+      "reasoning": "Categorized as security based on commit message, affects config areas, estimated trivial effort"
+    },
+    {
+      "hash": "53be288040f0bc84ac41d172421e46fc9c4a4c9c",
+      "message": "docs: permissions",
+      "author": "Dax Raad",
+      "commit_date": "2025-07-31T21:35:44.000Z",
+      "priority": "critical",
+      "category": "security",
+      "reasoning": "Categorized as security based on commit message, affects auth, docs areas, estimated trivial effort"
+    },
+    {
+      "hash": "5e72f50554ccd29cadff60a0de6bc7eaaf035540",
+      "message": "wip: permissions",
+      "author": "Dax Raad",
+      "commit_date": "2025-07-31T21:19:56.000Z",
+      "priority": "critical",
+      "category": "security",
+      "reasoning": "Categorized as security based on commit message, affects auth, config, docs areas, estimated small effort"
+    },
+    {
+      "hash": "614a23698fcbdf89d8e5ccfee68c42b70633e7b6",
+      "message": "wip: permissions",
+      "author": "Dax Raad",
+      "commit_date": "2025-07-31T20:51:55.000Z",
+      "priority": "critical",
+      "category": "security",
+      "reasoning": "Categorized as security based on commit message, affects auth, api, docs, ui, test areas, estimated medium effort"
+    },
+    {
+      "hash": "a2191ce6fb594526f66a551ee1654c0d871a34ca",
+      "message": "wip: permissions",
+      "author": "Dax Raad",
+      "commit_date": "2025-07-31T20:38:31.000Z",
+      "priority": "critical",
+      "category": "security",
+      "reasoning": "Categorized as security based on commit message, affects ui, test, build areas, estimated medium effort"
+    },
+    {
+      "hash": "936f4cb0c661cd48718fb5cd7dace646f9e10715",
+      "message": "fix: permission state hangs",
+      "author": "adamdotdevin",
+      "commit_date": "2025-07-31T16:36:08.000Z",
+      "priority": "critical",
+      "category": "security",
+      "reasoning": "Categorized as security based on commit message, affects ui areas, estimated small effort"
+    },
+    {
+      "hash": "a5b20f973fb575ba25256c1b3cb13b03bea96fa1",
+      "message": "wip: refactor permissions",
+      "author": "Dax Raad",
+      "commit_date": "2025-07-31T16:26:34.000Z",
+      "priority": "critical",
+      "category": "security",
+      "reasoning": "Categorized as security based on commit message, affects auth, api, docs, test, ui areas, estimated medium effort, high conflict risk (60%)"
+    },
+    {
+      "hash": "5500698734c5119ccd7b0d9ab504bb3a53e5e39d",
+      "message": "wip: tui permissions",
+      "author": "adamdotdevin",
+      "commit_date": "2025-07-31T14:34:43.000Z",
+      "priority": "critical",
+      "category": "security",
+      "reasoning": "Categorized as security based on commit message, affects auth, api, test, ui, docs areas, estimated large effort, high conflict risk (60%)"
+    },
+    {
+      "hash": "33cef075d228e80aefb44671ec68e1989c2855a8",
+      "message": "ci: new publish method (#1451)",
+      "author": "Dax",
+      "commit_date": "2025-07-31T05:00:29.000Z",
+      "priority": "critical",
+      "category": "feature",
+      "reasoning": "Categorized as feature based on commit message, affects build, docs, api, config, test, ui, auth areas, estimated xl effort, high conflict risk (75%), priority adjusted from high to critical"
+    },
+    {
+      "hash": "9bedd62da4fe76936c6755dd1138e07fd26b835a",
+      "message": "experimental well-known auth support",
+      "author": "Dax Raad",
+      "commit_date": "2025-07-29T23:30:24.000Z",
+      "priority": "critical",
+      "category": "security",
+      "reasoning": "Categorized as security based on commit message, affects auth, config areas, estimated small effort"
+    },
+    {
+      "hash": "b65172a2b78869356ebbe68a8ce8fb917e39a680",
+      "message": "Tweak auth cli copy",
+      "author": "Jay V",
+      "commit_date": "2025-07-24T23:16:05.000Z",
+      "priority": "critical",
+      "category": "security",
+      "reasoning": "Categorized as security based on commit message, affects auth areas, estimated trivial effort"
+    },
+    {
+      "hash": "e74b4d098b14c8232ca8eed5106291114f339f7d",
+      "message": "allow search in provider select",
+      "author": "Dax Raad",
+      "commit_date": "2025-08-01T18:01:40.000Z",
+      "priority": "high",
+      "category": "chore",
+      "reasoning": "Categorized as chore based on commit message, affects build, auth areas, estimated small effort, priority adjusted from medium to high"
+    },
+    {
+      "hash": "4c34b69ae64bf0a04f532d88ea9296ccb2790475",
+      "message": "chore: fix test to have deterministic testing (#1401)",
+      "author": "Yordis Prieto",
+      "commit_date": "2025-07-29T22:54:22.000Z",
+      "priority": "high",
+      "category": "bugfix",
+      "reasoning": "Categorized as bugfix based on commit message, affects test areas, estimated small effort"
+    }
+  ],
+  "generatedAt": "2025-08-02T23:18:36.990Z"
+}

@@ -1,64 +1,34 @@
 {
-  "$schema": "https://json.schemastore.org/package.json",
-  "name": "kuuzuki",
+  "name": "kuuzuki-monorepo",
+  "version": "0.1.17",
+  "description": "Kuuzuki monorepo with fork parity tracking",
   "private": true,
-  "type": "module",
-  "packageManager": "bun@1.2.14",
   "scripts": {
-    "dev": "bun run packages/kuuzuki/src/index.ts",
-    "typecheck": "bun run --filter='*' typecheck",
-    "stainless": "./scripts/stainless",
-    "postinstall": "./scripts/hooks",
-    "run": "./run.sh",
-    "deploy": "sst deploy",
-    "deploy:prod": "sst deploy --stage production",
-    "deploy:wrangler": "./scripts/deploy-wrangler.sh development",
-    "deploy:wrangler:prod": "./scripts/deploy-wrangler.sh production",
-    "setup:cloudflare": "./scripts/setup-cloudflare.sh",
-    "dev:infra": "sst dev",
-    "remove": "sst remove",
-    "remove:prod": "sst remove --stage production",
-    "build": "./run.sh build",
-    "build:all": "./run.sh build all",
+    "parity:generate": "fork-parity-dashboard generate",
+    "parity:analyze": "fork-parity-dashboard analyze",
+    "parity:dashboard": "fork-parity-dashboard serve",
+    "parity:cleanup": "fork-parity-dashboard cleanup",
+    "parity:sync": "fork-parity sync && npm run parity:generate",
+    "parity:status": "fork-parity dashboard --format=markdown",
+    "parity:critical": "fork-parity dashboard --priority=critical --format=markdown",
+    "parity:web": "npm run parity:generate && npm run parity:dashboard",
+    "build": "./run.sh build all",
     "build:tui": "./run.sh build tui",
     "build:server": "./run.sh build server",
+    "dev": "./dev.sh watch",
     "dev:tui": "./run.sh dev tui",
     "dev:server": "./run.sh dev server",
-    "dev:web": "bun run --filter @kuuzuki/web dev",
+    "test": "bun test",
     "clean": "./run.sh clean",
-    "check": "./run.sh check",
-    "generate-sdks": "./scripts/generate-sdks.sh"
+    "check": "./run.sh check"
   },
-  "workspaces": {
-    "packages": [
-      "packages/*",
-      "!packages/sdk"
-    ],
-    "catalog": {
-      "typescript": "5.8.2",
-      "@types/node": "22.13.9",
-      "zod": "3.25.49",
-      "ai": "5.0.0-beta.21"
-    }
-  },
-  "devDependencies": {
-    "prettier": "3.5.3",
-    "stripe": "18.3.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/moikas-code/kuuzuki"
-  },
-  "license": "MIT",
-  "prettier": {
-    "semi": false,
-    "printWidth": 120
-  },
-  "trustedDependencies": [
-    "esbuild",
-    "protobufjs",
-    "sharp"
+  "workspaces": [
+    "packages/*"
   ],
-  "patchedDependencies": {},
-  "version": "0.0.1"
+  "devDependencies": {
+    "bun": "latest"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }

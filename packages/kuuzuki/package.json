@@ -39,7 +39,14 @@
     "build:all": "npm run build:bun && npm run build:tsc",
     "validate": "node scripts/validate-package.js",
     "prepublishOnly": "npm run validate && node scripts/prepublish.js",
-    "postinstall": "node scripts/postinstall.js"
+    "postinstall": "node scripts/postinstall.js",
+    "parity:generate": "cd ../.. && fork-parity-dashboard generate",
+    "parity:analyze": "cd ../.. && fork-parity-dashboard analyze",
+    "parity:dashboard": "cd ../.. && fork-parity-dashboard serve",
+    "parity:cleanup": "cd ../.. && fork-parity-dashboard cleanup",
+    "parity:sync": "cd ../.. && fork-parity sync && npm run parity:generate",
+    "parity:status": "cd ../.. && fork-parity dashboard --format=markdown",
+    "parity:critical": "cd ../.. && fork-parity dashboard --priority=critical --format=markdown"
   },
   "bin": {
     "kuuzuki": "./bin/kuuzuki.js"
