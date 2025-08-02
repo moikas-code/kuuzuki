@@ -1056,85 +1056,54 @@ export namespace Session {
     const availableToolNames = new Set(Object.keys(tools))
     addFallbackTools(tools, availableToolNames, processor)
 
-    // SILENT CONTEXT COMPACTION: Trim messages if needed, but continue with task
+    // SMART CONTEXT COMPACTION: Intelligent task-aware context management
     const contextLimit = model.info.limit.context || 200000
     const safetyMargin = 0.85 // Use 85% of context limit for safety
     const maxSafeTokens = Math.floor(contextLimit * safetyMargin)
     const reservedForOutput = outputLimit
     const maxInputTokens = maxSafeTokens - reservedForOutput
 
-    // Calculate current token usage
-    const systemTokens = system.reduce((total, content) => total + Math.ceil(content.length / 3.5), 0)
-    let currentInputTokens = systemTokens
+    // Use SmartContextManager for intelligent compaction
+    const { SmartContextManager } = await import("./context/SmartContextManager")
+    const contextManager = new SmartContextManager()
 
-    // Count tokens in messages and trim if necessary
-    let trimmedMsgs = [...msgs]
-    const modelMessages = MessageV2.toModelMessage(trimmedMsgs)
-
-    for (const msg of modelMessages) {
-      let msgTokens = 0
-      if (typeof msg.content === "string") {
-        msgTokens = Math.ceil(msg.content.length / 3.5)
-      } else if (Array.isArray(msg.content)) {
-        msgTokens = msg.content.reduce((total, part) => {
-          if (part.type === "text") {
-            return total + Math.ceil(part.text.length / 3.5)
-          }
-          return total
-        }, 0)
-      }
-      currentInputTokens += msgTokens
+    const compactionOptions = {
+      maxTokens: maxInputTokens,
+      safetyMargin,
+      preserveTaskContext: true,
+      preserveToolOutputs: true,
+      preserveErrors: true,
+      minRecentMessages: 5,
+      taskContinuationPrompts: true,
     }
 
-    // If we exceed the limit, silently trim older messages (keep recent ones)
-    if (currentInputTokens > maxInputTokens) {
-      log.info("silently compacting context to fit within limits", {
-        currentInputTokens,
-        maxInputTokens,
-        contextLimit,
+    const compactionResult = await contextManager.compactContext(msgs, compactionOptions)
+
+    // Update msgs to use the intelligently trimmed version
+    msgs = compactionResult.trimmedMessages
+
+    // Log the smart compaction results
+    log.info("smart context compaction completed", {
+      originalMessages:
+        msgs.length + (compactionResult.tokensRemoved > 0 ? Math.ceil(compactionResult.tokensRemoved / 100) : 0),
+      preservedMessages: msgs.length,
+      tokensRemoved: compactionResult.tokensRemoved,
+      preservationRatio: compactionResult.preservationRatio,
+      strategy: compactionResult.compactionStrategy,
+      activeTasks: compactionResult.preservedTasks.length,
+      sessionID: input.sessionID,
+    })
+
+    // Add continuation prompt if there are incomplete tasks
+    if (compactionResult.continuationPrompt) {
+      // Inject continuation prompt as a system message
+      system.push(`\n--- TASK CONTINUATION ---\n${compactionResult.continuationPrompt}`)
+
+      log.info("added task continuation prompt", {
         sessionID: input.sessionID,
-      })
-
-      // Keep the most recent messages that fit within the limit
-      let tokenCount = systemTokens
-      const keptMessages = []
-
-      // Work backwards from most recent messages
-      for (let i = trimmedMsgs.length - 1; i >= 0; i--) {
-        const msg = trimmedMsgs[i]
-        const modelMsg = MessageV2.toModelMessage([msg])[0]
-
-        let msgTokens = 0
-        if (typeof modelMsg.content === "string") {
-          msgTokens = Math.ceil(modelMsg.content.length / 3.5)
-        } else if (Array.isArray(modelMsg.content)) {
-          msgTokens = modelMsg.content.reduce((total, part) => {
-            if (part.type === "text") {
-              return total + Math.ceil(part.text.length / 3.5)
-            }
-            return total
-          }, 0)
-        }
-
-        if (tokenCount + msgTokens <= maxInputTokens) {
-          keptMessages.unshift(msg)
-          tokenCount += msgTokens
-        } else {
-          break // Stop adding messages if we'd exceed the limit
-        }
-      }
-
-      trimmedMsgs = keptMessages
-      log.info("context compacted", {
-        originalMessages: msgs.length,
-        keptMessages: trimmedMsgs.length,
-        finalTokens: tokenCount,
-        sessionID: input.sessionID,
+        activeTasks: compactionResult.preservedTasks.length,
       })
     }
-
-    // Update msgs to use the trimmed version
-    msgs = trimmedMsgs
 
     const stream = streamText({
       onError() {},
