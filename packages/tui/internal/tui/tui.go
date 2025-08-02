@@ -39,6 +39,9 @@ type InterruptDebounceTimeoutMsg struct{}
 // ExitDebounceTimeoutMsg is sent when the exit key debounce timeout expires
 type ExitDebounceTimeoutMsg struct{}
 
+// FocusDetectionTimeoutMsg is sent when focus detection timeout expires
+type FocusDetectionTimeoutMsg struct{}
+
 // InterruptKeyState tracks the state of interrupt key presses for debouncing
 type InterruptKeyState int
 
@@ -57,6 +60,7 @@ const (
 
 const interruptDebounceTimeout = 1 * time.Second
 const exitDebounceTimeout = 1 * time.Second
+const focusDetectionTimeout = 3 * time.Second
 
 type Model struct {
 	width, height        int
@@ -81,6 +85,9 @@ type Model struct {
 	activeConfirmation  *chat.ConfirmationMessage
 	activeToolApproval  *chat.ToolApprovalMessage
 	activeTextInput     *chat.TextInputMessage
+	// Focus state tracking for multi-instance drag-and-drop filtering
+	hasFocus       bool
+	focusSupported bool
 }
 
 func (a Model) Init() tea.Cmd {
@@ -90,6 +97,15 @@ func (a Model) Init() tea.Cmd {
 	if !util.IsWsl() {
 		cmds = append(cmds, tea.RequestBackgroundColor)
 	}
+
+	// Enable focus reporting for multi-instance drag-and-drop filtering
+	cmds = append(cmds, tea.EnableReportFocus)
+
+	// Set timeout to detect if focus events are supported
+	cmds = append(cmds, tea.Tick(focusDetectionTimeout, func(time.Time) tea.Msg {
+		return FocusDetectionTimeoutMsg{}
+	}))
+
 	cmds = append(cmds, a.app.InitializeProvider())
 	cmds = append(cmds, a.editor.Init())
 	cmds = append(cmds, a.messages.Init())
@@ -342,6 +358,18 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				ThemeName: theme.CurrentThemeName(),
 			}
 		}
+	case tea.FocusMsg:
+		a.hasFocus = true
+		a.focusSupported = true
+		a.editor.SetFocusState(a.hasFocus, a.focusSupported)
+		slog.Debug("TUI gained focus - drag-and-drop enabled")
+		return a, nil
+	case tea.BlurMsg:
+		a.hasFocus = false
+		a.focusSupported = true
+		a.editor.SetFocusState(a.hasFocus, a.focusSupported)
+		slog.Debug("TUI lost focus - drag-and-drop disabled")
+		return a, nil
 	case modal.CloseModalMsg:
 		a.editor.Focus()
 		var cmd tea.Cmd
@@ -542,6 +570,14 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Reset exit key state after timeout
 		a.exitKeyState = ExitKeyIdle
 		a.editor.SetExitKeyInDebounce(false)
+	case FocusDetectionTimeoutMsg:
+		// If no focus events received within timeout, disable focus filtering
+		if !a.focusSupported {
+			slog.Debug("Focus detection timeout - disabling focus-based filtering")
+			a.focusSupported = false
+			a.hasFocus = true // Default to allowing all paste events
+			a.editor.SetFocusState(a.hasFocus, a.focusSupported)
+		}
 	case dialog.FindSelectedMsg:
 		return a.openFile(msg.FilePath)
 	case dialog.ShowInitDialogMsg:
@@ -1215,7 +1251,13 @@ func NewModel(app *app.App) tea.Model {
 		exitKeyState:         ExitKeyIdle,
 		fileViewer:           fileviewer.New(app),
 		messagesRight:        app.State.MessagesRight,
+		// Initialize focus state - assume focused on startup
+		hasFocus:       true,
+		focusSupported: false, // Will be set to true when first focus event is received
 	}
+
+	// Set initial focus state in editor
+	editor.SetFocusState(model.hasFocus, model.focusSupported)
 
 	return model
 }

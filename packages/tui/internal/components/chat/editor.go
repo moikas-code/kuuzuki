@@ -46,6 +46,7 @@ type EditorComponent interface {
 	SetInterruptKeyInDebounce(inDebounce bool)
 	SetExitKeyInDebounce(inDebounce bool)
 	RestoreFromHistory(index int)
+	SetFocusState(hasFocus bool, focusSupported bool)
 }
 
 type editorComponent struct {
@@ -59,6 +60,9 @@ type editorComponent struct {
 	currentText            string // Store current text when navigating history
 	pasteCounter           int
 	reverted               bool
+	// Focus state for multi-instance drag-and-drop filtering
+	hasFocus       bool
+	focusSupported bool
 }
 
 func (m *editorComponent) Init() tea.Cmd {
@@ -155,6 +159,12 @@ func (m *editorComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	case tea.PasteMsg:
+		// Filter paste events based on focus state for multi-instance drag-and-drop
+		if m.focusSupported && !m.hasFocus {
+			slog.Debug("Ignoring paste event - TUI not focused")
+			return m, nil
+		}
+
 		text := string(msg)
 
 		if filePath := strings.TrimSpace(strings.TrimPrefix(text, "@")); strings.HasPrefix(text, "@") && filePath != "" {
@@ -210,6 +220,12 @@ func (m *editorComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.textarea.InsertAttachment(attachment)
 		m.textarea.InsertString(" ")
 	case tea.ClipboardMsg:
+		// Filter clipboard events based on focus state for multi-instance drag-and-drop
+		if m.focusSupported && !m.hasFocus {
+			slog.Debug("Ignoring clipboard event - TUI not focused")
+			return m, nil
+		}
+
 		text := string(msg)
 		// Check if the pasted text is long and should be summarized
 		if m.shouldSummarizePastedText(text) {
@@ -551,6 +567,11 @@ func (m *editorComponent) SetValueWithAttachments(value string) {
 
 func (m *editorComponent) SetExitKeyInDebounce(inDebounce bool) {
 	m.exitKeyInDebounce = inDebounce
+}
+
+func (m *editorComponent) SetFocusState(hasFocus bool, focusSupported bool) {
+	m.hasFocus = hasFocus
+	m.focusSupported = focusSupported
 }
 
 func (m *editorComponent) getInterruptKeyText() string {
