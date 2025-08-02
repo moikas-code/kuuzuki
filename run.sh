@@ -62,9 +62,15 @@ build_tui() {
     cd "$SCRIPT_DIR/packages/tui"
     
     print_info "Building kuuzuki TUI..."
-    go build -o kuuzuki-tui ./cmd/kuuzuki
     
-    print_success "TUI built successfully"
+    # Get version from package.json
+    VERSION=$(jq -r .version ../kuuzuki/package.json)
+    print_info "Injecting version: $VERSION"
+    
+    # Build with version injection using ldflags
+    go build -ldflags "-X main.Version=$VERSION" -o kuuzuki-tui ./cmd/kuuzuki
+    
+    print_success "TUI built successfully with version $VERSION"
     cd "$SCRIPT_DIR"
 }
 
