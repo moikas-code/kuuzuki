@@ -311,7 +311,8 @@ function formatChunk(
     // LSP and FileTime not available in this context, continue without them
   }
 
-  return {    title: `${fileName} (${chunk.chunkIndex + 1}/${chunk.totalChunks})`,
+  return {
+    title: `${fileName} (${chunk.chunkIndex + 1}/${chunk.totalChunks})`,
     output,
     metadata: {
       fileSize: chunk.tokenCount,
