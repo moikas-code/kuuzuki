@@ -1439,6 +1439,63 @@ export namespace Session {
 
     const processor = createProcessor(next, model.info)
 
+    // Context limit protection for summarization
+    const outputLimit = 4000 // Conservative estimate for summary output
+    const contextLimit = model.info.limit.context || 200000
+    const safetyThreshold = contextLimit * 0.8 // Conservative threshold for summarization
+    
+    // Estimate tokens for system prompts and summary request
+    const systemTokens = estimateTokens(system.join("\n"))
+    const summaryRequestTokens = estimateTokens("Provide a detailed but concise summary of our conversation above. Focus on information that would be helpful for continuing the conversation, including what we did, what we're doing, which files we're working on, and what we're going to do next.")
+    const fixedTokens = systemTokens + summaryRequestTokens + outputLimit
+    
+    // Calculate available tokens for conversation history
+    const availableTokens = safetyThreshold - fixedTokens
+    
+    // Intelligently truncate messages if needed
+    let messagesToSummarize = filtered
+    if (availableTokens > 0) {
+      let currentTokens = 0
+      const truncatedMessages = []
+      
+      // Start from the most recent messages and work backwards
+      for (let i = filtered.length - 1; i >= 0; i--) {
+        const msg = filtered[i]
+        const modelMsgs = MessageV2.toModelMessage([msg])
+        let msgTokens = 0
+        
+        for (const modelMsg of modelMsgs) {
+          if (typeof modelMsg.content === "string") {
+            msgTokens += estimateTokens(modelMsg.content)
+          } else if (Array.isArray(modelMsg.content)) {
+            for (const part of modelMsg.content) {
+              if (part.type === "text") {
+                msgTokens += estimateTokens(part.text)
+              }
+            }
+          }
+        }
+        
+        if (currentTokens + msgTokens <= availableTokens) {
+          truncatedMessages.unshift(msg)
+          currentTokens += msgTokens
+        } else {
+          // Log truncation for debugging
+          log.info("summarization message truncation", {
+            sessionID: input.sessionID,
+            totalMessages: filtered.length,
+            includedMessages: truncatedMessages.length,
+            truncatedMessages: i + 1,
+            availableTokens,
+            usedTokens: currentTokens,
+          })
+          break
+        }
+      }
+      
+      messagesToSummarize = truncatedMessages
+    }
+
     const summaryMessages = [
       ...system.map(
         (x): ModelMessage => ({
@@ -1446,7 +1503,7 @@ export namespace Session {
           content: x,
         }),
       ),
-      ...MessageV2.toModelMessage(filtered),
+      ...MessageV2.toModelMessage(messagesToSummarize),
       {
         role: "user" as const,
         content: [
@@ -1465,6 +1522,7 @@ export namespace Session {
       abortSignal: abortSignal.signal,
       model: model.language,
       messages: validatedSummaryMessages,
+      maxOutputTokens: outputLimit,
     })
 
     const result = await processor.process(stream)

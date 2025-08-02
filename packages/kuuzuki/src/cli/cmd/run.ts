@@ -58,8 +58,23 @@ export const RunCommand = cmd({
         type: "string",
         describe: "mode to use",
       })
+      .option("debug", {
+        type: "boolean",
+        describe: "Enable debug logging",
+        default: false,
+      })
+      .option("verbose", {
+        type: "boolean",
+        describe: "Enable verbose logging",
+        default: false,
+      })
   },
   handler: async (args) => {
+    // Enable debug logging if requested
+    if (args.debug || args.verbose) {
+      process.env.KUUZUKI_DEBUG = "true"
+    }
+
     let message = args.message.join(" ")
 
     if (!process.stdin.isTTY) message += "\n" + (await Bun.stdin.text())

@@ -82,8 +82,23 @@ export const TuiCommand = cmd({
         type: "string",
         describe: "hostname to listen on",
         default: "127.0.0.1",
+      })
+      .option("debug", {
+        type: "boolean",
+        describe: "Enable debug logging",
+        default: false,
+      })
+      .option("verbose", {
+        type: "boolean",
+        describe: "Enable verbose logging",
+        default: false,
       }),
   handler: async (args) => {
+    // Enable debug logging if requested
+    if (args.debug || args.verbose) {
+      process.env.KUUZUKI_DEBUG = "true"
+    }
+
     while (true) {
       const cwd = args.project ? path.resolve(args.project) : process.cwd()
       try {
