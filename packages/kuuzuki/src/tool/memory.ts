@@ -3,6 +3,7 @@ import * as path from "path"
 import { Tool } from "./tool"
 import { App } from "../app/app"
 import { Permission } from "../permission"
+import DESCRIPTION from "./memory.txt"
 
 // Schema definitions for memory tool
 const RuleAnalyticsSchema = z.object({
@@ -95,26 +96,7 @@ interface AgentRc {
 }
 
 export const MemoryTool = Tool.define("memory", {
-  description: `Manage .agentrc rules and project memory. This tool allows you to add, update, remove, and organize rules that guide AI agent behavior.
-
-Actions:
-- add: Add a new rule to the specified category
-- update: Update an existing rule by ID
-- remove: Remove a rule by ID
-- list: List all rules or rules in a specific category
-- link: Link a rule to a documentation file for detailed guidance
-- migrate: Migrate old string-based rules to new structured format
-- suggest: Get contextually relevant rules for current situation
-- analytics: Show usage statistics and effectiveness metrics
-- read-docs: Auto-read documentation linked to rules
-- conflicts: Detect and display rule conflicts
-- feedback: Record user feedback on rule effectiveness
-
-Categories:
-- critical: Must-follow rules that prevent errors or ensure quality
-- preferred: Best practices and style preferences
-- contextual: Rules that reference documentation files for complex patterns
-- deprecated: Rules that are no longer relevant but kept for reference`,
+  description: DESCRIPTION,
 
   parameters: z.object({
     action: z.enum([

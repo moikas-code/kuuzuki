@@ -12,6 +12,16 @@ import { WebFetchTool } from "./webfetch"
 import { WriteTool } from "./write"
 import { MemoryTool } from "./memory"
 
+/**
+ * Tool Registry - Internal Management System
+ *
+ * This module manages the registration and configuration of user-facing tools.
+ * It defines which tools are available to AI agents and handles provider-specific
+ * tool configurations.
+ *
+ * This is an internal management system and does not need a .txt description file
+ * because it's not a user-facing tool that AI agents can call directly.
+ */
 export namespace ToolRegistry {
   const ALL = [
     BashTool,

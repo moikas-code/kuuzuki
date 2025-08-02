@@ -1,0 +1,69 @@
+Manage .agentrc rules and project memory. This tool allows you to add, update, remove, and organize rules that guide AI agent behavior.
+
+## Actions
+
+### Rule Management
+- **add**: Add a new rule to the specified category
+- **update**: Update an existing rule by ID  
+- **remove**: Remove a rule by ID
+- **list**: List all rules or rules in a specific category
+
+### Advanced Features
+- **link**: Link a rule to a documentation file for detailed guidance
+- **migrate**: Migrate old string-based rules to new structured format
+- **suggest**: Get contextually relevant rules for current situation
+- **analytics**: Show usage statistics and effectiveness metrics
+- **read-docs**: Auto-read documentation linked to rules
+- **conflicts**: Detect and display rule conflicts
+- **feedback**: Record user feedback on rule effectiveness
+
+## Rule Categories
+
+- **critical**: Must-follow rules that prevent errors or ensure quality
+- **preferred**: Best practices and style preferences  
+- **contextual**: Rules that reference documentation files for complex patterns
+- **deprecated**: Rules that are no longer relevant but kept for reference
+
+## Usage Examples
+
+### Adding Rules
+```
+memory(action="add", rule="Always use TypeScript strict mode", category="critical", reason="Prevents runtime type errors")
+```
+
+### Contextual Rules with Documentation
+```
+memory(action="add", rule="Follow React component patterns", category="contextual", filePath="docs/react-patterns.md")
+memory(action="link", ruleId="react-patterns-123", filePath="docs/component-guide.md")
+```
+
+### Analytics and Optimization
+```
+memory(action="analytics", timeframe="30d")
+memory(action="suggest", context="Working on React components with TypeScript")
+memory(action="conflicts")
+```
+
+### Feedback and Improvement
+```
+memory(action="feedback", ruleId="rule-123", rating=5, comment="This rule saved me from a major bug")
+```
+
+## Features
+
+### Smart Suggestions
+The tool analyzes your current context (files, tools, errors) to suggest relevant rules automatically.
+
+### Conflict Detection
+Automatically detects contradictory, overlapping, or redundant rules and suggests resolutions.
+
+### Documentation Integration
+Links rules to documentation files for complex patterns that need detailed explanations.
+
+### Analytics & Learning
+Tracks rule effectiveness, usage patterns, and user feedback to improve rule recommendations.
+
+### Migration Support
+Seamlessly migrates from simple string-based rules to the new structured format with categories and metadata.
+
+This tool helps maintain consistent coding practices, captures institutional knowledge, and improves AI agent behavior over time through learned patterns and user feedback.

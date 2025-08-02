@@ -44,6 +44,8 @@ import { LSP } from "../lsp"
 import { ReadTool } from "../tool/read"
 import { mergeDeep, pipe, splitWhen } from "remeda"
 import { ToolRegistry } from "../tool/registry"
+import { ToolInterceptor } from "../tool/interceptor"
+import { ToolAnalytics } from "../tool/analytics"
 import { validateSessionID, validateMessageID } from "../util/id-validation"
 
 export namespace Session {
@@ -478,6 +480,76 @@ export namespace Session {
     ),
   })
   export type ChatInput = z.infer<typeof ChatInput>
+
+  /**
+   * Add fallback tools for common missing tool patterns
+   */
+  function addFallbackTools(
+    tools: Record<string, AITool>, 
+    availableToolNames: Set<string>,
+    processor: any
+  ) {
+    const commonMissingTools = [
+      'kb_read', 'kb_search', 'kb_update', 'kb_create', 'kb_delete', 
+      'kb_status', 'kb_issues', 'kb_list', 'kb',
+      'moidvk_check_code_practices', 'moidvk_format_code'
+    ]
+
+    for (const missingTool of commonMissingTools) {
+      if (availableToolNames.has(missingTool)) continue
+
+      const resolution = ToolInterceptor.intercept(
+        { name: missingTool, parameters: {} },
+        availableToolNames
+      )
+
+      if (resolution.success && resolution.resolvedCall) {
+        // Create an alias tool that redirects to the resolved tool
+        const resolvedToolName = resolution.resolvedCall.name
+        const resolvedTool = tools[resolvedToolName]
+        
+        if (resolvedTool) {
+          tools[missingTool] = tool({
+            id: missingTool as any,
+            description: `Fallback for ${missingTool} - redirects to ${resolvedToolName}`,
+            inputSchema: resolvedTool.inputSchema,
+            async execute(args, options) {
+              log.info(`Redirecting ${missingTool} to ${resolvedToolName}`, { args })
+              return await resolvedTool.execute(args, options)
+            }
+          })
+          log.info(`Added fallback tool: ${missingTool} -> ${resolvedToolName}`)
+          ToolAnalytics.recordResolution(missingTool, true, "fallback-redirect", resolvedToolName)
+        }
+      } else if (resolution.alternatives && resolution.alternatives.length > 0) {
+        // Create a fallback tool that suggests alternatives
+        tools[missingTool] = tool({
+          id: missingTool as any,
+          description: `Fallback for ${missingTool} - provides alternative suggestions`,
+          inputSchema: z.object({}).passthrough(),
+          async execute(args, options) {
+            await processor.track(options.toolCallId)
+            
+            const errorMessage = ToolInterceptor.createErrorMessage(missingTool, {
+              success: false,
+              alternatives: resolution.alternatives
+            })
+            
+            return {
+              output: errorMessage,
+              title: `Tool ${missingTool} not available`,
+              metadata: { 
+                fallback: true, 
+                alternatives: resolution.alternatives 
+              }
+            }
+          }
+        })
+        log.info(`Added alternative suggestion tool: ${missingTool}`)
+        ToolAnalytics.recordResolution(missingTool, false, "fallback-suggestion")
+      }
+    }
+  }
 
   export async function chat(
     input: z.infer<typeof ChatInput>,
@@ -977,6 +1049,10 @@ export namespace Session {
       }
       tools[key] = item
     }
+
+    // Add fallback tools for common missing tool patterns
+    const availableToolNames = new Set(Object.keys(tools))
+    addFallbackTools(tools, availableToolNames, processor)
 
     const stream = streamText({
       onError() {},
