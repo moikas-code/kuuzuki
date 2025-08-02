@@ -220,11 +220,15 @@ export namespace Session {
         }[]
       >()
 
+      // Track recent summarizations to prevent multiple summarizations
+      const recentSummarizations = new Map<string, number>() // sessionID -> timestamp
+
       return {
         sessions,
         messages,
         pending,
         queued,
+        recentSummarizations,
       }
     },
     async (state) => {
@@ -336,7 +340,6 @@ export namespace Session {
     })
     await Share.remove(id, share.secret)
   }
-
 
   export async function update(id: string, editor: (session: Info) => void) {
     const { sessions } = state()
@@ -484,30 +487,31 @@ export namespace Session {
   /**
    * Add fallback tools for common missing tool patterns
    */
-  function addFallbackTools(
-    tools: Record<string, AITool>, 
-    availableToolNames: Set<string>,
-    processor: any
-  ) {
+  function addFallbackTools(tools: Record<string, AITool>, availableToolNames: Set<string>, processor: any) {
     const commonMissingTools = [
-      'kb_read', 'kb_search', 'kb_update', 'kb_create', 'kb_delete', 
-      'kb_status', 'kb_issues', 'kb_list', 'kb',
-      'moidvk_check_code_practices', 'moidvk_format_code'
+      "kb_read",
+      "kb_search",
+      "kb_update",
+      "kb_create",
+      "kb_delete",
+      "kb_status",
+      "kb_issues",
+      "kb_list",
+      "kb",
+      "moidvk_check_code_practices",
+      "moidvk_format_code",
     ]
 
     for (const missingTool of commonMissingTools) {
       if (availableToolNames.has(missingTool)) continue
 
-      const resolution = ToolInterceptor.intercept(
-        { name: missingTool, parameters: {} },
-        availableToolNames
-      )
+      const resolution = ToolInterceptor.intercept({ name: missingTool, parameters: {} }, availableToolNames)
 
       if (resolution.success && resolution.resolvedCall) {
         // Create an alias tool that redirects to the resolved tool
         const resolvedToolName = resolution.resolvedCall.name
         const resolvedTool = tools[resolvedToolName]
-        
+
         if (resolvedTool) {
           tools[missingTool] = tool({
             id: missingTool as any,
@@ -516,7 +520,7 @@ export namespace Session {
             async execute(args, options) {
               log.info(`Redirecting ${missingTool} to ${resolvedToolName}`, { args })
               return await resolvedTool.execute(args, options)
-            }
+            },
           })
           log.info(`Added fallback tool: ${missingTool} -> ${resolvedToolName}`)
           ToolAnalytics.recordResolution(missingTool, true, "fallback-redirect", resolvedToolName)
@@ -529,21 +533,21 @@ export namespace Session {
           inputSchema: z.object({}).passthrough(),
           async execute(args, options) {
             await processor.track(options.toolCallId)
-            
+
             const errorMessage = ToolInterceptor.createErrorMessage(missingTool, {
               success: false,
-              alternatives: resolution.alternatives
+              alternatives: resolution.alternatives,
             })
-            
+
             return {
               output: errorMessage,
               title: `Tool ${missingTool} not available`,
-              metadata: { 
-                fallback: true, 
-                alternatives: resolution.alternatives 
-              }
+              metadata: {
+                fallback: true,
+                alternatives: resolution.alternatives,
+              },
             }
-          }
+          },
         })
         log.info(`Added alternative suggestion tool: ${missingTool}`)
         ToolAnalytics.recordResolution(missingTool, false, "fallback-suggestion")
@@ -782,7 +786,7 @@ export namespace Session {
     const previous = msgs.filter((x) => x.info.role === "assistant").at(-1)?.info as MessageV2.Assistant
     const outputLimit = Math.min(model.info.limit.output, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX
     const systemPrompts: string[] = []
-    
+
     // Get mode early to avoid temporal dead zone
     const mode = await Mode.get(inputMode)
 
@@ -942,23 +946,23 @@ export namespace Session {
         inputSchema: item.parameters as ZodSchema,
         async execute(args, options) {
           await processor.track(options.toolCallId)
-          
+
           // Add validation error handling for tool parameters
           let validatedArgs = args
           try {
             // If the tool has parameters schema, validate and potentially fix
-            if (item.parameters && 'parse' in item.parameters) {
+            if (item.parameters && "parse" in item.parameters) {
               validatedArgs = item.parameters.parse(args)
             }
           } catch (validationError: any) {
             log.warn(`Tool parameter validation error for ${item.id}:`, {
               error: validationError.message,
               args,
-              tool: item.id
+              tool: item.id,
             })
-            
+
             // For TodoWrite tool, handle common validation errors gracefully
-            if (item.id === 'TodoWrite' && validationError.message?.includes('Invalid enum value')) {
+            if (item.id === "TodoWrite" && validationError.message?.includes("Invalid enum value")) {
               // Try to fix common issues like invalid priority values
               if (args.todos && Array.isArray(args.todos)) {
                 validatedArgs = {
@@ -966,12 +970,10 @@ export namespace Session {
                   todos: args.todos.map((todo: any) => ({
                     ...todo,
                     // Default invalid priority to 'medium'
-                    priority: ['high', 'medium', 'low', 'critical'].includes(todo.priority) 
-                      ? todo.priority 
-                      : 'medium'
-                  }))
+                    priority: ["high", "medium", "low", "critical"].includes(todo.priority) ? todo.priority : "medium",
+                  })),
                 }
-                
+
                 // Try parsing again with fixed values
                 try {
                   validatedArgs = item.parameters.parse(validatedArgs)
@@ -979,7 +981,7 @@ export namespace Session {
                   // If still failing, return error to AI
                   return {
                     error: `Tool validation failed: ${validationError.message}. Please check your parameters.`,
-                    suggestion: "For TodoWrite, use priority values: 'high', 'medium', 'low', or 'critical'"
+                    suggestion: "For TodoWrite, use priority values: 'high', 'medium', 'low', or 'critical'",
                   }
                 }
               }
@@ -987,11 +989,11 @@ export namespace Session {
               // For other validation errors, return helpful message
               return {
                 error: `Tool validation failed: ${validationError.message}`,
-                suggestion: "Please check the tool parameters and try again."
+                suggestion: "Please check the tool parameters and try again.",
               }
             }
           }
-          
+
           const result = await item.execute(validatedArgs, {
             sessionID: input.sessionID,
             abort: abortSignal.signal,
@@ -1053,6 +1055,86 @@ export namespace Session {
     // Add fallback tools for common missing tool patterns
     const availableToolNames = new Set(Object.keys(tools))
     addFallbackTools(tools, availableToolNames, processor)
+
+    // SILENT CONTEXT COMPACTION: Trim messages if needed, but continue with task
+    const contextLimit = model.info.limit.context || 200000
+    const safetyMargin = 0.85 // Use 85% of context limit for safety
+    const maxSafeTokens = Math.floor(contextLimit * safetyMargin)
+    const reservedForOutput = outputLimit
+    const maxInputTokens = maxSafeTokens - reservedForOutput
+
+    // Calculate current token usage
+    const systemTokens = system.reduce((total, content) => total + Math.ceil(content.length / 3.5), 0)
+    let currentInputTokens = systemTokens
+
+    // Count tokens in messages and trim if necessary
+    let trimmedMsgs = [...msgs]
+    const modelMessages = MessageV2.toModelMessage(trimmedMsgs)
+
+    for (const msg of modelMessages) {
+      let msgTokens = 0
+      if (typeof msg.content === "string") {
+        msgTokens = Math.ceil(msg.content.length / 3.5)
+      } else if (Array.isArray(msg.content)) {
+        msgTokens = msg.content.reduce((total, part) => {
+          if (part.type === "text") {
+            return total + Math.ceil(part.text.length / 3.5)
+          }
+          return total
+        }, 0)
+      }
+      currentInputTokens += msgTokens
+    }
+
+    // If we exceed the limit, silently trim older messages (keep recent ones)
+    if (currentInputTokens > maxInputTokens) {
+      log.info("silently compacting context to fit within limits", {
+        currentInputTokens,
+        maxInputTokens,
+        contextLimit,
+        sessionID: input.sessionID,
+      })
+
+      // Keep the most recent messages that fit within the limit
+      let tokenCount = systemTokens
+      const keptMessages = []
+
+      // Work backwards from most recent messages
+      for (let i = trimmedMsgs.length - 1; i >= 0; i--) {
+        const msg = trimmedMsgs[i]
+        const modelMsg = MessageV2.toModelMessage([msg])[0]
+
+        let msgTokens = 0
+        if (typeof modelMsg.content === "string") {
+          msgTokens = Math.ceil(modelMsg.content.length / 3.5)
+        } else if (Array.isArray(modelMsg.content)) {
+          msgTokens = modelMsg.content.reduce((total, part) => {
+            if (part.type === "text") {
+              return total + Math.ceil(part.text.length / 3.5)
+            }
+            return total
+          }, 0)
+        }
+
+        if (tokenCount + msgTokens <= maxInputTokens) {
+          keptMessages.unshift(msg)
+          tokenCount += msgTokens
+        } else {
+          break // Stop adding messages if we'd exceed the limit
+        }
+      }
+
+      trimmedMsgs = keptMessages
+      log.info("context compacted", {
+        originalMessages: msgs.length,
+        keptMessages: trimmedMsgs.length,
+        finalTokens: tokenCount,
+        sessionID: input.sessionID,
+      })
+    }
+
+    // Update msgs to use the trimmed version
+    msgs = trimmedMsgs
 
     const stream = streamText({
       onError() {},
@@ -1149,9 +1231,7 @@ export namespace Session {
     }
     state().queued.delete(input.sessionID)
     return result
-
-
-}
+  }
 
   function createProcessor(assistantMsg: MessageV2.Assistant, model: ModelsDev.Model) {
     const toolCalls: Record<string, MessageV2.ToolPart> = {}
@@ -1475,6 +1555,23 @@ export namespace Session {
   }
 
   export async function summarize(input: { sessionID: string; providerID: string; modelID: string }) {
+    // Check if we've summarized recently to prevent multiple summarizations
+    const now = Date.now()
+    const lastSummarization = state().recentSummarizations.get(input.sessionID)
+    const SUMMARIZATION_COOLDOWN = 30000 // 30 seconds cooldown
+
+    if (lastSummarization && now - lastSummarization < SUMMARIZATION_COOLDOWN) {
+      log.info("skipping summarization due to recent summarization", {
+        sessionID: input.sessionID,
+        lastSummarization,
+        cooldownRemaining: SUMMARIZATION_COOLDOWN - (now - lastSummarization),
+      })
+      return // Skip summarization if done recently
+    }
+
+    // Track this summarization attempt
+    state().recentSummarizations.set(input.sessionID, now)
+
     using abortSignal = lock(input.sessionID)
     const msgs = await messages(input.sessionID)
     const lastSummary = msgs.findLast((msg) => msg.info.role === "assistant" && msg.info.summary === true)
@@ -1519,27 +1616,29 @@ export namespace Session {
     const outputLimit = 4000 // Conservative estimate for summary output
     const contextLimit = model.info.limit.context || 200000
     const safetyThreshold = contextLimit * 0.8 // Conservative threshold for summarization
-    
+
     // Estimate tokens for system prompts and summary request
     const systemTokens = estimateTokens(system.join("\n"))
-    const summaryRequestTokens = estimateTokens("Provide a detailed but concise summary of our conversation above. Focus on information that would be helpful for continuing the conversation, including what we did, what we're doing, which files we're working on, and what we're going to do next.")
+    const summaryRequestTokens = estimateTokens(
+      "Provide a detailed but concise summary of our conversation above. Focus on information that would be helpful for continuing the conversation, including what we did, what we're doing, which files we're working on, and what we're going to do next.",
+    )
     const fixedTokens = systemTokens + summaryRequestTokens + outputLimit
-    
+
     // Calculate available tokens for conversation history
     const availableTokens = safetyThreshold - fixedTokens
-    
+
     // Intelligently truncate messages if needed
     let messagesToSummarize = filtered
     if (availableTokens > 0) {
       let currentTokens = 0
       const truncatedMessages = []
-      
+
       // Start from the most recent messages and work backwards
       for (let i = filtered.length - 1; i >= 0; i--) {
         const msg = filtered[i]
         const modelMsgs = MessageV2.toModelMessage([msg])
         let msgTokens = 0
-        
+
         for (const modelMsg of modelMsgs) {
           if (typeof modelMsg.content === "string") {
             msgTokens += estimateTokens(modelMsg.content)
@@ -1551,7 +1650,7 @@ export namespace Session {
             }
           }
         }
-        
+
         if (currentTokens + msgTokens <= availableTokens) {
           truncatedMessages.unshift(msg)
           currentTokens += msgTokens
@@ -1568,7 +1667,7 @@ export namespace Session {
           break
         }
       }
-      
+
       messagesToSummarize = truncatedMessages
     }
 
@@ -1684,5 +1783,4 @@ export namespace Session {
     })
     await App.initialize()
   }
-
 }
