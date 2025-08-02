@@ -1,5 +1,14 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec"
 
+/**
+ * Tool Interface Definitions - Internal Type System
+ *
+ * This module defines the core interfaces and types for the tool system.
+ * It provides the foundational types that all tools implement.
+ *
+ * This is an internal type definition module and does not need a .txt description file
+ * because it's not a user-facing tool registered in the ToolRegistry.
+ */
 export namespace Tool {
   interface Metadata {
     [key: string]: any

@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { Tool } from "./tool"
 import DESCRIPTION_WRITE from "./todowrite.txt"
+import DESCRIPTION_READ from "./todoread.txt"
 import { App } from "../app/app"
 
 const TodoInfo = z.object({
@@ -37,7 +38,7 @@ export const TodoWriteTool = Tool.define("todowrite", {
 })
 
 export const TodoReadTool = Tool.define("todoread", {
-  description: "Use this tool to read your todo list",
+  description: DESCRIPTION_READ,
   parameters: z.object({}),
   async execute(_params, opts) {
     const todos = state()[opts.sessionID] ?? []

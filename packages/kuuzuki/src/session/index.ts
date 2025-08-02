@@ -44,6 +44,8 @@ import { LSP } from "../lsp"
 import { ReadTool } from "../tool/read"
 import { mergeDeep, pipe, splitWhen } from "remeda"
 import { ToolRegistry } from "../tool/registry"
+import { ToolInterceptor } from "../tool/interceptor"
+import { ToolAnalytics } from "../tool/analytics"
 import { validateSessionID, validateMessageID } from "../util/id-validation"
 
 export namespace Session {
@@ -478,6 +480,76 @@ export namespace Session {
     ),
   })
   export type ChatInput = z.infer<typeof ChatInput>
+
+  /**
+   * Add fallback tools for common missing tool patterns
+   */
+  function addFallbackTools(
+    tools: Record<string, AITool>, 
+    availableToolNames: Set<string>,
+    processor: any
+  ) {
+    const commonMissingTools = [
+      'kb_read', 'kb_search', 'kb_update', 'kb_create', 'kb_delete', 
+      'kb_status', 'kb_issues', 'kb_list', 'kb',
+      'moidvk_check_code_practices', 'moidvk_format_code'
+    ]
+
+    for (const missingTool of commonMissingTools) {
+      if (availableToolNames.has(missingTool)) continue
+
+      const resolution = ToolInterceptor.intercept(
+        { name: missingTool, parameters: {} },
+        availableToolNames
+      )
+
+      if (resolution.success && resolution.resolvedCall) {
+        // Create an alias tool that redirects to the resolved tool
+        const resolvedToolName = resolution.resolvedCall.name
+        const resolvedTool = tools[resolvedToolName]
+        
+        if (resolvedTool) {
+          tools[missingTool] = tool({
+            id: missingTool as any,
+            description: `Fallback for ${missingTool} - redirects to ${resolvedToolName}`,
+            inputSchema: resolvedTool.inputSchema,
+            async execute(args, options) {
+              log.info(`Redirecting ${missingTool} to ${resolvedToolName}`, { args })
+              return await resolvedTool.execute(args, options)
+            }
+          })
+          log.info(`Added fallback tool: ${missingTool} -> ${resolvedToolName}`)
+          ToolAnalytics.recordResolution(missingTool, true, "fallback-redirect", resolvedToolName)
+        }
+      } else if (resolution.alternatives && resolution.alternatives.length > 0) {
+        // Create a fallback tool that suggests alternatives
+        tools[missingTool] = tool({
+          id: missingTool as any,
+          description: `Fallback for ${missingTool} - provides alternative suggestions`,
+          inputSchema: z.object({}).passthrough(),
+          async execute(args, options) {
+            await processor.track(options.toolCallId)
+            
+            const errorMessage = ToolInterceptor.createErrorMessage(missingTool, {
+              success: false,
+              alternatives: resolution.alternatives
+            })
+            
+            return {
+              output: errorMessage,
+              title: `Tool ${missingTool} not available`,
+              metadata: { 
+                fallback: true, 
+                alternatives: resolution.alternatives 
+              }
+            }
+          }
+        })
+        log.info(`Added alternative suggestion tool: ${missingTool}`)
+        ToolAnalytics.recordResolution(missingTool, false, "fallback-suggestion")
+      }
+    }
+  }
 
   export async function chat(
     input: z.infer<typeof ChatInput>,
@@ -978,6 +1050,10 @@ export namespace Session {
       tools[key] = item
     }
 
+    // Add fallback tools for common missing tool patterns
+    const availableToolNames = new Set(Object.keys(tools))
+    addFallbackTools(tools, availableToolNames, processor)
+
     const stream = streamText({
       onError() {},
       async prepareStep({ messages }) {
@@ -1439,6 +1515,63 @@ export namespace Session {
 
     const processor = createProcessor(next, model.info)
 
+    // Context limit protection for summarization
+    const outputLimit = 4000 // Conservative estimate for summary output
+    const contextLimit = model.info.limit.context || 200000
+    const safetyThreshold = contextLimit * 0.8 // Conservative threshold for summarization
+    
+    // Estimate tokens for system prompts and summary request
+    const systemTokens = estimateTokens(system.join("\n"))
+    const summaryRequestTokens = estimateTokens("Provide a detailed but concise summary of our conversation above. Focus on information that would be helpful for continuing the conversation, including what we did, what we're doing, which files we're working on, and what we're going to do next.")
+    const fixedTokens = systemTokens + summaryRequestTokens + outputLimit
+    
+    // Calculate available tokens for conversation history
+    const availableTokens = safetyThreshold - fixedTokens
+    
+    // Intelligently truncate messages if needed
+    let messagesToSummarize = filtered
+    if (availableTokens > 0) {
+      let currentTokens = 0
+      const truncatedMessages = []
+      
+      // Start from the most recent messages and work backwards
+      for (let i = filtered.length - 1; i >= 0; i--) {
+        const msg = filtered[i]
+        const modelMsgs = MessageV2.toModelMessage([msg])
+        let msgTokens = 0
+        
+        for (const modelMsg of modelMsgs) {
+          if (typeof modelMsg.content === "string") {
+            msgTokens += estimateTokens(modelMsg.content)
+          } else if (Array.isArray(modelMsg.content)) {
+            for (const part of modelMsg.content) {
+              if (part.type === "text") {
+                msgTokens += estimateTokens(part.text)
+              }
+            }
+          }
+        }
+        
+        if (currentTokens + msgTokens <= availableTokens) {
+          truncatedMessages.unshift(msg)
+          currentTokens += msgTokens
+        } else {
+          // Log truncation for debugging
+          log.info("summarization message truncation", {
+            sessionID: input.sessionID,
+            totalMessages: filtered.length,
+            includedMessages: truncatedMessages.length,
+            truncatedMessages: i + 1,
+            availableTokens,
+            usedTokens: currentTokens,
+          })
+          break
+        }
+      }
+      
+      messagesToSummarize = truncatedMessages
+    }
+
     const summaryMessages = [
       ...system.map(
         (x): ModelMessage => ({
@@ -1446,7 +1579,7 @@ export namespace Session {
           content: x,
         }),
       ),
-      ...MessageV2.toModelMessage(filtered),
+      ...MessageV2.toModelMessage(messagesToSummarize),
       {
         role: "user" as const,
         content: [
@@ -1465,6 +1598,7 @@ export namespace Session {
       abortSignal: abortSignal.signal,
       model: model.language,
       messages: validatedSummaryMessages,
+      maxOutputTokens: outputLimit,
     })
 
     const result = await processor.process(stream)

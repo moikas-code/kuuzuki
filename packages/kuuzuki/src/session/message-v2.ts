@@ -5,6 +5,7 @@ import { Message } from "./message"
 import { convertToModelMessages, type ModelMessage, type UIMessage } from "ai"
 import { Identifier } from "../id/id"
 import { LSP } from "../lsp"
+import { Log } from "../util/log"
 
 export namespace MessageV2 {
   export const OutputLengthError = NamedError.create("MessageOutputLengthError", z.object({}))
@@ -430,15 +431,19 @@ export namespace MessageV2 {
       parts: Part[]
     }[],
   ): ModelMessage[] {
+    const log = Log.create({ service: "message-v2" })
     const result: UIMessage[] = []
 
     for (const msg of input) {
       if (msg.parts.length === 0) {
-        console.warn("MessageV2.toModelMessage: Skipping message with empty parts", {
-          messageId: msg.info.id,
-          role: msg.info.role,
-          sessionID: msg.info.sessionID,
-        })
+        // Only log in debug mode to prevent sensitive information exposure
+        if (process.env.KUUZUKI_DEBUG === "true") {
+          log.debug("Skipping message with empty parts", {
+            messageId: msg.info.id,
+            role: msg.info.role,
+            // sessionID removed for security - no longer exposed
+          })
+        }
         continue
       }
 
