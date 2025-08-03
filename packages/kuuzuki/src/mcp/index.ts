@@ -1,48 +1,50 @@
-import { experimental_createMCPClient, type Tool } from "ai"
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js"
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
-import { App } from "../app/app"
-import { Config } from "../config/config"
-import { Log } from "../util/log"
-import { NamedError } from "../util/error"
-import { z } from "zod"
-import { Session } from "../session"
-import { Bus } from "../bus"
+import { experimental_createMCPClient, type Tool } from "ai";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { App } from "../app/app";
+import { Config } from "../config/config";
+import { Log } from "../util/log";
+import { NamedError } from "../util/error";
+import { z } from "zod";
+import { Session } from "../session";
+import { Bus } from "../bus";
 
 export namespace MCP {
-  const log = Log.create({ service: "mcp" })
+  const log = Log.create({ service: "mcp" });
 
   export const Failed = NamedError.create(
     "MCPFailed",
     z.object({
       name: z.string(),
     }),
-  )
+  );
 
   const state = App.state(
     "mcp",
     async () => {
-      const cfg = await Config.get()
+      const cfg = await Config.get();
       const clients: {
-        [name: string]: Awaited<ReturnType<typeof experimental_createMCPClient>>
-      } = {}
+        [name: string]: Awaited<
+          ReturnType<typeof experimental_createMCPClient>
+        >;
+      } = {};
       for (const [key, mcpConfig] of Object.entries(cfg.mcp ?? {})) {
         // Type assertion to ensure mcpConfig conforms to expected MCP config structure
         const mcp = mcpConfig as {
-          enabled?: boolean
-          type: "remote" | "local"
-          url?: string
-          headers?: Record<string, string>
-          command?: string[]
-          environment?: Record<string, string>
-        }
-        
+          enabled?: boolean;
+          type: "remote" | "local";
+          url?: string;
+          headers?: Record<string, string>;
+          command?: string[];
+          environment?: Record<string, string>;
+        };
+
         if (mcp.enabled === false) {
-          log.info("mcp server disabled", { key })
-          continue
+          log.info("mcp server disabled", { key });
+          continue;
         }
-        log.info("found", { key, type: mcp.type })
+        log.info("found", { key, type: mcp.type });
         if (mcp.type === "remote") {
           const transports = [
             new StreamableHTTPClientTransport(new URL(mcp.url!), {
@@ -55,15 +57,15 @@ export namespace MCP {
                 headers: mcp.headers,
               },
             }),
-          ]
+          ];
           for (const transport of transports) {
             const client = await experimental_createMCPClient({
               name: key,
               transport,
-            }).catch(() => {})
-            if (!client) continue
-            clients[key] = client
-            break
+            }).catch(() => {});
+            if (!client) continue;
+            clients[key] = client;
+            break;
           }
           if (!clients[key])
             Bus.publish(Session.Event.Error, {
@@ -73,11 +75,11 @@ export namespace MCP {
                   message: `MCP server ${key} failed to start`,
                 },
               },
-            })
+            });
         }
 
         if (mcp.type === "local") {
-          const [cmd, ...args] = mcp.command!
+          const [cmd, ...args] = mcp.command!;
           const client = await experimental_createMCPClient({
             name: key,
             transport: new StdioClientTransport({
@@ -90,7 +92,7 @@ export namespace MCP {
                 ...mcp.environment,
               },
             }),
-          }).catch(() => {})
+          }).catch(() => {});
           if (!client) {
             Bus.publish(Session.Event.Error, {
               error: {
@@ -99,35 +101,36 @@ export namespace MCP {
                   message: `MCP server ${key} failed to start`,
                 },
               },
-            })
-            continue
+            });
+            continue;
           }
-          clients[key] = client
+          clients[key] = client;
         }
       }
 
       return {
         clients,
-      }
+      };
     },
     async (state) => {
       for (const client of Object.values(state.clients)) {
-        client.close()
+        client.close();
       }
     },
-  )
+  );
 
   export async function clients() {
-    return state().then((state) => state.clients)
+    return state().then((state) => state.clients);
   }
 
   export async function tools() {
-    const result: Record<string, Tool> = {}
+    const result: Record<string, Tool> = {};
     for (const [clientName, client] of Object.entries(await clients())) {
       for (const [toolName, tool] of Object.entries(await client.tools())) {
-        result[clientName + "_" + toolName] = tool
+        const sanitizedClientName = clientName.replace(/\s+/g, "_");
+        result[sanitizedClientName + "_" + toolName] = tool;
       }
     }
-    return result
+    return result;
   }
 }
