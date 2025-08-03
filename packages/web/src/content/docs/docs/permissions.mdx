@@ -1,0 +1,410 @@
+---
+title: Permissions
+description: Configure command permissions and security controls in kuuzuki with full OpenCode compatibility
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components";
+
+The permission system in kuuzuki provides flexible security controls with **full OpenCode compatibility**. You can use either kuuzuki's simplified array format or OpenCode's advanced object format - both work seamlessly.
+
+## Overview
+
+When permissions are configured, kuuzuki will prompt for user approval before executing commands that match your specified patterns. This is particularly useful for:
+
+- Destructive operations (`rm -rf`, `git reset --hard`)
+- Network requests (`curl`, `wget`)
+- System modifications (`sudo` commands)
+- Package installations (`npm install`, `pip install`)
+
+## Configuration Formats
+
+kuuzuki supports **two configuration formats** for maximum flexibility:
+
+<Tabs>
+<TabItem label="kuuzuki Simple Format">
+
+```json
+{
+  "permission": ["git *", "rm -rf *", "curl *", "sudo *"]
+}
+```
+
+**Perfect for:** Quick setup, simple use cases, command-based restrictions.
+
+</TabItem>
+<TabItem label="OpenCode Compatible Format">
+
+```json
+{
+  "permission": {
+    "bash": {
+      "git push": "ask",
+      "git status": "allow",
+      "*": "allow"
+    },
+    "edit": "ask"
+  }
+}
+```
+
+**Perfect for:** Advanced control, tool-specific permissions, OpenCode migration.
+
+</TabItem>
+<TabItem label="Global Permissions">
+
+```json
+{
+  "permission": {
+    "bash": "ask",
+    "edit": "allow"
+  }
+}
+```
+
+**Perfect for:** Blanket security policies, maximum protection.
+
+</TabItem>
+</Tabs>
+## Wildcard Patterns
+
+The permission system supports glob-style wildcard patterns:
+
+### Basic Wildcards
+
+- `*` - Matches any characters within a single argument
+- `**` - Matches everything (use with caution)
+- `?` - Matches any single character
+
+### Pattern Examples
+
+| Pattern         | Matches                                                 | Doesn't Match                |
+| --------------- | ------------------------------------------------------- | ---------------------------- |
+| `git *`         | `git status`, `git add .`, `git commit -m "msg"`        | `npm install`, `ls -la`      |
+| `rm -rf *`      | `rm -rf directory`, `rm -rf file.txt`                   | `rm file.txt`, `ls -la`      |
+| `curl *`        | `curl https://api.com`, `curl -X POST https://api.com`  | `wget https://api.com`       |
+| `sudo *`        | `sudo apt update`, `sudo systemctl restart nginx`       | `apt update`                 |
+| `npm install *` | `npm install package`, `npm install --save-dev package` | `npm run build`              |
+| `**`            | Any command                                             | Nothing (matches everything) |
+
+### Advanced Patterns
+
+```json
+{
+  "permission": [
+    "git push *", // Only git push commands
+    "rm -rf *", // Recursive deletions
+    "curl * | *", // Curl with pipes
+    "* > /etc/*", // Writing to system directories
+    "docker run *", // Docker container execution
+    "ssh *" // SSH connections
+  ]
+}
+```
+
+## Permission Workflow
+
+When a command matches a permission pattern:
+
+1. **Command Execution Paused** - The command is intercepted before execution
+2. **Permission Request** - A dialog appears showing:
+   - The exact command to be executed
+   - Command description (if provided)
+   - Security context
+3. **User Decision** - Choose from:
+   - **Allow Once** - Execute this command once
+   - **Allow Always** - Remember approval for this exact command
+   - **Deny** - Block the command execution
+
+### Permission Dialog Example
+
+```
+┌─ Permission Required ─────────────────────────────┐
+│                                                   │
+│ Command: rm -rf temp_directory                    │
+│ Description: Remove temporary directory           │
+│                                                   │
+│ This command requires permission to execute.      │
+│                                                   │
+│ [A] Allow Once   [S] Allow Always   [D] Deny      │
+└───────────────────────────────────────────────────┘
+```
+
+## Security Best Practices
+
+### Recommended Patterns
+
+For most users, these patterns provide good security coverage:
+
+```json
+{
+  "permission": [
+    "rm -rf *",
+    "sudo *",
+    "curl *",
+    "wget *",
+    "git push *",
+    "git reset --hard *",
+    "docker run *",
+    "npm install *",
+    "pip install *",
+    "* > /etc/*",
+    "* > /usr/*"
+  ]
+}
+```
+
+### High-Security Environment
+
+For sensitive environments, consider broader patterns:
+
+```json
+{
+  "permission": ["**"]
+}
+```
+
+This requires approval for **every** command, providing maximum security but reduced convenience.
+
+### Development Environment
+
+For development work, focus on destructive operations:
+
+```json
+{
+  "permission": [
+    "rm -rf *",
+    "git reset --hard *",
+    "git push *",
+    "docker *",
+    "sudo *"
+  ]
+}
+```
+
+## Pattern Testing
+
+You can test your patterns using the kuuzuki CLI:
+
+```bash
+# Test if a command would require permission
+kuuzuki test-permission "git push origin main"
+
+# List all configured patterns
+kuuzuki list-permissions
+
+# Validate pattern syntax
+kuuzuki validate-pattern "git *"
+```
+
+## Troubleshooting
+
+### Pattern Not Matching
+
+If your pattern isn't working as expected:
+
+1. **Check Pattern Syntax** - Ensure wildcards are properly placed
+2. **Test with Simple Patterns** - Start with basic patterns like `git *`
+3. **Case Sensitivity** - Patterns are case-insensitive by default
+4. **Exact Matching** - Remember that `git *` won't match `git` (no arguments)
+
+### Too Many Prompts
+
+If you're getting too many permission requests:
+
+1. **Refine Patterns** - Make patterns more specific
+2. **Use "Allow Always"** - For trusted commands you run frequently
+3. **Review Configuration** - Remove overly broad patterns like `**`
+
+### Commands Not Being Caught
+
+If dangerous commands aren't being caught:
+
+1. **Add Missing Patterns** - Your patterns might not cover all cases
+2. **Test Pattern Matching** - Use the testing commands above
+3. **Check Configuration** - Ensure `kuuzuki.json` is in the right location
+
+## Examples
+
+### Web Development
+
+<Tabs>
+<TabItem label="kuuzuki Format">
+
+```json
+{
+  "permission": [
+    "rm -rf node_modules",
+    "npm install *",
+    "git push *",
+    "curl *",
+    "docker *"
+  ]
+}
+```
+
+</TabItem>
+<TabItem label="OpenCode Format">
+
+```json
+{
+  "permission": {
+    "bash": {
+      "git push": "ask",
+      "npm install": "ask",
+      "docker": "ask",
+      "*": "allow"
+    },
+    "edit": "allow"
+  }
+}
+```
+
+</TabItem>
+</Tabs>
+
+### System Administration
+
+<Tabs>
+<TabItem label="kuuzuki Format">
+
+```json
+{
+  "permission": ["sudo *", "rm -rf *", "systemctl *", "service *"]
+}
+```
+
+</TabItem>
+<TabItem label="OpenCode Format">
+
+```json
+{
+  "permission": {
+    "bash": "ask",
+    "edit": "ask"
+  }
+}
+```
+
+</TabItem>
+</Tabs>
+
+### OpenCode Migration
+
+If you're migrating from OpenCode, your existing config works unchanged:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "bash": {
+      "git push": "ask",
+      "*": "allow"
+    }
+  }
+}
+```
+
+Just change the schema URL to `https://kuuzuki.ai/config.json` and you're done!
+
+## Advanced Features
+
+### Filesystem Protection
+
+kuuzuki automatically prevents commands from accessing files outside your project directory:
+
+```bash
+# ✅ Allowed (within project)
+rm -rf ./temp
+
+# ❌ Blocked (outside project)
+rm -rf /etc/passwd
+```
+
+### AST-Based Analysis
+
+Commands are parsed using tree-sitter for accurate security analysis:
+
+- Detects complex command structures
+- Handles pipes, redirects, and subcommands
+- Provides precise pattern matching
+
+### Smart Pattern Matching
+
+kuuzuki enhances OpenCode patterns with intelligent matching:
+
+```json
+{
+  "permission": {
+    "bash": {
+      "git push": "ask" // Matches "git push", "git push origin main", etc.
+    }
+  }
+}
+```
+
+## Migration & Compatibility
+
+### From OpenCode
+
+Your existing OpenCode configuration works without changes:
+
+1. Copy your `opencode.json` permission settings
+2. Paste into `kuuzuki.json`
+3. Update the schema URL (optional)
+
+### Hybrid Usage
+
+You can even mix formats in the same project:
+
+```json
+{
+  "permission": {
+    "bash": {
+      "git push": "ask",
+      "*": "allow"
+    },
+    "edit": "ask"
+  }
+}
+```
+
+## Integration
+
+The permission system works with:
+
+- **All Tools** - bash, edit, write operations
+- **MCP Servers** - Permissions apply to all command execution
+- **Modes & Agents** - Respect permission configurations
+- **File Operations** - Automatic boundary protection
+
+## Disabling Permissions
+
+<Tabs>
+<TabItem label="Disable All">
+
+```json
+{
+  "permission": []
+}
+```
+
+</TabItem>
+<TabItem label="Disable Specific Tools">
+
+```json
+{
+  "permission": {
+    "bash": {
+      "*": "allow"
+    },
+    "edit": "allow"
+  }
+}
+```
+
+</TabItem>
+</Tabs>
+
+---
+
+kuuzuki's permission system provides **enterprise-grade security** with **OpenCode compatibility** and **kuuzuki simplicity**. Choose the format that works best for your team and security requirements.
