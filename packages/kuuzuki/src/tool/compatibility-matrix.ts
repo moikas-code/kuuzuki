@@ -11,42 +11,42 @@
 export namespace ToolCompatibilityMatrix {
   export interface ToolMapping {
     /** Direct 1:1 tool name mappings */
-    exact: Record<string, string[]>
+    exact: Record<string, string[]>;
 
     /** Functional equivalents that can achieve the same result */
-    functional: Record<string, FunctionalAlternative[]>
+    functional: Record<string, FunctionalAlternative[]>;
 
     /** Composite alternatives that combine multiple tools */
-    composite: Record<string, CompositeAlternative[]>
+    composite: Record<string, CompositeAlternative[]>;
 
     /** Partial alternatives that provide subset of functionality */
-    partial: Record<string, PartialAlternative[]>
+    partial: Record<string, PartialAlternative[]>;
   }
 
   export interface FunctionalAlternative {
-    tools: string[]
-    description: string
-    strategy: "sequential" | "parallel" | "choice"
-    confidence: number // 0-1, how well this alternative works
-    parameterMapping?: Record<string, string>
+    tools: string[];
+    description: string;
+    strategy: "sequential" | "parallel" | "choice";
+    confidence: number; // 0-1, how well this alternative works
+    parameterMapping?: Record<string, string>;
   }
 
   export interface CompositeAlternative {
     steps: Array<{
-      tool: string
-      description: string
-      parameterMapping?: Record<string, string>
-    }>
-    description: string
-    confidence: number
+      tool: string;
+      description: string;
+      parameterMapping?: Record<string, string>;
+    }>;
+    description: string;
+    confidence: number;
   }
 
   export interface PartialAlternative {
-    tool: string
-    description: string
-    limitations: string[]
-    confidence: number
-    parameterMapping?: Record<string, string>
+    tool: string;
+    description: string;
+    limitations: string[];
+    confidence: number;
+    parameterMapping?: Record<string, string>;
   }
 
   /**
@@ -90,30 +90,65 @@ export namespace ToolCompatibilityMatrix {
       performance_hotspots: ["kb-mcp_performance_hotspots"],
 
       // Fork Parity Tools
-      fork_parity_auto_triage_commits: ["fork-parity_fork_parity_auto_triage_commits"],
-      fork_parity_get_detailed_status: ["fork-parity_fork_parity_get_detailed_status"],
-      fork_parity_generate_dashboard: ["fork-parity_fork_parity_generate_dashboard"],
-      fork_parity_get_actionable_items: ["fork-parity_fork_parity_get_actionable_items"],
-      fork_parity_update_commit_status: ["fork-parity_fork_parity_update_commit_status"],
-      fork_parity_batch_analyze_commits: ["fork-parity_fork_parity_batch_analyze_commits"],
-      fork_parity_create_review_template: ["fork-parity_fork_parity_create_review_template"],
-      fork_parity_generate_integration_plan: ["fork-parity_fork_parity_generate_integration_plan"],
-      fork_parity_sync_and_analyze: ["fork-parity_fork_parity_sync_and_analyze"],
-      fork_parity_advanced_analysis: ["fork-parity_fork_parity_advanced_analysis"],
-      fork_parity_conflict_analysis: ["fork-parity_fork_parity_conflict_analysis"],
+      fork: ["fork-parity_fork_parity_get_detailed_status"], // Generic fork -> most common status tool
+      fork_parity_auto_triage_commits: [
+        "fork-parity_fork_parity_auto_triage_commits",
+      ],
+      fork_parity_get_detailed_status: [
+        "fork-parity_fork_parity_get_detailed_status",
+      ],
+      fork_parity_generate_dashboard: [
+        "fork-parity_fork_parity_generate_dashboard",
+      ],
+      fork_parity_get_actionable_items: [
+        "fork-parity_fork_parity_get_actionable_items",
+      ],
+      fork_parity_update_commit_status: [
+        "fork-parity_fork_parity_update_commit_status",
+      ],
+      fork_parity_batch_analyze_commits: [
+        "fork-parity_fork_parity_batch_analyze_commits",
+      ],
+      fork_parity_create_review_template: [
+        "fork-parity_fork_parity_create_review_template",
+      ],
+      fork_parity_generate_integration_plan: [
+        "fork-parity_fork_parity_generate_integration_plan",
+      ],
+      fork_parity_sync_and_analyze: [
+        "fork-parity_fork_parity_sync_and_analyze",
+      ],
+      fork_parity_advanced_analysis: [
+        "fork-parity_fork_parity_advanced_analysis",
+      ],
+      fork_parity_conflict_analysis: [
+        "fork-parity_fork_parity_conflict_analysis",
+      ],
       fork_parity_migration_plan: ["fork-parity_fork_parity_migration_plan"],
-      fork_parity_setup_github_actions: ["fork-parity_fork_parity_setup_github_actions"],
-      fork_parity_setup_notifications: ["fork-parity_fork_parity_setup_notifications"],
-      fork_parity_send_notification: ["fork-parity_fork_parity_send_notification"],
-      fork_parity_learn_adaptation: ["fork-parity_fork_parity_learn_adaptation"],
+      fork_parity_setup_github_actions: [
+        "fork-parity_fork_parity_setup_github_actions",
+      ],
+      fork_parity_setup_notifications: [
+        "fork-parity_fork_parity_setup_notifications",
+      ],
+      fork_parity_send_notification: [
+        "fork-parity_fork_parity_send_notification",
+      ],
+      fork_parity_learn_adaptation: [
+        "fork-parity_fork_parity_learn_adaptation",
+      ],
 
       // Development Tools (moidvk)
       moidvk_check_code_practices: ["mcp__moidvk__check_code_practices"],
       moidvk_format_code: ["mcp__moidvk__format_code"],
       moidvk_rust_code_practices: ["mcp__moidvk__rust_code_practices"],
       moidvk_python_code_analyzer: ["mcp__moidvk__python_code_analyzer"],
-      moidvk_scan_security_vulnerabilities: ["mcp__moidvk__scan_security_vulnerabilities"],
-      moidvk_check_production_readiness: ["mcp__moidvk__check_production_readiness"],
+      moidvk_scan_security_vulnerabilities: [
+        "mcp__moidvk__scan_security_vulnerabilities",
+      ],
+      moidvk_check_production_readiness: [
+        "mcp__moidvk__check_production_readiness",
+      ],
       moidvk_check_accessibility: ["mcp__moidvk__check_accessibility"],
     },
 
@@ -290,7 +325,10 @@ export namespace ToolCompatibilityMatrix {
         {
           tool: "grep",
           description: "Text-based search (no semantic understanding)",
-          limitations: ["No semantic understanding", "Exact text matching only"],
+          limitations: [
+            "No semantic understanding",
+            "Exact text matching only",
+          ],
           confidence: 0.4,
         },
       ],
@@ -313,23 +351,23 @@ export namespace ToolCompatibilityMatrix {
         },
       ],
     },
-  }
+  };
 
   /**
    * Get all possible alternatives for a tool
    */
   export function getAlternatives(toolName: string): {
-    exact: string[]
-    functional: FunctionalAlternative[]
-    composite: CompositeAlternative[]
-    partial: PartialAlternative[]
+    exact: string[];
+    functional: FunctionalAlternative[];
+    composite: CompositeAlternative[];
+    partial: PartialAlternative[];
   } {
     return {
       exact: MATRIX.exact[toolName] || [],
       functional: MATRIX.functional[toolName] || [],
       composite: MATRIX.composite[toolName] || [],
       partial: MATRIX.partial[toolName] || [],
-    }
+    };
   }
 
   /**
@@ -339,11 +377,11 @@ export namespace ToolCompatibilityMatrix {
     toolName: string,
     availableTools: Set<string>,
   ): {
-    type: "exact" | "functional" | "composite" | "partial" | null
-    alternative: any
-    confidence: number
+    type: "exact" | "functional" | "composite" | "partial" | null;
+    alternative: any;
+    confidence: number;
   } {
-    const alternatives = getAlternatives(toolName)
+    const alternatives = getAlternatives(toolName);
 
     // Check exact matches first
     for (const exactTool of alternatives.exact) {
@@ -352,101 +390,124 @@ export namespace ToolCompatibilityMatrix {
           type: "exact",
           alternative: exactTool,
           confidence: 1.0,
-        }
+        };
       }
     }
 
     // Check functional alternatives
-    const validFunctional = alternatives.functional.filter((alt) => alt.tools.every((tool) => availableTools.has(tool)))
+    const validFunctional = alternatives.functional.filter((alt) =>
+      alt.tools.every((tool) => availableTools.has(tool)),
+    );
     if (validFunctional.length > 0) {
-      const best = validFunctional.reduce((a, b) => (a.confidence > b.confidence ? a : b))
+      const best = validFunctional.reduce((a, b) =>
+        a.confidence > b.confidence ? a : b,
+      );
       return {
         type: "functional",
         alternative: best,
         confidence: best.confidence,
-      }
+      };
     }
 
     // Check composite alternatives
     const validComposite = alternatives.composite.filter((alt) =>
       alt.steps.every((step) => availableTools.has(step.tool)),
-    )
+    );
     if (validComposite.length > 0) {
-      const best = validComposite.reduce((a, b) => (a.confidence > b.confidence ? a : b))
+      const best = validComposite.reduce((a, b) =>
+        a.confidence > b.confidence ? a : b,
+      );
       return {
         type: "composite",
         alternative: best,
         confidence: best.confidence,
-      }
+      };
     }
 
     // Check partial alternatives
-    const validPartial = alternatives.partial.filter((alt) => availableTools.has(alt.tool))
+    const validPartial = alternatives.partial.filter((alt) =>
+      availableTools.has(alt.tool),
+    );
     if (validPartial.length > 0) {
-      const best = validPartial.reduce((a, b) => (a.confidence > b.confidence ? a : b))
+      const best = validPartial.reduce((a, b) =>
+        a.confidence > b.confidence ? a : b,
+      );
       return {
         type: "partial",
         alternative: best,
         confidence: best.confidence,
-      }
+      };
     }
 
     return {
       type: null,
       alternative: null,
       confidence: 0,
-    }
+    };
   }
 
   /**
    * Generate a human-readable explanation of available alternatives
    */
-  export function explainAlternatives(toolName: string, availableTools: Set<string>): string {
-    const alternatives = getAlternatives(toolName)
-    const explanations: string[] = []
+  export function explainAlternatives(
+    toolName: string,
+    availableTools: Set<string>,
+  ): string {
+    const alternatives = getAlternatives(toolName);
+    const explanations: string[] = [];
 
     // Exact alternatives
-    const exactMatches = alternatives.exact.filter((tool) => availableTools.has(tool))
+    const exactMatches = alternatives.exact.filter((tool) =>
+      availableTools.has(tool),
+    );
     if (exactMatches.length > 0) {
-      explanations.push(`✅ Direct replacement: ${exactMatches.join(", ")}`)
+      explanations.push(`✅ Direct replacement: ${exactMatches.join(", ")}`);
     }
 
     // Functional alternatives
     const functionalMatches = alternatives.functional.filter((alt) =>
       alt.tools.every((tool) => availableTools.has(tool)),
-    )
+    );
     if (functionalMatches.length > 0) {
-      explanations.push("🔄 Functional alternatives:")
+      explanations.push("🔄 Functional alternatives:");
       functionalMatches.forEach((alt, i) => {
-        explanations.push(`  ${i + 1}. ${alt.description} (confidence: ${Math.round(alt.confidence * 100)}%)`)
-      })
+        explanations.push(
+          `  ${i + 1}. ${alt.description} (confidence: ${Math.round(alt.confidence * 100)}%)`,
+        );
+      });
     }
 
     // Composite alternatives
     const compositeMatches = alternatives.composite.filter((alt) =>
       alt.steps.every((step) => availableTools.has(step.tool)),
-    )
+    );
     if (compositeMatches.length > 0) {
-      explanations.push("🔧 Multi-step alternatives:")
+      explanations.push("🔧 Multi-step alternatives:");
       compositeMatches.forEach((alt, i) => {
-        explanations.push(`  ${i + 1}. ${alt.description} (confidence: ${Math.round(alt.confidence * 100)}%)`)
-      })
+        explanations.push(
+          `  ${i + 1}. ${alt.description} (confidence: ${Math.round(alt.confidence * 100)}%)`,
+        );
+      });
     }
 
     // Partial alternatives
-    const partialMatches = alternatives.partial.filter((alt) => availableTools.has(alt.tool))
+    const partialMatches = alternatives.partial.filter((alt) =>
+      availableTools.has(alt.tool),
+    );
     if (partialMatches.length > 0) {
-      explanations.push("⚠️  Partial alternatives (limited functionality):")
+      explanations.push("⚠️  Partial alternatives (limited functionality):");
       partialMatches.forEach((alt, i) => {
-        explanations.push(`  ${i + 1}. ${alt.description} (confidence: ${Math.round(alt.confidence * 100)}%)`)
-        explanations.push(`     Limitations: ${alt.limitations.join(", ")}`)
-      })
+        explanations.push(
+          `  ${i + 1}. ${alt.description} (confidence: ${Math.round(alt.confidence * 100)}%)`,
+        );
+        explanations.push(`     Limitations: ${alt.limitations.join(", ")}`);
+      });
     }
 
     if (explanations.length === 0) {
-      return `❌ No alternatives found for '${toolName}' with current available tools.`
+      return `❌ No alternatives found for '${toolName}' with current available tools.`;
     }
 
-    return `Alternatives for '${toolName}':\n\n${explanations.join("\n")}`
+    return `Alternatives for '${toolName}':\n\n${explanations.join("\n")}`;
   }
 }
