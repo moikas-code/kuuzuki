@@ -66,7 +66,7 @@ export namespace Config {
     for (const [key, value] of Object.entries(auth)) {
       if (value.type === "wellknown") {
         process.env[value.key] = value.token;
-        const wellknown = await fetch(`${key}/.well-known/opencode`).then((x) =>
+        const wellknown = await fetch(`${key}/.well-known/kuuzuki`).then((x) =>
           x.json(),
         );
         result = mergeDeep(

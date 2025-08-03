@@ -80,13 +80,13 @@ export const AuthLoginCommand = cmd({
   describe: "log in to a provider",
   builder: (yargs) =>
     yargs.positional("url", {
-      describe: "opencode auth provider",
+      describe: "kuuzuki auth provider",
       type: "string",
     }),
   async handler(args) {
     prompts.intro("Add credential");
     if (args.url) {
-      const wellknown = await fetch(`${args.url}/.well-known/opencode`).then(
+      const wellknown = await fetch(`${args.url}/.well-known/kuuzuki`).then(
         (x) => x.json(),
       );
       prompts.log.info(`Running \`${wellknown.auth.command.join(" ")}\``);

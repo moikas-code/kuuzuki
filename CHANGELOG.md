@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated Permission.ask API with `type`/`pattern` parameters and auto-generated IDs
   - Integrated permissions into bash, edit, write, and memory tools
 - **Experimental Well-Known Auth Support** - New authentication method for custom providers
-  - Support for `.well-known/opencode` endpoint discovery
+  - Support for `.well-known/kuuzuki` endpoint discovery
   - New `WellKnown` auth type with key/token fields
   - CLI support: `kuuzuki auth login <url>` for well-known providers
   - Automatic config merging from well-known endpoints
