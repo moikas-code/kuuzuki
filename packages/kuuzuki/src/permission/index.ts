@@ -2,6 +2,7 @@ import { App } from "../app/app";
 import { z } from "zod";
 import { Bus } from "../bus";
 import { Log } from "../util/log";
+import { Identifier } from "../id/id";
 
 export namespace Permission {
   const log = Log.create({ service: "permission" });
@@ -73,9 +74,6 @@ export namespace Permission {
   }) {
     const { pending, approved } = state();
 
-    // Generate unique ID for this permission request
-    const id = `${input.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
     log.info("asking", {
       sessionID: input.sessionID,
       messageID: input.messageID,
@@ -96,7 +94,7 @@ export namespace Permission {
     }
 
     const info: Info = {
-      id,
+      id: Identifier.ascending("permission"),
       type: input.type,
       pattern: input.pattern,
       sessionID: input.sessionID,
@@ -110,26 +108,22 @@ export namespace Permission {
     };
     pending[input.sessionID] = pending[input.sessionID] || {};
     return new Promise<void>((resolve, reject) => {
-      pending[input.sessionID][id] = {
+      pending[input.sessionID][info.id] = {
         info,
         resolve,
         reject,
       };
-      setTimeout(() => {
-        respond({
-          sessionID: input.sessionID,
-          permissionID: id,
-          response: "always",
-        });
-      }, 1000);
       Bus.publish(Event.Updated, info);
     });
   }
 
+  export const Response = z.enum(["once", "always", "reject"]);
+  export type Response = z.infer<typeof Response>;
+
   export function respond(input: {
     sessionID: Info["sessionID"];
     permissionID: Info["id"];
-    response: "once" | "always" | "reject";
+    response: Response;
   }) {
     log.info("response", input);
     const { pending, approved } = state();

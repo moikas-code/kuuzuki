@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "0.1.17",
+  "version": "0.1.19",
   "name": "kuuzuki",
   "description": "AI-powered terminal assistant",
   "keywords": [
@@ -86,7 +86,7 @@
     "@openauthjs/openauth": "0.4.3",
     "@standard-schema/spec": "1.0.0",
     "@zip.js/zip.js": "2.7.62",
-    "ai": "5.0.0-beta.21",
+    "ai": "5.0.0-beta.34",
     "chalk": "5.4.1",
     "decimal.js": "10.5.0",
     "diff": "8.0.2",

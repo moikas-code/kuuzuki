@@ -208,12 +208,13 @@ async function readAgentRc(agentrcPath: string): Promise<AgentRc> {
 async function writeAgentRc(
   agentrcPath: string,
   agentrc: AgentRc,
-  sessionID: string,
+  ctx: Tool.Context,
 ): Promise<void> {
   await Permission.ask({
     type: "edit",
-    sessionID,
-    messageID: "memory-operation",
+    sessionID: ctx.sessionID,
+    messageID: ctx.messageID,
+    callID: ctx.toolCallID,
     title: "Update .agentrc rules",
     metadata: { filePath: agentrcPath },
   });
@@ -321,7 +322,7 @@ async function addRule(
   agentrc.rules = rules;
   agentrc.ruleMetadata = metadata;
 
-  await writeAgentRc(agentrcPath, agentrc, ctx.sessionID);
+  await writeAgentRc(agentrcPath, agentrc, ctx);
 
   return {
     title: "Rule Added",
@@ -373,7 +374,7 @@ async function updateRule(
     agentrc.ruleMetadata.lastModified = new Date().toISOString();
   }
 
-  await writeAgentRc(agentrcPath, agentrc, ctx.sessionID);
+  await writeAgentRc(agentrcPath, agentrc, ctx);
 
   return {
     title: "Rule Updated",
@@ -422,7 +423,7 @@ async function removeRule(
     agentrc.ruleMetadata.totalRules -= 1;
   }
 
-  await writeAgentRc(agentrcPath, agentrc, ctx.sessionID);
+  await writeAgentRc(agentrcPath, agentrc, ctx);
 
   return {
     title: "Rule Removed",
@@ -520,7 +521,7 @@ async function linkRule(
     foundRule.filePath = params.filePath;
     foundRule.lastUsed = new Date().toISOString();
 
-    await writeAgentRc(agentrcPath, agentrc, ctx.sessionID);
+    await writeAgentRc(agentrcPath, agentrc, ctx);
 
     return {
       title: "Rule Linked",
@@ -556,7 +557,7 @@ async function linkRule(
     rules.contextual.push(newRule);
     agentrc.rules = rules;
 
-    await writeAgentRc(agentrcPath, agentrc, ctx.sessionID);
+    await writeAgentRc(agentrcPath, agentrc, ctx);
 
     return {
       title: "Rule Created and Linked",
@@ -619,7 +620,7 @@ async function migrateRules(
   agentrc.rules = newRules;
   agentrc.ruleMetadata = metadata;
 
-  await writeAgentRc(agentrcPath, agentrc, ctx.sessionID);
+  await writeAgentRc(agentrcPath, agentrc, ctx);
 
   return {
     title: "Rules Migrated",
@@ -1212,7 +1213,7 @@ async function recordFeedback(
   foundRule.lastUsed = new Date().toISOString();
   foundRule.usageCount += 1;
 
-  await writeAgentRc(agentrcPath, agentrc, ctx.sessionID);
+  await writeAgentRc(agentrcPath, agentrc, ctx);
 
   return {
     title: "Feedback Recorded",

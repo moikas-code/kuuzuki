@@ -714,6 +714,7 @@ export namespace Session {
                     sessionID: input.sessionID,
                     abort: new AbortController().signal,
                     messageID: userMsg.id,
+                    toolCallID: "file-read",
                     metadata: async () => {},
                   }),
                 );
@@ -1107,6 +1108,7 @@ export namespace Session {
             sessionID: input.sessionID,
             abort: abortSignal.signal,
             messageID: assistantMsg.id,
+            toolCallID: options.toolCallId,
             metadata: async (val) => {
               const match = processor.partFromToolCall(options.toolCallId);
               if (match && match.state.status === "running") {

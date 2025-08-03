@@ -5,6 +5,34 @@ All notable changes to kuuzuki will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.19] - 2025-08-03
+
+### Added
+
+- **Enhanced Permission System** - Complete integration of upstream OpenCode permission system
+  - Tool-level permission tracking with `toolCallID` context
+  - Server endpoints for TUI permission handling (`/session/:id/permissions/:permissionID`)
+  - Updated Permission.ask API with `type`/`pattern` parameters and auto-generated IDs
+  - Integrated permissions into bash, edit, write, and memory tools
+- **Experimental Well-Known Auth Support** - New authentication method for custom providers
+  - Support for `.well-known/opencode` endpoint discovery
+  - New `WellKnown` auth type with key/token fields
+  - CLI support: `kuuzuki auth login <url>` for well-known providers
+  - Automatic config merging from well-known endpoints
+
+### Changed
+
+- **Auth CLI Improvements** - Better pluralization in environment variable display
+  - Conditional pluralization: "1 environment variable" vs "2 environment variables"
+  - Improved user experience in `kuuzuki auth list` command
+
+### Technical
+
+- Enhanced auth system with three auth types: `oauth`, `api`, and `wellknown`
+- Updated config system to process well-known auth configurations
+- Added `loadRaw` function for dynamic config loading
+- Maintained backward compatibility with existing auth methods
+
 ## [0.1.0] - 2025-01-29
 
 ### Added

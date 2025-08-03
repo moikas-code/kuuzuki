@@ -1,25 +1,26 @@
-import { Log } from "../util/log"
-import { Bus } from "../bus"
-import { describeRoute, generateSpecs, openAPISpecs } from "hono-openapi"
-import { Hono } from "hono"
-import { streamSSE } from "hono/streaming"
-import { Session } from "../session"
-import { resolver, validator as zValidator } from "hono-openapi/zod"
-import { z } from "zod"
-import { Provider } from "../provider/provider"
-import { App } from "../app/app"
-import { mapValues } from "remeda"
-import { NamedError } from "../util/error"
-import { ModelsDev } from "../provider/models"
-import { Ripgrep } from "../file/ripgrep"
-import { Config } from "../config/config"
-import { File } from "../file"
-import { LSP } from "../lsp"
-import { MessageV2 } from "../session/message-v2"
-import { Mode } from "../session/mode"
-import { callTui, TuiRoute } from "./tui"
-import { Monitor, Cache } from "../performance"
-import { webhookHandler } from "./billing"
+import { Log } from "../util/log";
+import { Bus } from "../bus";
+import { describeRoute, generateSpecs, openAPISpecs } from "hono-openapi";
+import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
+import { Session } from "../session";
+import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { z } from "zod";
+import { Provider } from "../provider/provider";
+import { App } from "../app/app";
+import { mapValues } from "remeda";
+import { NamedError } from "../util/error";
+import { ModelsDev } from "../provider/models";
+import { Ripgrep } from "../file/ripgrep";
+import { Config } from "../config/config";
+import { File } from "../file";
+import { LSP } from "../lsp";
+import { MessageV2 } from "../session/message-v2";
+import { Mode } from "../session/mode";
+import { callTui, TuiRoute } from "./tui";
+import { Monitor, Cache } from "../performance";
+import { webhookHandler } from "./billing";
+import { Permission } from "../permission";
 
 const ERRORS = {
   400: {
@@ -38,15 +39,15 @@ const ERRORS = {
       },
     },
   },
-} as const
+} as const;
 
 export namespace Server {
-  const log = Log.create({ service: "server" })
+  const log = Log.create({ service: "server" });
 
-  export type Routes = ReturnType<typeof app>
+  export type Routes = ReturnType<typeof app>;
 
   function app() {
-    const app = new Hono()
+    const app = new Hono();
 
     const result = app
       .onError((err, c) => {
@@ -57,36 +58,39 @@ export namespace Server {
           method: c.req.method,
           errorMessage: err.message,
           errorStack: err.stack,
-        })
-        
+        });
+
         if (err instanceof NamedError) {
           return c.json(err.toObject(), {
             status: 400,
-          })
+          });
         }
-        return c.json(new NamedError.Unknown({ message: err.toString() }).toObject(), {
-          status: 400,
-        })
+        return c.json(
+          new NamedError.Unknown({ message: err.toString() }).toObject(),
+          {
+            status: 400,
+          },
+        );
       })
       .use(async (c, next) => {
-        const skipLogging = c.req.path === "/log"
+        const skipLogging = c.req.path === "/log";
         if (!skipLogging) {
           log.info("request", {
             method: c.req.method,
             path: c.req.path,
-          })
+          });
         }
-        const start = Date.now()
-        await next()
-        const duration = Date.now() - start
+        const start = Date.now();
+        await next();
+        const duration = Date.now() - start;
 
         // Record performance metrics
-        Monitor.Performance.recordRequestTime(duration)
+        Monitor.Performance.recordRequestTime(duration);
 
         if (!skipLogging) {
           log.info("response", {
             duration,
-          })
+          });
         }
       })
       .get(
@@ -122,24 +126,24 @@ export namespace Server {
           },
         }),
         async (c) => {
-          log.info("event connected")
+          log.info("event connected");
           return streamSSE(c, async (stream) => {
             stream.writeSSE({
               data: JSON.stringify({}),
-            })
+            });
             const unsub = Bus.subscribeAll(async (event) => {
               await stream.writeSSE({
                 data: JSON.stringify(event),
-              })
-            })
+              });
+            });
             await new Promise<void>((resolve) => {
               stream.onAbort(() => {
-                unsub()
-                resolve()
-                log.info("event disconnected")
-              })
-            })
-          })
+                unsub();
+                resolve();
+                log.info("event disconnected");
+              });
+            });
+          });
         },
       )
       .get(
@@ -158,7 +162,7 @@ export namespace Server {
           },
         }),
         async (c) => {
-          return c.json(App.info())
+          return c.json(App.info());
         },
       )
       .post(
@@ -177,8 +181,8 @@ export namespace Server {
           },
         }),
         async (c) => {
-          await App.initialize()
-          return c.json(true)
+          await App.initialize();
+          return c.json(true);
         },
       )
       .get(
@@ -197,7 +201,7 @@ export namespace Server {
           },
         }),
         async (c) => {
-          return c.json(await Config.get())
+          return c.json(await Config.get());
         },
       )
       .get(
@@ -216,9 +220,9 @@ export namespace Server {
           },
         }),
         async (c) => {
-          const sessions = await Array.fromAsync(Session.list())
-          sessions.sort((a, b) => b.time.updated - a.time.updated)
-          return c.json(sessions)
+          const sessions = await Array.fromAsync(Session.list());
+          sessions.sort((a, b) => b.time.updated - a.time.updated);
+          return c.json(sessions);
         },
       )
       .post(
@@ -238,8 +242,8 @@ export namespace Server {
           },
         }),
         async (c) => {
-          const session = await Session.create()
-          return c.json(session)
+          const session = await Session.create();
+          return c.json(session);
         },
       )
       .delete(
@@ -264,8 +268,8 @@ export namespace Server {
           }),
         ),
         async (c) => {
-          await Session.remove(c.req.valid("param").id)
-          return c.json(true)
+          await Session.remove(c.req.valid("param").id);
+          return c.json(true);
         },
       )
       .post(
@@ -298,15 +302,15 @@ export namespace Server {
           }),
         ),
         async (c) => {
-          const sessionID = c.req.valid("param").id
-          const body = c.req.valid("json")
-          await Session.initialize({ 
+          const sessionID = c.req.valid("param").id;
+          const body = c.req.valid("json");
+          await Session.initialize({
             sessionID,
             messageID: body.messageID,
             providerID: body.providerID,
-            modelID: body.modelID
-          })
-          return c.json(true)
+            modelID: body.modelID,
+          });
+          return c.json(true);
         },
       )
       .post(
@@ -331,7 +335,7 @@ export namespace Server {
           }),
         ),
         async (c) => {
-          return c.json(Session.abort(c.req.valid("param").id))
+          return c.json(Session.abort(c.req.valid("param").id));
         },
       )
       .post(
@@ -356,10 +360,10 @@ export namespace Server {
           }),
         ),
         async (c) => {
-          const id = c.req.valid("param").id
-          await Session.share(id)
-          const session = await Session.get(id)
-          return c.json(session)
+          const id = c.req.valid("param").id;
+          await Session.share(id);
+          const session = await Session.get(id);
+          return c.json(session);
         },
       )
       .delete(
@@ -384,10 +388,10 @@ export namespace Server {
           }),
         ),
         async (c) => {
-          const id = c.req.valid("param").id
-          await Session.unshare(id)
-          const session = await Session.get(id)
-          return c.json(session)
+          const id = c.req.valid("param").id;
+          await Session.unshare(id);
+          const session = await Session.get(id);
+          return c.json(session);
         },
       )
       .post(
@@ -419,14 +423,14 @@ export namespace Server {
           }),
         ),
         async (c) => {
-          const id = c.req.valid("param").id
-          const body = c.req.valid("json")
-          await Session.summarize({ 
+          const id = c.req.valid("param").id;
+          const body = c.req.valid("json");
+          await Session.summarize({
             sessionID: id,
             providerID: body.providerID,
-            modelID: body.modelID
-          })
-          return c.json(true)
+            modelID: body.modelID,
+          });
+          return c.json(true);
         },
       )
       .get(
@@ -458,8 +462,8 @@ export namespace Server {
           }),
         ),
         async (c) => {
-          const messages = await Session.messages(c.req.valid("param").id)
-          return c.json(messages)
+          const messages = await Session.messages(c.req.valid("param").id);
+          return c.json(messages);
         },
       )
       .post(
@@ -480,22 +484,22 @@ export namespace Server {
         // Add raw body logging middleware
         async (c, next) => {
           try {
-            const rawBody = await c.req.text()
+            const rawBody = await c.req.text();
             log.info("Raw chat request body", {
               path: c.req.path,
               rawBody,
               contentType: c.req.header("content-type"),
-            })
+            });
             // Restore body for subsequent middleware
             c.req.raw = new Request(c.req.raw.url, {
               ...c.req.raw,
               body: rawBody,
               headers: c.req.raw.headers,
-            })
+            });
           } catch (e) {
-            log.error("Failed to log raw body", { error: e })
+            log.error("Failed to log raw body", { error: e });
           }
-          await next()
+          await next();
         },
         zValidator(
           "param",
@@ -505,9 +509,9 @@ export namespace Server {
         ),
         zValidator("json", Session.ChatInput.omit({ sessionID: true })),
         async (c) => {
-          const sessionID = c.req.valid("param").id
-          const body = c.req.valid("json")
-          
+          const sessionID = c.req.valid("param").id;
+          const body = c.req.valid("json");
+
           // Debug logging for chat request
           log.info("Chat request received", {
             sessionID,
@@ -515,10 +519,10 @@ export namespace Server {
             bodyKeys: Object.keys(body),
             partsCount: body.parts?.length,
             firstPartType: body.parts?.[0]?.type,
-          })
-          
-          const msg = await Session.chat({ ...body, sessionID })
-          return c.json(msg)
+          });
+
+          const msg = await Session.chat({ ...body, sessionID });
+          return c.json(msg);
         },
       )
       .post(
@@ -544,10 +548,13 @@ export namespace Server {
         ),
         zValidator("json", Session.RevertInput.omit({ sessionID: true })),
         async (c) => {
-          const id = c.req.valid("param").id
-          log.info("revert", c.req.valid("json"))
-          const session = await Session.revert({ sessionID: id, ...c.req.valid("json") })
-          return c.json(session)
+          const id = c.req.valid("param").id;
+          log.info("revert", c.req.valid("json"));
+          const session = await Session.revert({
+            sessionID: id,
+            ...c.req.valid("json"),
+          });
+          return c.json(session);
         },
       )
       .post(
@@ -572,9 +579,77 @@ export namespace Server {
           }),
         ),
         async (c) => {
-          const id = c.req.valid("param").id
-          const session = await Session.unrevert({ sessionID: id })
-          return c.json(session)
+          const id = c.req.valid("param").id;
+          const session = await Session.unrevert({ sessionID: id });
+          return c.json(session);
+        },
+      )
+      .get(
+        "/session/:id/message/:messageID",
+        describeRoute({
+          description: "Get a message from a session",
+          responses: {
+            200: {
+              description: "Message",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.object({
+                      info: MessageV2.Info,
+                      parts: MessageV2.Part.array(),
+                    }),
+                  ),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string().openapi({ description: "Session ID" }),
+            messageID: z.string().openapi({ description: "Message ID" }),
+          }),
+        ),
+        async (c) => {
+          const params = c.req.valid("param");
+          const message = await Session.getMessage(params.id, params.messageID);
+          return c.json(message);
+        },
+      )
+      .post(
+        "/session/:id/permissions/:permissionID",
+        describeRoute({
+          description: "Respond to a permission request",
+          responses: {
+            200: {
+              description: "Permission processed successfully",
+              content: {
+                "application/json": {
+                  schema: resolver(z.boolean()),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string(),
+            permissionID: z.string(),
+          }),
+        ),
+        zValidator("json", z.object({ response: Permission.Response })),
+        async (c) => {
+          const params = c.req.valid("param");
+          const id = params.id;
+          const permissionID = params.permissionID;
+          Permission.respond({
+            sessionID: id,
+            permissionID,
+            response: c.req.valid("json").response,
+          });
+          return c.json(true);
         },
       )
       .get(
@@ -598,11 +673,16 @@ export namespace Server {
           },
         }),
         async (c) => {
-          const providers = await Provider.list().then((x) => mapValues(x, (item) => item.info))
+          const providers = await Provider.list().then((x) =>
+            mapValues(x, (item) => item.info),
+          );
           return c.json({
             providers: Object.values(providers),
-            default: mapValues(providers, (item) => Provider.sort(Object.values(item.models))[0].id),
-          })
+            default: mapValues(
+              providers,
+              (item) => Provider.sort(Object.values(item.models))[0].id,
+            ),
+          });
         },
       )
       .get(
@@ -627,14 +707,14 @@ export namespace Server {
           }),
         ),
         async (c) => {
-          const app = App.info()
-          const pattern = c.req.valid("query").pattern
+          const app = App.info();
+          const pattern = c.req.valid("query").pattern;
           const result = await Ripgrep.search({
             cwd: app.path.cwd,
             pattern,
             limit: 10,
-          })
-          return c.json(result)
+          });
+          return c.json(result);
         },
       )
       .get(
@@ -659,14 +739,14 @@ export namespace Server {
           }),
         ),
         async (c) => {
-          const query = c.req.valid("query").query
-          const app = App.info()
+          const query = c.req.valid("query").query;
+          const app = App.info();
           const result = await Ripgrep.files({
             cwd: app.path.cwd,
             query,
             limit: 10,
-          })
-          return c.json(result)
+          });
+          return c.json(result);
         },
       )
       .get(
@@ -691,9 +771,9 @@ export namespace Server {
           }),
         ),
         async (c) => {
-          const query = c.req.valid("query").query
-          const result = await LSP.workspaceSymbol(query)
-          return c.json(result)
+          const query = c.req.valid("query").query;
+          const result = await LSP.workspaceSymbol(query);
+          return c.json(result);
         },
       )
       .get(
@@ -723,13 +803,13 @@ export namespace Server {
           }),
         ),
         async (c) => {
-          const path = c.req.valid("query").path
-          const content = await File.read(path)
+          const path = c.req.valid("query").path;
+          const content = await File.read(path);
           log.info("read file", {
             path,
             content: content.content,
-          })
-          return c.json(content)
+          });
+          return c.json(content);
         },
       )
       .get(
@@ -748,8 +828,8 @@ export namespace Server {
           },
         }),
         async (c) => {
-          const content = await File.status()
-          return c.json(content)
+          const content = await File.status();
+          return c.json(content);
         },
       )
       .post(
@@ -770,35 +850,38 @@ export namespace Server {
         zValidator(
           "json",
           z.object({
-            service: z.string().openapi({ description: "Service name for the log entry" }),
-            level: z.enum(["debug", "info", "error", "warn"]).openapi({ description: "Log level" }),
+            service: z
+              .string()
+              .openapi({ description: "Service name for the log entry" }),
+            level: z
+              .enum(["debug", "info", "error", "warn"])
+              .openapi({ description: "Log level" }),
             message: z.string().openapi({ description: "Log message" }),
-            extra: z
-              .record(z.string(), z.any())
-              .optional()
-              .openapi({ description: "Additional metadata for the log entry" }),
+            extra: z.record(z.string(), z.any()).optional().openapi({
+              description: "Additional metadata for the log entry",
+            }),
           }),
         ),
         async (c) => {
-          const { service, level, message, extra } = c.req.valid("json")
-          const logger = Log.create({ service })
+          const { service, level, message, extra } = c.req.valid("json");
+          const logger = Log.create({ service });
 
           switch (level) {
             case "debug":
-              logger.debug(message, extra)
-              break
+              logger.debug(message, extra);
+              break;
             case "info":
-              logger.info(message, extra)
-              break
+              logger.info(message, extra);
+              break;
             case "error":
-              logger.error(message, extra)
-              break
+              logger.error(message, extra);
+              break;
             case "warn":
-              logger.warn(message, extra)
-              break
+              logger.warn(message, extra);
+              break;
           }
 
-          return c.json(true)
+          return c.json(true);
         },
       )
       .get(
@@ -818,9 +901,9 @@ export namespace Server {
         }),
         async (c) => {
           return App.provide({ cwd: process.cwd() }, async () => {
-            const modes = await Mode.list()
-            return c.json(modes)
-          })
+            const modes = await Mode.list();
+            return c.json(modes);
+          });
         },
       )
       .post(
@@ -935,7 +1018,7 @@ export namespace Server {
             status: "ok" as const,
             timestamp: new Date().toISOString(),
             version: process.env["KUUZUKI_VERSION"] || "dev",
-          })
+          });
         },
       )
       .get(
@@ -965,20 +1048,20 @@ export namespace Server {
               monitor: Monitor.getStats(),
               cache: Cache.getStats(),
               optimizer: { uptime: Date.now() - Date.now() }, // Placeholder
-            }
-            return c.json(stats)
+            };
+            return c.json(stats);
           } catch (error) {
-            log.error("Failed to get performance stats", error as Error)
-            return c.json({ error: "Failed to get performance stats" }, 500)
+            log.error("Failed to get performance stats", error as Error);
+            return c.json({ error: "Failed to get performance stats" }, 500);
           }
         },
-      )
+      );
 
-    return result
+    return result;
   }
 
   export async function openapi() {
-    const a = app()
+    const a = app();
     const result = await generateSpecs(a, {
       documentation: {
         info: {
@@ -988,8 +1071,8 @@ export namespace Server {
         },
         openapi: "3.0.0",
       },
-    })
-    return result
+    });
+    return result;
   }
 
   export function listen(opts: { port: number; hostname: string }) {
@@ -998,7 +1081,7 @@ export namespace Server {
       hostname: opts.hostname,
       idleTimeout: 0,
       fetch: app().fetch,
-    })
-    return server
+    });
+    return server;
   }
 }

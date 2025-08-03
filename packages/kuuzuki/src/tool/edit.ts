@@ -66,6 +66,7 @@ export const EditTool = Tool.define("edit", {
         type: "edit",
         sessionID: ctx.sessionID,
         messageID: ctx.messageID,
+        callID: ctx.toolCallID,
         title: "Edit this file: " + filepath,
         metadata: {
           filePath: filepath,
