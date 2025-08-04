@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Development files
+src/
+test/
+tests/
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+
+# Build artifacts (keep only what's in files field)
+.kuuzuki/
+.kuuzuki-test/
+dist-tsc/
+.claude/
+.fork-parity/
+
+# Development tools
+.env
+.env.*
+*.log
+*.tgz
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Large binaries (keep only packaged ones)
+kuuzuki-cli
+*.exe
+
+# Development scripts
+build-test-local.sh
+cleanup-root.sh
