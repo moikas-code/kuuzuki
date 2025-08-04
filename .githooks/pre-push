@@ -34,12 +34,19 @@ echo "Running pre-publish validation..."
 # Change to kuuzuki package directory
 cd packages/kuuzuki || exit 1
 
-# Run validation
-if npm run validate; then
+# Run validation with timeout (60 seconds to handle GitKraken constraints)
+if timeout 60 npm run validate; then
     echo -e "${GREEN}✅ All validation checks passed!${NC}"
     exit 0
 else
-    echo -e "${RED}❌ Validation failed! Fix the errors above before pushing the version tag.${NC}"
-    echo -e "${YELLOW}Tip: Run 'npm run validate' in packages/kuuzuki to see the issues.${NC}"
+    exit_code=$?
+    if [ $exit_code -eq 124 ]; then
+        echo -e "${RED}❌ Validation timed out after 60 seconds!${NC}"
+        echo -e "${YELLOW}This often happens in GitKraken. Try pushing from terminal instead:${NC}"
+        echo -e "${YELLOW}  git push origin $tag_name${NC}"
+    else
+        echo -e "${RED}❌ Validation failed! Fix the errors above before pushing the version tag.${NC}"
+        echo -e "${YELLOW}Tip: Run 'npm run validate' in packages/kuuzuki to see the issues.${NC}"
+    fi
     exit 1
 fi
