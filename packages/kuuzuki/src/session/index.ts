@@ -1227,7 +1227,10 @@ export namespace Session {
     }
 
     const stream = streamText({
-      onError() {},
+      onError(error) {
+        log.error("Stream error", { error, sessionID: input.sessionID });
+        throw error;
+      },
       async prepareStep({ messages }) {
         const queue = (state().queued.get(input.sessionID) ?? []).filter(
           (x) => !x.processed,
@@ -1528,6 +1531,14 @@ export namespace Session {
               case "finish":
                 assistantMsg.time.completed = Date.now();
                 await updateMessage(assistantMsg);
+                break;
+
+              case "text-delta" as any:
+                // Handle text-delta events (new AI SDK event type)
+                if (currentText) {
+                  currentText.text += (value as any).text;
+                  await updatePart(currentText);
+                }
                 break;
 
               default:
