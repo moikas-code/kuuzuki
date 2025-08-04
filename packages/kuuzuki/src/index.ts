@@ -92,7 +92,6 @@ const cli = yargs(hideBin(process.argv))
   .strict()
 
 try {
-  // Initialize global paths
   await ensureInitialized()
   
   // If no command is provided, default to TUI
