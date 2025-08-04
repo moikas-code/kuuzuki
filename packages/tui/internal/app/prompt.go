@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	opencode "github.com/sst/opencode-sdk-go"
@@ -43,6 +44,13 @@ func (p Prompt) ToMessage(
 	}
 	for _, att := range textAttachments {
 		if source, ok := att.GetTextSource(); ok {
+			// BEAST BOY SAFETY CHECK: Prevent slice bounds panic!
+			if att.StartIndex < 0 || att.EndIndex < att.StartIndex || att.EndIndex > len(text) {
+				// Log the invalid indices for debugging
+				fmt.Printf("🚨 BEAST BOY DETECTED INVALID ATTACHMENT: start=%d, end=%d, textLen=%d - SKIPPING!\n",
+					att.StartIndex, att.EndIndex, len(text))
+				continue
+			}
 			text = text[:att.StartIndex] + source.Value + text[att.EndIndex:]
 		}
 	}
