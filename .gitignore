@@ -72,3 +72,9 @@ app.log
 organize-root.sh
 cleanup-root.sh
 dist-tsc/
+
+.fork-parity/
+
+.fork-parity-reports/
+
+.kuuzuki/

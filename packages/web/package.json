@@ -7,7 +7,11 @@
     "dev:remote": "sst shell --stage=dev --target=Web astro dev",
     "start": "astro dev",
     "build": "astro build",
+    "build:cloudflare": "astro build",
     "preview": "astro preview",
+    "preview:cloudflare": "wrangler dev",
+    "deploy:dev": "wrangler deploy --env development",
+    "deploy:prod": "wrangler deploy --env production",
     "astro": "astro"
   },
   "dependencies": {
