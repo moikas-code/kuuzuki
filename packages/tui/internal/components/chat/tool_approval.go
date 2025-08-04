@@ -164,12 +164,14 @@ func (t *ToolApprovalMessage) View(width int) string {
 		help,
 	)
 
-	// Add a border around the whole thing
+	// Add a border around the whole thing with enhanced visibility for overlay
 	borderStyle := baseStyle.
-		Border(lipgloss.RoundedBorder()).
+		Border(lipgloss.ThickBorder()).
 		BorderForeground(theme.Warning()).
+		Background(theme.Background()).
 		Width(width-4).
-		Margin(1, 2)
+		Margin(1, 2).
+		Padding(1)
 
 	return borderStyle.Render(content)
 }

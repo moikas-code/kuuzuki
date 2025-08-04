@@ -721,10 +721,28 @@ func (m Model) GetAttachments() []*attachment.Attachment {
 			case *attachment.Attachment:
 				// Clone the attachment to avoid modifying the original
 				att := *v
-				att.StartIndex = position + colPosition
-				att.EndIndex = position + colPosition + len(v.Display)
+
+				// BEAST BOY SAFE INDEX CALCULATION: Prevent invalid ranges!
+				startIdx := position + colPosition
+				displayLen := len(v.Display)
+				endIdx := startIdx + displayLen
+
+				// Ensure valid indices (defensive programming)
+				if startIdx < 0 {
+					startIdx = 0
+				}
+				if displayLen < 0 {
+					displayLen = 0
+					endIdx = startIdx
+				}
+				if endIdx < startIdx {
+					endIdx = startIdx
+				}
+
+				att.StartIndex = startIdx
+				att.EndIndex = endIdx
 				attachments = append(attachments, &att)
-				colPosition += len(v.Display)
+				colPosition += displayLen
 			case rune:
 				colPosition++
 			}

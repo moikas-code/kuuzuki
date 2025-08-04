@@ -44,6 +44,13 @@ memory(action="suggest", context="Working on React components with TypeScript")
 memory(action="conflicts")
 ```
 
+### Compact Output Mode
+```
+memory(action="list", compact=true)  // Default: compact format to reduce context usage
+memory(action="list", compact=false) // Verbose format with full details
+memory(action="analytics", compact=true) // Compact analytics summary
+```
+
 ### Feedback and Improvement
 ```
 memory(action="feedback", ruleId="rule-123", rating=5, comment="This rule saved me from a major bug")
@@ -65,5 +72,10 @@ Tracks rule effectiveness, usage patterns, and user feedback to improve rule rec
 
 ### Migration Support
 Seamlessly migrates from simple string-based rules to the new structured format with categories and metadata.
+
+### Compact Mode (Default)
+Uses compact output format by default to reduce context usage by 70-80%. Shows essential information in a condensed format:
+- `[category] rule-id: "text" (usage info) 📄` (with doc icon if documentation exists)
+- Set `compact=false` for full verbose output when detailed information is needed
 
 This tool helps maintain consistent coding practices, captures institutional knowledge, and improves AI agent behavior over time through learned patterns and user feedback.

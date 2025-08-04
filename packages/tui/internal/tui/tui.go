@@ -611,9 +611,39 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.activeToolApproval = chat.NewToolApprovalMessage(msg.ID, msg.ToolName, msg.Description, msg.Metadata)
 		a.editor.Blur() // Remove focus from editor
 	case chat.ToolApprovalAnswerMsg:
-		// Handle tool approval response
-		// In the future, this would send the response to the permission system
-		// For now, just clear the approval dialog
+		// Handle tool approval response - send to server
+		if a.activeToolApproval != nil {
+			// Send permission response to server
+			go func() {
+				ctx := context.Background()
+				sessionID := a.app.Session.ID
+				permissionID := msg.ID
+
+				// Map approval to permission response
+				var response string
+				if msg.Approved {
+					response = "once" // Could be "always" for future enhancement
+				} else {
+					response = "reject"
+				}
+
+				// Make HTTP request to permission endpoint
+				url := fmt.Sprintf("/session/%s/permissions/%s", sessionID, permissionID)
+				body := map[string]interface{}{
+					"response": response,
+				}
+
+				var result bool
+				err := a.app.Client.Post(ctx, url, body, &result)
+				if err != nil {
+					slog.Error("Failed to send permission response", "error", err, "sessionID", sessionID, "permissionID", permissionID)
+				} else {
+					slog.Info("Permission response sent", "sessionID", sessionID, "permissionID", permissionID, "response", response)
+				}
+			}()
+		}
+
+		// Clear the approval dialog and return focus
 		a.activeToolApproval = nil
 		a.editor.Focus() // Return focus to editor
 	case chat.TextInputMsg:
@@ -864,6 +894,32 @@ func (a Model) home() string {
 		)
 	}
 
+	// Add tool approval overlay if active (centered on screen)
+	if a.activeToolApproval != nil {
+		approvalOverlay := a.activeToolApproval.View(effectiveWidth)
+		approvalWidth := lipgloss.Width(approvalOverlay)
+		approvalHeight := lipgloss.Height(approvalOverlay)
+
+		// Center the dialog on screen, lowered by 10%
+		approvalX := (effectiveWidth - approvalWidth) / 2
+		approvalY := (a.height-approvalHeight)/2 + int(float64(a.height)*0.1)
+
+		// Ensure dialog stays within bounds
+		if approvalX < 0 {
+			approvalX = 0
+		}
+		if approvalY < 0 {
+			approvalY = 0
+		}
+
+		mainLayout = layout.PlaceOverlay(
+			approvalX,
+			approvalY,
+			approvalOverlay,
+			mainLayout,
+		)
+	}
+
 	return mainLayout
 }
 
@@ -885,12 +941,10 @@ func (a Model) chat() string {
 		styles.WhitespaceStyle(t.Background()),
 	)
 
-	// Add interactive messages if active
+	// Add interactive messages if active (except tool approval which will be overlaid)
 	var interactiveView string
 	if a.activeConfirmation != nil {
 		interactiveView = a.activeConfirmation.View(effectiveWidth) + "\n"
-	} else if a.activeToolApproval != nil {
-		interactiveView = a.activeToolApproval.View(effectiveWidth) + "\n"
 	} else if a.activeTextInput != nil {
 		interactiveView = a.activeTextInput.View(effectiveWidth) + "\n"
 	}
@@ -918,6 +972,32 @@ func (a Model) chat() string {
 			editorX,
 			editorY-overlayHeight,
 			overlay,
+			mainLayout,
+		)
+	}
+
+	// Add tool approval overlay if active (centered on screen)
+	if a.activeToolApproval != nil {
+		approvalOverlay := a.activeToolApproval.View(effectiveWidth)
+		approvalWidth := lipgloss.Width(approvalOverlay)
+		approvalHeight := lipgloss.Height(approvalOverlay)
+
+		// Center the dialog on screen, lowered by 10%
+		approvalX := (effectiveWidth - approvalWidth) / 2
+		approvalY := (a.height-approvalHeight)/2 + int(float64(a.height)*0.1)
+
+		// Ensure dialog stays within bounds
+		if approvalX < 0 {
+			approvalX = 0
+		}
+		if approvalY < 0 {
+			approvalY = 0
+		}
+
+		mainLayout = layout.PlaceOverlay(
+			approvalX,
+			approvalY,
+			approvalOverlay,
 			mainLayout,
 		)
 	}

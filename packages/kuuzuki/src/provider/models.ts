@@ -1,12 +1,13 @@
-import { Global } from "../global"
-import { Log } from "../util/log"
-import path from "path"
-import { z } from "zod"
-import { data } from "./models-macro" with { type: "macro" }
+import { Global } from "../global";
+import { Log } from "../util/log";
+import path from "path";
+import { z } from "zod";
+import { data } from "./models-macro" with { type: "macro" };
+import { Installation } from "../installation";
 
 export namespace ModelsDev {
-  const log = Log.create({ service: "models.dev" })
-  const filepath = path.join(Global.Path.cache, "models.json")
+  const log = Log.create({ service: "models.dev" });
+  const filepath = path.join(Global.Path.cache, "models.json");
 
   export const Model = z
     .object({
@@ -31,8 +32,8 @@ export namespace ModelsDev {
     })
     .openapi({
       ref: "Model",
-    })
-  export type Model = z.infer<typeof Model>
+    });
+  export type Model = z.infer<typeof Model>;
 
   export const Provider = z
     .object({
@@ -45,26 +46,36 @@ export namespace ModelsDev {
     })
     .openapi({
       ref: "Provider",
-    })
+    });
 
-  export type Provider = z.infer<typeof Provider>
+  export type Provider = z.infer<typeof Provider>;
 
   export async function get() {
-    const file = Bun.file(filepath)
-    const result = await file.json().catch(() => {})
+    const file = Bun.file(filepath);
+    const result = await file.json().catch(() => {});
     if (result) {
-      refresh()
-      return result as Record<string, Provider>
+      refresh();
+      return result as Record<string, Provider>;
     }
-    refresh()
-    const json = await data()
-    return JSON.parse(json) as Record<string, Provider>
+    refresh();
+    const json = await data();
+    return JSON.parse(json) as Record<string, Provider>;
   }
 
-  async function refresh() {
-    const file = Bun.file(filepath)
-    log.info("refreshing")
-    const result = await fetch("https://models.dev/api.json").catch(() => {})
-    if (result && result.ok) await Bun.write(file, result)
+  export async function refresh() {
+    const file = Bun.file(filepath);
+    log.info("refreshing", {
+      file: filepath,
+    });
+    const result = await fetch("https://models.dev/api.json", {
+      headers: {
+        "User-Agent": `kuuzuki/${Installation.VERSION}`,
+      },
+    }).catch((e) => {
+      log.error("Failed to fetch models.dev", {
+        error: e,
+      });
+    });
+    if (result && result.ok) await Bun.write(file, await result.text());
   }
 }

@@ -45,30 +45,40 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Publishing version: $VERSION"
       
-      # 7. Fix catalog dependencies
-      - name: Fix catalog dependencies
-        run: |
-          cd packages/kuuzuki
-          echo "Running fix-catalog-deps.js..."
-          node scripts/fix-catalog-deps.js
-          echo "Checking package.json after fix..."
-          grep -c "catalog:" package.json || echo "No catalog: references found"
-          
-          # Also remove catalog field from root package.json for npm compatibility
-          cd ../..
-          if grep -q '"catalog":' package.json; then
-            echo "Removing catalog field from root package.json..."
-            node -e "
-              const fs = require('fs');
-              const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-              delete pkg.catalog;
-              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-              console.log('Removed catalog field from root package.json');
-            "
-          fi
+       # 7. Run tests before publishing
+       - name: Run tests
+         run: |
+           echo "Running test suite..."
+           bun test --timeout 30000 || {
+             echo "❌ Tests failed! Stopping publish process."
+             exit 1
+           }
+           echo "✅ All tests passed!"
 
-      # 8. Update version in package.json
-      - name: Update package version
+       # 8. Fix catalog dependencies
+       - name: Fix catalog dependencies
+         run: |
+           cd packages/kuuzuki
+           echo "Running fix-catalog-deps.js..."
+           node scripts/fix-catalog-deps.js
+           echo "Checking package.json after fix..."
+           grep -c "catalog:" package.json || echo "No catalog: references found"
+           
+           # Also remove catalog field from root package.json for npm compatibility
+           cd ../..
+           if grep -q '"catalog":' package.json; then
+             echo "Removing catalog field from root package.json..."
+             node -e "
+               const fs = require('fs');
+               const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+               delete pkg.catalog;
+               fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+               console.log('Removed catalog field from root package.json');
+             "
+           fi
+
+       # 9. Update version in package.json
+       - name: Update package version
         run: |
           cd packages/kuuzuki
           # Manually update version to avoid npm catalog issues
@@ -80,14 +90,13 @@ jobs:
             console.log('Updated version to:', pkg.version);
           "
       
-      # 9. Prepare source for npm (fix Bun macros)
-      - name: Prepare source files
-        run: |
-          cd packages/kuuzuki
-          bun run scripts/prepare-npm.ts
-      
-      # 9. Build cross-platform TUI binaries and packages
-      - name: Build all platform packages
+       # 10. Prepare source for npm (fix Bun macros)
+       - name: Prepare source files
+         run: |
+           cd packages/kuuzuki
+           bun run scripts/prepare-npm.ts
+       
+       # 11. Build cross-platform TUI binaries and packages      - name: Build all platform packages
         run: |
           cd packages/kuuzuki
           
@@ -154,9 +163,8 @@ jobs:
           
           echo "All platform binaries built successfully!"
       
-      # 10. Create main package
-      - name: Create main kuuzuki package
-        run: |
+       # 12. Create main package
+       - name: Create main kuuzuki package        run: |
           cd packages/kuuzuki
           
           # Create main package structure
@@ -288,9 +296,8 @@ jobs:
           
           echo "Main package created successfully!"
       
-      # 11. Test packages
-      - name: Test built packages
-        run: |
+       # 13. Test packages
+       - name: Test built packages        run: |
           cd packages/kuuzuki/dist/npm/kuuzuki
           echo "Testing main package..."
           node bin/kuuzuki --version || echo "Version command needs bun runtime"
@@ -300,9 +307,8 @@ jobs:
           echo "Source files:"
           ls -la src/ | head -20
       
-      # 12. Publish platform packages
-      - name: Publish platform packages
-        env:
+       # 14. Publish platform packages
+       - name: Publish platform packages        env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
         run: |
           cd packages/kuuzuki
@@ -322,21 +328,19 @@ jobs:
             cd ../../..
           done
       
-      # 13. Wait for platform packages to be available
-      - name: Wait for npm propagation
-        run: sleep 30
-      
-      # 14. Publish main package
-      - name: Publish main kuuzuki package
-        env:
+       # 15. Wait for platform packages to be available
+       - name: Wait for npm propagation
+         run: sleep 30
+       
+       # 16. Publish main package
+       - name: Publish main kuuzuki package        env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
         run: |
           cd packages/kuuzuki/dist/npm/kuuzuki
           npm publish --access public
       
-      # 15. Create GitHub Release
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+       # 17. Create GitHub Release
+       - name: Create Release        uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           body: |

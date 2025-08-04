@@ -1,12 +1,12 @@
-import { App } from "../app/app"
-import { Log } from "../util/log"
-import { LSPClient } from "./client"
-import path from "path"
-import { LSPServer } from "./server"
-import { z } from "zod"
+import { App } from "../app/app";
+import { Log } from "../util/log";
+import { LSPClient } from "./client";
+import path from "path";
+import { LSPServer } from "./server";
+import { z } from "zod";
 
 export namespace LSP {
-  const log = Log.create({ service: "lsp" })
+  const log = Log.create({ service: "lsp" });
 
   export const Range = z
     .object({
@@ -21,8 +21,8 @@ export namespace LSP {
     })
     .openapi({
       ref: "Range",
-    })
-  export type Range = z.infer<typeof Range>
+    });
+  export type Range = z.infer<typeof Range>;
 
   export const Symbol = z
     .object({
@@ -35,8 +35,8 @@ export namespace LSP {
     })
     .openapi({
       ref: "Symbol",
-    })
-  export type Symbol = z.infer<typeof Symbol>
+    });
+  export type Symbol = z.infer<typeof Symbol>;
 
   export const DocumentSymbol = z
     .object({
@@ -48,85 +48,94 @@ export namespace LSP {
     })
     .openapi({
       ref: "DocumentSymbol",
-    })
-  export type DocumentSymbol = z.infer<typeof DocumentSymbol>
+    });
+  export type DocumentSymbol = z.infer<typeof DocumentSymbol>;
 
   const state = App.state(
     "lsp",
     async () => {
-      const clients: LSPClient.Info[] = []
+      const clients: LSPClient.Info[] = [];
       return {
         broken: new Set<string>(),
+        servers: LSPServer,
         clients,
-      }
+      };
     },
     async (state) => {
       for (const client of state.clients) {
-        await client.shutdown()
+        await client.shutdown();
       }
     },
-  )
+  );
 
   export async function init() {
-    return state()
+    return state();
   }
 
   async function getClients(file: string) {
-    const s = await state()
-    const extension = path.parse(file).ext
-    const result: LSPClient.Info[] = []
+    const s = await state();
+    const extension = path.parse(file).ext;
+    const result: LSPClient.Info[] = [];
     for (const server of Object.values(LSPServer)) {
-      if (!server.extensions.includes(extension)) continue
-      const root = await server.root(file, App.info())
-      if (!root) continue
-      if (s.broken.has(root + server.id)) continue
+      if (!server.extensions.includes(extension)) continue;
+      const root = await server.root(file, App.info());
+      if (!root) continue;
+      if (s.broken.has(root + server.id)) continue;
 
-      const match = s.clients.find((x) => x.root === root && x.serverID === server.id)
+      const match = s.clients.find(
+        (x) => x.root === root && x.serverID === server.id,
+      );
       if (match) {
-        result.push(match)
-        continue
+        result.push(match);
+        continue;
       }
-      const handle = await server.spawn(App.info(), root)
-      if (!handle) continue
+      const handle = await server.spawn(App.info(), root);
+      if (!handle) continue;
       const client = await LSPClient.create({
         serverID: server.id,
         server: handle,
         root,
       }).catch((err) => {
-        s.broken.add(root + server.id)
-        handle.process.kill()
-        log.error("", { error: err })
-      })
-      if (!client) continue
-      s.clients.push(client)
-      result.push(client)
+        s.broken.add(root + server.id);
+        handle.process.kill();
+        log.error("", { error: err });
+      });
+      if (!client) continue;
+      s.clients.push(client);
+      result.push(client);
     }
-    return result
+    return result;
   }
 
   export async function touchFile(input: string, waitForDiagnostics?: boolean) {
-    const clients = await getClients(input)
+    const clients = await getClients(input);
     await run(async (client) => {
-      if (!clients.includes(client)) return
-      const wait = waitForDiagnostics ? client.waitForDiagnostics({ path: input }) : Promise.resolve()
-      await client.notify.open({ path: input })
-      return wait
-    })
+      if (!clients.includes(client)) return;
+      const wait = waitForDiagnostics
+        ? client.waitForDiagnostics({ path: input })
+        : Promise.resolve();
+      await client.notify.open({ path: input });
+      return wait;
+    });
   }
 
   export async function diagnostics() {
-    const results: Record<string, LSPClient.Diagnostic[]> = {}
+    const results: Record<string, LSPClient.Diagnostic[]> = {};
     for (const result of await run(async (client) => client.diagnostics)) {
       for (const [path, diagnostics] of result.entries()) {
-        const arr = results[path] || []
-        arr.push(...diagnostics)
-        results[path] = arr
+        const arr = results[path] || [];
+        arr.push(...diagnostics);
+        results[path] = arr;
       }
     }
-    return results
+    return results;
   }
 
-  export async function hover(input: { file: string; line: number; character: number }) {
+  export async function hover(input: {
+    file: string;
+    line: number;
+    character: number;
+  }) {
     return run((client) => {
       return client.connection.sendRequest("textDocument/hover", {
         textDocument: {
@@ -136,8 +145,8 @@ export namespace LSP {
           line: input.line,
           character: input.character,
         },
-      })
-    })
+      });
+    });
   }
 
   enum SymbolKind {
@@ -178,7 +187,7 @@ export namespace LSP {
     SymbolKind.Constant,
     SymbolKind.Struct,
     SymbolKind.Enum,
-  ]
+  ];
 
   export async function workspaceSymbol(query: string) {
     return run((client) =>
@@ -186,10 +195,12 @@ export namespace LSP {
         .sendRequest("workspace/symbol", {
           query,
         })
-        .then((result: any) => result.filter((x: LSP.Symbol) => kinds.includes(x.kind)))
+        .then((result: any) =>
+          result.filter((x: LSP.Symbol) => kinds.includes(x.kind)),
+        )
         .then((result: any) => result.slice(0, 10))
         .catch(() => []),
-    ).then((result) => result.flat() as LSP.Symbol[])
+    ).then((result) => result.flat() as LSP.Symbol[]);
   }
 
   export async function documentSymbol(uri: string) {
@@ -203,13 +214,15 @@ export namespace LSP {
         .catch(() => []),
     )
       .then((result) => result.flat() as (LSP.DocumentSymbol | LSP.Symbol)[])
-      .then((result) => result.filter(Boolean))
+      .then((result) => result.filter(Boolean));
   }
 
-  async function run<T>(input: (client: LSPClient.Info) => Promise<T>): Promise<T[]> {
-    const clients = await state().then((x) => x.clients)
-    const tasks = clients.map((x) => input(x))
-    return Promise.all(tasks)
+  async function run<T>(
+    input: (client: LSPClient.Info) => Promise<T>,
+  ): Promise<T[]> {
+    const clients = await state().then((x) => x.clients);
+    const tasks = clients.map((x) => input(x));
+    return Promise.all(tasks);
   }
 
   export namespace Diagnostic {
@@ -219,13 +232,13 @@ export namespace LSP {
         2: "WARN",
         3: "INFO",
         4: "HINT",
-      }
+      };
 
-      const severity = severityMap[diagnostic.severity || 1]
-      const line = diagnostic.range.start.line + 1
-      const col = diagnostic.range.start.character + 1
+      const severity = severityMap[diagnostic.severity || 1];
+      const line = diagnostic.range.start.line + 1;
+      const col = diagnostic.range.start.character + 1;
 
-      return `${severity} [${line}:${col}] ${diagnostic.message}`
+      return `${severity} [${line}:${col}] ${diagnostic.message}`;
     }
   }
 }

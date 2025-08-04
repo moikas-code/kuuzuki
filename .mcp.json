@@ -1,7 +1,7 @@
 {
     "mcpServers": {
       "moidvk": {
-        "command": "moidvk",
+        "command": "npx @moikas/moidvk",
         "args": ["serve"]
       },
       "weather": {

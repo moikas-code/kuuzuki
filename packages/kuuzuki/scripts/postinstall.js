@@ -1,36 +1,36 @@
 #!/usr/bin/env node
 
-const { chmod, access } = require('fs').promises;
-const { join } = require('path');
-const { platform, arch } = require('os');
+const { chmod, access } = require("fs").promises;
+const { join } = require("path");
+const { platform, arch } = require("os");
 
 async function makeBinariesExecutable() {
-  const binariesDir = join(__dirname, '..', 'binaries');
-  
+  const binariesDir = join(__dirname, "..", "binaries");
+
   const p = platform();
   const a = arch();
-  
+
   let platformName;
   switch (p) {
-    case 'darwin':
-      platformName = a === 'arm64' ? 'macos-arm64' : 'macos';
+    case "darwin":
+      platformName = a === "arm64" ? "macos-arm64" : "macos";
       break;
-    case 'win32':
-      platformName = a === 'arm64' ? 'windows-arm64.exe' : 'windows.exe';
+    case "win32":
+      platformName = a === "arm64" ? "windows-arm64" : "windows-x64";
       break;
     default:
-      platformName = a === 'arm64' ? 'linux-arm64' : 'linux';
+      platformName = a === "arm64" ? "linux-arm64" : "linux";
   }
-  
-  const binaryName = `kuuzuki-tui-${platformName}`;
+
+  const binaryName = `kuuzuki-tui-${platformName}${p === "win32" ? ".exe" : ""}`;
   const binaryPath = join(binariesDir, binaryName);
-  
+
   try {
     // Check if binary exists
     await access(binaryPath);
-    
+
     // Make executable (755 permissions) - skip on Windows as it doesn't use chmod
-    if (process.platform !== 'win32') {
+    if (process.platform !== "win32") {
       await chmod(binaryPath, 0o755);
     }
     console.log(`✓ Kuuzuki binary ready for ${platform()}`);
