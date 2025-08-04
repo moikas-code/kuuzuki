@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auth CLI Improvements** - Better pluralization in environment variable display
   - Conditional pluralization: "1 environment variable" vs "2 environment variables"
   - Improved user experience in `kuuzuki auth list` command
+- **Memory Tool Compact Mode** - Reduced context usage by 70-80% with compact output format
+  - Compact format enabled by default: `[category] rule-id: "text" (usage info) 📄`
+  - Set `compact=false` for full verbose output when detailed information is needed
+  - Applies to `list`, `analytics`, and other memory tool actions
 
 ### Technical
 

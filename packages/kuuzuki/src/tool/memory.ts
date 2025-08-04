@@ -3,6 +3,7 @@ import * as path from "path";
 import { Tool } from "./tool";
 import { App } from "../app/app";
 import { Permission } from "../permission";
+import { MemoryStorage } from "./memory-storage";
 import DESCRIPTION from "./memory.txt";
 
 // Schema definitions for memory tool
@@ -36,10 +37,15 @@ const RuleSchema = z.object({
   category: z.enum(["critical", "preferred", "contextual", "deprecated"]),
   filePath: z.string().optional(),
   reason: z.string().optional(),
-  createdAt: z.string(),
+  createdAt: z.string().default(() => new Date().toISOString()),
   lastUsed: z.string().optional(),
   usageCount: z.number().default(0),
-  analytics: RuleAnalyticsSchema.optional(),
+  analytics: RuleAnalyticsSchema.default({
+    timesApplied: 0,
+    timesIgnored: 0,
+    effectivenessScore: 0,
+    userFeedback: [],
+  }),
   documentationLinks: z.array(DocumentationLinkSchema).default([]),
   tags: z.array(z.string()).default([]),
 });
@@ -111,6 +117,12 @@ export const MemoryTool = Tool.define("memory", {
       "read-docs",
       "conflicts",
       "feedback",
+      "search",
+      "usage-history",
+      "session-context",
+      "cleanup",
+      "export-db",
+      "import-db",
     ]),
     rule: z
       .string()
@@ -147,6 +159,11 @@ export const MemoryTool = Tool.define("memory", {
       .string()
       .optional()
       .describe("Timeframe for analytics (e.g., '7d', '30d', 'all')"),
+    compact: z
+      .boolean()
+      .optional()
+      .default(true)
+      .describe("Use compact output format to reduce context usage"),
   }),
 
   async execute(params, ctx) {
@@ -180,6 +197,18 @@ export const MemoryTool = Tool.define("memory", {
           return await detectConflicts(agentrc, params);
         case "feedback":
           return await recordFeedback(agentrcPath, agentrc, params, ctx);
+        case "search":
+          return await searchRules(params, ctx);
+        case "usage-history":
+          return await getUsageHistory(params, ctx);
+        case "session-context":
+          return await manageSessionContext(params, ctx);
+        case "cleanup":
+          return await cleanupData(params);
+        case "export-db":
+          return await exportDatabase(ctx);
+        case "import-db":
+          return await importDatabase(params);
         default:
           throw new Error(`Unknown action: ${params.action}`);
       }
@@ -198,11 +227,49 @@ export const MemoryTool = Tool.define("memory", {
 async function readAgentRc(agentrcPath: string): Promise<AgentRc> {
   const file = Bun.file(agentrcPath);
   if (!(await file.exists())) {
-    throw new Error(".agentrc file not found. Please create one first.");
+    // Create a default .agentrc file with proper structure
+    const defaultAgentRc: AgentRc = {
+      rules: {
+        critical: [],
+        preferred: [],
+        contextual: [],
+        deprecated: [],
+      },
+      ruleMetadata: {
+        version: "2.0.0",
+        lastModified: new Date().toISOString(),
+        totalRules: 0,
+        sessionRules: [],
+      },
+    };
+
+    await Bun.write(agentrcPath, JSON.stringify(defaultAgentRc, null, 2));
+    return defaultAgentRc;
   }
 
   const content = await file.text();
-  return JSON.parse(content);
+  const agentrc = JSON.parse(content);
+
+  // Ensure the agentrc has the proper structure
+  if (!agentrc.rules) {
+    agentrc.rules = {
+      critical: [],
+      preferred: [],
+      contextual: [],
+      deprecated: [],
+    };
+  }
+
+  if (!agentrc.ruleMetadata) {
+    agentrc.ruleMetadata = {
+      version: "2.0.0",
+      lastModified: new Date().toISOString(),
+      totalRules: 0,
+      sessionRules: [],
+    };
+  }
+
+  return agentrc;
 }
 
 async function writeAgentRc(
@@ -244,7 +311,61 @@ function ensureStructuredRules(agentrc: AgentRc): AgentRcRules {
     return { critical: [], preferred: [], contextual: [], deprecated: [] };
   }
 
-  return AgentRcRulesSchema.parse(agentrc.rules);
+  // Handle structured rules that may be missing required fields
+  const rules = agentrc.rules as any;
+  const result: AgentRcRules = {
+    critical: [],
+    preferred: [],
+    contextual: [],
+    deprecated: [],
+  };
+
+  // Process each category
+  for (const [category, categoryRules] of Object.entries(rules)) {
+    if (!Array.isArray(categoryRules)) continue;
+
+    const processedRules = categoryRules.map((rule: any) => {
+      // Create a normalized rule with all required fields
+      const normalizedRule = {
+        id: rule.id || generateRuleId(rule.text || "unknown"),
+        text: rule.text || "",
+        category: rule.category || category,
+        filePath: rule.filePath,
+        reason: rule.reason,
+        createdAt: rule.createdAt || new Date().toISOString(),
+        lastUsed: rule.lastUsed,
+        usageCount: rule.usageCount || 0,
+        analytics: rule.analytics || {
+          timesApplied: 0,
+          timesIgnored: 0,
+          effectivenessScore: 0,
+          userFeedback: [],
+        },
+        documentationLinks: rule.documentationLinks || [],
+        tags: rule.tags || [],
+      };
+
+      // Use Zod parsing with defaults to ensure schema compliance
+      try {
+        return RuleSchema.parse(normalizedRule);
+      } catch (error) {
+        // If validation still fails, create a minimal valid rule
+        return RuleSchema.parse({
+          id: generateRuleId(rule.text || "unknown"),
+          text: rule.text || "Unknown rule",
+          category: category as any,
+          createdAt: new Date().toISOString(),
+          usageCount: 0,
+        });
+      }
+    });
+
+    if (category in result) {
+      (result as any)[category] = processedRules;
+    }
+  }
+
+  return result;
 }
 
 async function addRule(
@@ -323,6 +444,24 @@ async function addRule(
   agentrc.ruleMetadata = metadata;
 
   await writeAgentRc(agentrcPath, agentrc, ctx);
+
+  // Also store in SQLite database
+  try {
+    const storage = MemoryStorage.getInstance();
+    storage.addRule({
+      id: ruleId,
+      text: params.rule,
+      category: params.category,
+      filePath: params.filePath,
+      reason: params.reason,
+      analytics: JSON.stringify(newRule.analytics),
+      documentationLinks: JSON.stringify(newRule.documentationLinks),
+      tags: JSON.stringify(newRule.tags),
+    });
+  } catch (error) {
+    // SQLite storage is optional, don't fail if it's not available
+    console.warn("Failed to store rule in SQLite:", error);
+  }
 
   return {
     title: "Rule Added",
@@ -438,6 +577,7 @@ async function listRules(
 ): Promise<{ title: string; metadata: any; output: string }> {
   const rules = ensureStructuredRules(agentrc);
   const targetCategory = params.category;
+  const compact = params.compact !== false; // Default to compact mode
 
   let output = "";
   let totalCount = 0;
@@ -453,13 +593,22 @@ async function listRules(
     output += `\n## ${category.toUpperCase()} RULES (${categoryRules.length})\n`;
 
     for (const rule of categoryRules) {
-      output += `\n**${rule.id}**\n`;
-      output += `Text: ${rule.text}\n`;
-      if (rule.filePath) output += `Documentation: ${rule.filePath}\n`;
-      if (rule.reason) output += `Reason: ${rule.reason}\n`;
-      output += `Created: ${rule.createdAt}\n`;
-      if (rule.lastUsed) output += `Last used: ${rule.lastUsed}\n`;
-      output += `Usage count: ${rule.usageCount}\n`;
+      if (compact) {
+        // Compact format: [category] rule-id: "text" (usage info)
+        const usageInfo =
+          rule.usageCount > 0 ? ` (${rule.usageCount} uses)` : "";
+        const docInfo = rule.filePath ? " 📄" : "";
+        output += `[${category}] ${rule.id}: "${rule.text}"${usageInfo}${docInfo}\n`;
+      } else {
+        // Verbose format (original)
+        output += `\n**${rule.id}**\n`;
+        output += `Text: ${rule.text}\n`;
+        if (rule.filePath) output += `Documentation: ${rule.filePath}\n`;
+        if (rule.reason) output += `Reason: ${rule.reason}\n`;
+        output += `Created: ${rule.createdAt}\n`;
+        if (rule.lastUsed) output += `Last used: ${rule.lastUsed}\n`;
+        output += `Usage count: ${rule.usageCount}\n`;
+      }
     }
 
     totalCount += categoryRules.length;
@@ -476,6 +625,7 @@ async function listRules(
     metadata: {
       totalCount,
       category: targetCategory,
+      compact,
       ruleMetadata: agentrc.ruleMetadata,
     },
     output: output.trim(),
@@ -572,60 +722,137 @@ async function migrateRules(
   agentrc: AgentRc,
   ctx: Tool.Context,
 ): Promise<{ title: string; metadata: any; output: string }> {
-  if (!Array.isArray(agentrc.rules)) {
+  let migrationCount = 0;
+  let fixedCount = 0;
+
+  // Handle legacy string array format
+  if (Array.isArray(agentrc.rules)) {
+    const oldRules = agentrc.rules as string[];
+    const newRules: AgentRcRules = {
+      critical: [],
+      preferred: [],
+      contextual: [],
+      deprecated: [],
+    };
+
+    // Migrate old string rules to preferred category by default
+    for (const ruleText of oldRules) {
+      const ruleId = generateRuleId(ruleText);
+      const rule: Rule = {
+        id: ruleId,
+        text: ruleText,
+        category: "preferred",
+        reason: "Migrated from legacy format",
+        createdAt: new Date().toISOString(),
+        usageCount: 0,
+        analytics: {
+          timesApplied: 0,
+          timesIgnored: 0,
+          effectivenessScore: 0,
+          userFeedback: [],
+        },
+        documentationLinks: [],
+        tags: [],
+      };
+      newRules.preferred.push(rule);
+      migrationCount++;
+    }
+
+    agentrc.rules = newRules;
+  }
+  // Handle structured rules that may be missing required fields
+  else if (agentrc.rules && typeof agentrc.rules === "object") {
+    const rules = agentrc.rules as any;
+    const fixedRules: AgentRcRules = {
+      critical: [],
+      preferred: [],
+      contextual: [],
+      deprecated: [],
+    };
+
+    // Fix each category
+    for (const [category, categoryRules] of Object.entries(rules)) {
+      if (!Array.isArray(categoryRules)) continue;
+
+      const processedRules = categoryRules.map((rule: any) => {
+        let needsFix = false;
+
+        // Check if rule needs fixing
+        if (
+          !rule.createdAt ||
+          !rule.category ||
+          rule.usageCount === undefined ||
+          !rule.analytics
+        ) {
+          needsFix = true;
+        }
+
+        if (needsFix) {
+          fixedCount++;
+          return RuleSchema.parse({
+            id: rule.id || generateRuleId(rule.text || "unknown"),
+            text: rule.text || "",
+            category: rule.category || category,
+            filePath: rule.filePath,
+            reason: rule.reason,
+            createdAt: rule.createdAt || new Date().toISOString(),
+            lastUsed: rule.lastUsed,
+            usageCount: rule.usageCount || 0,
+            analytics: rule.analytics || {
+              timesApplied: 0,
+              timesIgnored: 0,
+              effectivenessScore: 0,
+              userFeedback: [],
+            },
+            documentationLinks: rule.documentationLinks || [],
+            tags: rule.tags || [],
+          });
+        }
+
+        return rule;
+      });
+
+      if (category in fixedRules) {
+        (fixedRules as any)[category] = processedRules;
+      }
+    }
+
+    agentrc.rules = fixedRules;
+  }
+
+  // Update metadata
+  const metadata: RuleMetadata = {
+    version: "2.0.0",
+    lastModified: new Date().toISOString(),
+    totalRules: migrationCount + fixedCount,
+    sessionRules: agentrc.ruleMetadata?.sessionRules || [],
+  };
+
+  agentrc.ruleMetadata = metadata;
+
+  if (migrationCount === 0 && fixedCount === 0) {
     return {
       title: "Migration Not Needed",
       metadata: {},
-      output: "Rules are already in structured format",
+      output: "Rules are already in proper structured format",
     };
   }
-
-  const oldRules = agentrc.rules as string[];
-  const newRules: AgentRcRules = {
-    critical: [],
-    preferred: [],
-    contextual: [],
-    deprecated: [],
-  };
-
-  // Migrate old string rules to preferred category by default
-  for (const ruleText of oldRules) {
-    const ruleId = generateRuleId(ruleText);
-    const rule: Rule = {
-      id: ruleId,
-      text: ruleText,
-      category: "preferred",
-      reason: "Migrated from legacy format",
-      createdAt: new Date().toISOString(),
-      usageCount: 0,
-      analytics: {
-        timesApplied: 0,
-        timesIgnored: 0,
-        effectivenessScore: 0,
-        userFeedback: [],
-      },
-      documentationLinks: [],
-      tags: [],
-    };
-    newRules.preferred.push(rule);
-  }
-
-  const metadata: RuleMetadata = {
-    version: "1.0.0",
-    lastModified: new Date().toISOString(),
-    totalRules: oldRules.length,
-    sessionRules: [],
-  };
-
-  agentrc.rules = newRules;
-  agentrc.ruleMetadata = metadata;
 
   await writeAgentRc(agentrcPath, agentrc, ctx);
 
+  let output = "";
+  if (migrationCount > 0) {
+    output += `Successfully migrated ${migrationCount} rules from legacy string format to structured format. `;
+  }
+  if (fixedCount > 0) {
+    output += `Fixed ${fixedCount} rules by adding missing required fields. `;
+  }
+  output += "All rules now conform to the standard schema.";
+
   return {
     title: "Rules Migrated",
-    metadata: { migratedCount: oldRules.length },
-    output: `Successfully migrated ${oldRules.length} rules from legacy string format to structured format. All rules were placed in 'preferred' category.`,
+    metadata: { migratedCount: migrationCount, fixedCount },
+    output: output.trim(),
   };
 }
 
@@ -790,93 +1017,167 @@ function calculateRelevanceScore(
   return score;
 }
 
+interface AnalyticsResult {
+  totalRules: number;
+  usedRules: number;
+  recentlyUsed: number;
+  categoryStats: Record<string, number>;
+  topUsed: Array<{ id: string; text: string; usageCount: number }>;
+  leastUsed: Array<{ id: string; text: string; createdAt: string }>;
+}
+
 async function showAnalytics(
   agentrc: AgentRc,
-  params: any,
+  params: { timeframe?: string; compact?: boolean },
 ): Promise<{ title: string; metadata: any; output: string }> {
-  const rules = ensureStructuredRules(agentrc);
-  const allRules = [
-    ...rules.critical,
-    ...rules.preferred,
-    ...rules.contextual,
-    ...rules.deprecated,
-  ];
+  const timeframe = params.timeframe || "30d";
+  const timeframeDays = getTimeframeDays(timeframe);
 
-  if (allRules.length === 0) {
-    return {
-      title: "No Analytics",
-      metadata: {},
-      output: "No rules found to analyze.",
+  // Try to get analytics from SQLite first, fall back to .agentrc
+  let analytics: AnalyticsResult;
+  try {
+    const storage = MemoryStorage.getInstance();
+    analytics = storage.getRuleAnalytics(timeframeDays);
+  } catch (error) {
+    // Fall back to .agentrc analytics
+    const rules = ensureStructuredRules(agentrc);
+    const allRules = [
+      ...rules.critical,
+      ...rules.preferred,
+      ...rules.contextual,
+      ...rules.deprecated,
+    ];
+
+    if (allRules.length === 0) {
+      return {
+        title: "No Analytics",
+        metadata: {},
+        output: "No rules found to analyze.",
+      };
+    }
+
+    const cutoffDate = getTimeframeCutoff(timeframe);
+    const totalRules = allRules.length;
+    const usedRules = allRules.filter((r) => r.usageCount > 0).length;
+    const recentlyUsed = allRules.filter(
+      (r) => r.lastUsed && new Date(r.lastUsed) > cutoffDate,
+    ).length;
+
+    const categoryStats = {
+      critical: rules.critical.length,
+      preferred: rules.preferred.length,
+      contextual: rules.contextual.length,
+      deprecated: rules.deprecated.length,
+    };
+
+    const topUsed = allRules
+      .sort((a, b) => b.usageCount - a.usageCount)
+      .slice(0, 5)
+      .map((rule) => ({
+        id: rule.id,
+        text: rule.text,
+        usageCount: rule.usageCount,
+      }));
+
+    const leastUsed = allRules
+      .filter((r) => r.usageCount === 0)
+      .sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      )
+      .slice(0, 5)
+      .map((rule) => ({
+        id: rule.id,
+        text: rule.text,
+        createdAt: rule.createdAt,
+      }));
+
+    analytics = {
+      totalRules,
+      usedRules,
+      recentlyUsed,
+      categoryStats,
+      topUsed,
+      leastUsed,
     };
   }
 
-  const timeframe = params.timeframe || "30d";
-  const cutoffDate = getTimeframeCutoff(timeframe);
-
-  // Calculate analytics
-  const totalRules = allRules.length;
-  const usedRules = allRules.filter((r) => r.usageCount > 0).length;
-  const recentlyUsed = allRules.filter(
-    (r) => r.lastUsed && new Date(r.lastUsed) > cutoffDate,
-  ).length;
-
-  const categoryStats = {
-    critical: rules.critical.length,
-    preferred: rules.preferred.length,
-    contextual: rules.contextual.length,
-    deprecated: rules.deprecated.length,
-  };
-
-  const topUsed = allRules
-    .sort((a, b) => b.usageCount - a.usageCount)
-    .slice(0, 5);
-
-  const leastUsed = allRules
-    .filter((r) => r.usageCount === 0)
-    .sort(
-      (a, b) =>
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-    )
-    .slice(0, 5);
+  const compact = params.compact !== false; // Default to compact mode
 
   let output = `## Rule Analytics (${timeframe})\n\n`;
-  output += `**Total Rules**: ${totalRules}\n`;
-  output += `**Used Rules**: ${usedRules} (${Math.round((usedRules / totalRules) * 100)}%)\n`;
-  output += `**Recently Used**: ${recentlyUsed}\n\n`;
+  output += `**Total Rules**: ${analytics.totalRules}\n`;
+  output += `**Used Rules**: ${analytics.usedRules} (${Math.round((analytics.usedRules / analytics.totalRules) * 100)}%)\n`;
+  output += `**Recently Used**: ${analytics.recentlyUsed}\n\n`;
 
-  output += `### Category Distribution\n`;
-  Object.entries(categoryStats).forEach(([category, count]) => {
-    const percentage = Math.round((count / totalRules) * 100);
-    output += `- **${category}**: ${count} (${percentage}%)\n`;
-  });
+  if (compact) {
+    // Compact category distribution
+    output += `### Categories: `;
+    const categoryEntries = Object.entries(analytics.categoryStats);
+    output +=
+      categoryEntries
+        .map(([category, count]) => `${category}(${count})`)
+        .join(", ") + "\n\n";
 
-  if (topUsed.length > 0) {
-    output += `\n### Most Used Rules\n`;
-    topUsed.forEach((rule, index) => {
-      output += `${index + 1}. **${rule.id}** - ${rule.usageCount} uses\n`;
-      output += `   "${rule.text}"\n`;
-    });
-  }
-
-  if (leastUsed.length > 0) {
-    output += `\n### Unused Rules (Consider Review)\n`;
-    leastUsed.forEach((rule, index) => {
-      const age = Math.round(
-        (Date.now() - new Date(rule.createdAt).getTime()) /
-          (1000 * 60 * 60 * 24),
+    // Compact top used rules
+    if (analytics.topUsed.length > 0) {
+      output += `### Top Used: `;
+      output +=
+        analytics.topUsed
+          .slice(0, 3)
+          .map(
+            (rule: { id: string; usageCount: number }) =>
+              `${rule.id}(${rule.usageCount})`,
+          )
+          .join(", ") + "\n";
+    }
+  } else {
+    // Verbose format (original)
+    output += `### Category Distribution\n`;
+    Object.entries(analytics.categoryStats).forEach(([category, count]) => {
+      const percentage = Math.round(
+        ((count as number) / analytics.totalRules) * 100,
       );
-      output += `${index + 1}. **${rule.id}** - Created ${age} days ago\n`;
-      output += `   "${rule.text}"\n`;
+      output += `- **${category}**: ${count} (${percentage}%)\n`;
     });
+
+    if (analytics.topUsed.length > 0) {
+      output += `\n### Most Used Rules\n`;
+      analytics.topUsed.forEach(
+        (
+          rule: { id: string; text: string; usageCount: number },
+          index: number,
+        ) => {
+          output += `${index + 1}. **${rule.id}** - ${rule.usageCount} uses\n`;
+          output += `   "${rule.text}"\n`;
+        },
+      );
+    }
+
+    if (analytics.leastUsed.length > 0) {
+      output += `\n### Unused Rules (Consider Review)\n`;
+      analytics.leastUsed.forEach(
+        (
+          rule: { id: string; text: string; createdAt: string },
+          index: number,
+        ) => {
+          const age = Math.round(
+            (Date.now() - new Date(rule.createdAt).getTime()) /
+              (1000 * 60 * 60 * 24),
+          );
+          output += `${index + 1}. **${rule.id}** - Created ${age} days ago\n`;
+          output += `   "${rule.text}"\n`;
+        },
+      );
+    }
   }
 
   return {
     title: "Rule Analytics",
     metadata: {
-      totalRules,
-      usedRules,
-      recentlyUsed,
-      categoryStats,
+      totalRules: analytics.totalRules,
+      usedRules: analytics.usedRules,
+      recentlyUsed: analytics.recentlyUsed,
+      categoryStats: analytics.categoryStats,
       timeframe,
     },
     output: output.trim(),
@@ -903,6 +1204,28 @@ function getTimeframeCutoff(timeframe: string): Date {
       return new Date(now.getTime() - num * 365 * 24 * 60 * 60 * 1000);
     default:
       return new Date(0);
+  }
+}
+
+function getTimeframeDays(timeframe: string): number {
+  const match = timeframe.match(/^(\d+)([dwmy])$/);
+
+  if (!match) return 365; // Default to 1 year
+
+  const [, amount, unit] = match;
+  const num = parseInt(amount);
+
+  switch (unit) {
+    case "d":
+      return num;
+    case "w":
+      return num * 7;
+    case "m":
+      return num * 30;
+    case "y":
+      return num * 365;
+    default:
+      return 365;
   }
 }
 
@@ -1223,5 +1546,385 @@ async function recordFeedback(
       newEffectivenessScore: foundRule.analytics.effectivenessScore,
     },
     output: `Recorded ${params.rating}-star rating for rule "${foundRule.text}". ${params.comment ? `Comment: "${params.comment}"` : ""} New effectiveness score: ${Math.round(foundRule.analytics.effectivenessScore * 100)}%`,
+  };
+}
+
+// New SQLite-powered functions
+async function searchRules(
+  params: any,
+  ctx: Tool.Context,
+): Promise<{ title: string; metadata: any; output: string }> {
+  if (!params.context) {
+    throw new Error("'context' parameter is required for search action");
+  }
+
+  const storage = MemoryStorage.getInstance();
+  const results = storage.searchRules(params.context);
+
+  if (results.length === 0) {
+    return {
+      title: "No Search Results",
+      metadata: { query: params.context },
+      output: `No rules found matching: "${params.context}"`,
+    };
+  }
+
+  let output = `## Search Results for "${params.context}"\n\n`;
+  output += `Found ${results.length} matching rules:\n\n`;
+
+  results.slice(0, 10).forEach((record, index) => {
+    const analytics = JSON.parse(record.analytics || "{}");
+    output += `### ${index + 1}. ${record.category.toUpperCase()} - ${record.id}\n`;
+    output += `**Rule**: ${record.text}\n`;
+    if (record.reason) output += `**Reason**: ${record.reason}\n`;
+    output += `**Usage Count**: ${record.usageCount}\n`;
+    if (analytics.effectivenessScore) {
+      output += `**Effectiveness**: ${Math.round(analytics.effectivenessScore * 100)}%\n`;
+    }
+    output += `**Created**: ${new Date(record.createdAt).toLocaleDateString()}\n\n`;
+  });
+
+  // Record search context for future suggestions
+  storage.updateSessionContext({
+    sessionId: ctx.sessionID,
+    workingDirectory: App.info().path.root,
+    fileTypes: "[]",
+    recentFiles: "[]",
+    lastActivity: new Date().toISOString(),
+    contextData: JSON.stringify({ lastSearch: params.context }),
+  });
+
+  return {
+    title: "Search Results",
+    metadata: {
+      query: params.context,
+      resultCount: results.length,
+      topResults: results.slice(0, 5).map((r) => r.id),
+    },
+    output: output.trim(),
+  };
+}
+
+async function getUsageHistory(
+  params: any,
+  ctx: Tool.Context,
+): Promise<{ title: string; metadata: any; output: string }> {
+  const storage = MemoryStorage.getInstance();
+
+  if (params.ruleId) {
+    // Get usage history for specific rule
+    const history = storage.getRuleUsageHistory(params.ruleId, 20);
+    const rule = storage.getRule(params.ruleId);
+
+    if (!rule) {
+      throw new Error(`Rule not found: ${params.ruleId}`);
+    }
+
+    let output = `## Usage History for Rule: ${rule.id}\n\n`;
+    output += `**Rule**: ${rule.text}\n`;
+    output += `**Category**: ${rule.category}\n`;
+    output += `**Total Usage**: ${rule.usageCount}\n\n`;
+
+    if (history.length === 0) {
+      output += "No usage history found.";
+    } else {
+      output += `### Recent Usage (${history.length} entries)\n\n`;
+      history.forEach((usage, index) => {
+        output += `${index + 1}. **${new Date(usage.timestamp).toLocaleString()}**\n`;
+        output += `   Session: ${usage.sessionId}\n`;
+        if (usage.context) output += `   Context: ${usage.context}\n`;
+        if (usage.effectiveness)
+          output += `   Effectiveness: ${Math.round(usage.effectiveness * 100)}%\n`;
+        output += `\n`;
+      });
+    }
+
+    return {
+      title: "Rule Usage History",
+      metadata: { ruleId: params.ruleId, historyCount: history.length },
+      output: output.trim(),
+    };
+  } else {
+    // Get usage history for current session
+    const history = storage.getSessionUsageHistory(ctx.sessionID, 20);
+
+    let output = `## Session Usage History\n\n`;
+    output += `**Session**: ${ctx.sessionID}\n`;
+    output += `**Recent Activity**: ${history.length} rule applications\n\n`;
+
+    if (history.length === 0) {
+      output += "No rules have been used in this session yet.";
+    } else {
+      history.forEach((usage, index) => {
+        output += `${index + 1}. **${new Date(usage.timestamp).toLocaleString()}**\n`;
+        output += `   Rule: ${usage.ruleId}\n`;
+        if ((usage as any).ruleText)
+          output += `   Text: ${(usage as any).ruleText}\n`;
+        if ((usage as any).category)
+          output += `   Category: ${(usage as any).category}\n`;
+        if (usage.context) output += `   Context: ${usage.context}\n`;
+        output += `\n`;
+      });
+    }
+
+    return {
+      title: "Session Usage History",
+      metadata: { sessionId: ctx.sessionID, historyCount: history.length },
+      output: output.trim(),
+    };
+  }
+}
+
+interface SessionContextParams {
+  context?: string;
+}
+
+async function manageSessionContext(
+  params: SessionContextParams,
+  ctx: Tool.Context,
+): Promise<{ title: string; metadata: any; output: string }> {
+  const storage = MemoryStorage.getInstance();
+
+  // Update current session context
+  const context = await analyzeContext(ctx);
+  storage.updateSessionContext({
+    sessionId: ctx.sessionID,
+    workingDirectory: context.workingDirectory,
+    fileTypes: JSON.stringify(context.fileTypes),
+    recentFiles: JSON.stringify(context.recentFiles),
+    lastActivity: new Date().toISOString(),
+    contextData: JSON.stringify({
+      errorPatterns: context.errorPatterns,
+      commandHistory: context.commandHistory,
+      currentTool: context.currentTool,
+    }),
+  });
+
+  if (params.context === "list") {
+    // List recent sessions
+    const recentSessions = storage.getRecentSessions(10);
+
+    let output = `## Recent Sessions\n\n`;
+    output += `Found ${recentSessions.length} recent sessions:\n\n`;
+
+    recentSessions.forEach((session, index) => {
+      const fileTypes = JSON.parse(session.fileTypes || "[]");
+      const contextData = JSON.parse(session.contextData || "{}");
+
+      output += `### ${index + 1}. Session ${session.sessionId.substring(0, 8)}...\n`;
+      output += `**Directory**: ${session.workingDirectory}\n`;
+      output += `**Last Activity**: ${new Date(session.lastActivity).toLocaleString()}\n`;
+      if (fileTypes.length > 0)
+        output += `**File Types**: ${fileTypes.join(", ")}\n`;
+      if (contextData.currentTool)
+        output += `**Last Tool**: ${contextData.currentTool}\n`;
+      output += `\n`;
+    });
+
+    return {
+      title: "Session Contexts",
+      metadata: { sessionCount: recentSessions.length },
+      output: output.trim(),
+    };
+  } else {
+    // Show current session context
+    const currentSession = storage.getSessionContext(ctx.sessionID);
+
+    let output = `## Current Session Context\n\n`;
+    output += `**Session ID**: ${ctx.sessionID}\n`;
+    output += `**Working Directory**: ${context.workingDirectory}\n`;
+    output += `**File Types**: ${context.fileTypes.join(", ") || "None detected"}\n`;
+    output += `**Recent Files**: ${context.recentFiles.slice(0, 5).join(", ") || "None"}\n`;
+
+    if (currentSession) {
+      const contextData = JSON.parse(currentSession.contextData || "{}");
+      output += `**Last Activity**: ${new Date(currentSession.lastActivity).toLocaleString()}\n`;
+      if (contextData.currentTool)
+        output += `**Current Tool**: ${contextData.currentTool}\n`;
+      if (contextData.errorPatterns?.length > 0) {
+        output += `**Error Patterns**: ${contextData.errorPatterns.join(", ")}\n`;
+      }
+    }
+
+    return {
+      title: "Current Session Context",
+      metadata: { sessionId: ctx.sessionID, context },
+      output: output.trim(),
+    };
+  }
+}
+
+interface CleanupParams {
+  timeframe?: string;
+}
+
+async function cleanupData(
+  params: CleanupParams,
+): Promise<{ title: string; metadata: any; output: string }> {
+  const storage = MemoryStorage.getInstance();
+
+  const usageCleanupDays =
+    parseInt(params.timeframe?.replace("d", "") || "90") || 90;
+  const sessionCleanupDays =
+    parseInt(params.timeframe?.replace("d", "") || "30") || 30;
+
+  const usageDeleted = storage.cleanupOldUsageData(usageCleanupDays);
+  const sessionsDeleted = storage.cleanupOldSessions(sessionCleanupDays);
+
+  // Vacuum database to reclaim space
+  storage.vacuum();
+
+  let output = `## Database Cleanup Complete\n\n`;
+  output += `**Usage Data Cleaned**: ${usageDeleted} old entries (older than ${usageCleanupDays} days)\n`;
+  output += `**Sessions Cleaned**: ${sessionsDeleted} old sessions (older than ${sessionCleanupDays} days)\n`;
+  output += `**Database Optimized**: VACUUM completed\n`;
+
+  return {
+    title: "Database Cleanup",
+    metadata: {
+      usageDeleted,
+      sessionsDeleted,
+      usageCleanupDays,
+      sessionCleanupDays,
+    },
+    output: output.trim(),
+  };
+}
+
+async function exportDatabase(
+  ctx: Tool.Context,
+): Promise<{ title: string; metadata: any; output: string }> {
+  const storage = MemoryStorage.getInstance();
+  const app = App.info();
+
+  // Get all data from database
+  const rules = storage.getRulesByCategory();
+  const analytics = storage.getRuleAnalytics(365); // Full year
+  const recentSessions = storage.getRecentSessions(100);
+
+  const exportData = {
+    version: "1.0.0",
+    exportedAt: new Date().toISOString(),
+    rules: rules.map((rule) => ({
+      ...rule,
+      analytics: JSON.parse(rule.analytics || "{}"),
+      documentationLinks: JSON.parse(rule.documentationLinks || "[]"),
+      tags: JSON.parse(rule.tags || "[]"),
+    })),
+    analytics,
+    sessions: recentSessions.map((session) => ({
+      ...session,
+      fileTypes: JSON.parse(session.fileTypes || "[]"),
+      recentFiles: JSON.parse(session.recentFiles || "[]"),
+      contextData: JSON.parse(session.contextData || "{}"),
+    })),
+  };
+
+  const exportPath = path.join(
+    app.path.root,
+    ".kuuzuki",
+    `memory-export-${Date.now()}.json`,
+  );
+  await Bun.write(exportPath, JSON.stringify(exportData, null, 2));
+
+  let output = `## Database Export Complete\n\n`;
+  output += `**Export File**: ${exportPath}\n`;
+  output += `**Rules Exported**: ${exportData.rules.length}\n`;
+  output += `**Sessions Exported**: ${exportData.sessions.length}\n`;
+  const fileSize = await Bun.file(exportPath).size;
+  output += `**Export Size**: ${Math.round(fileSize / 1024)} KB\n`;
+
+  return {
+    title: "Database Export",
+    metadata: {
+      exportPath,
+      rulesCount: exportData.rules.length,
+      sessionsCount: exportData.sessions.length,
+    },
+    output: output.trim(),
+  };
+}
+
+interface ImportParams {
+  filePath?: string;
+}
+
+async function importDatabase(
+  params: ImportParams,
+): Promise<{ title: string; metadata: any; output: string }> {
+  if (!params.filePath) {
+    throw new Error("'filePath' parameter is required for import-db action");
+  }
+
+  const app = App.info();
+  const importPath = path.isAbsolute(params.filePath)
+    ? params.filePath
+    : path.join(app.path.root, params.filePath);
+
+  const file = Bun.file(importPath);
+  if (!(await file.exists())) {
+    throw new Error(`Import file not found: ${params.filePath}`);
+  }
+
+  const importData = JSON.parse(await file.text());
+  const storage = MemoryStorage.getInstance();
+
+  let importedRules = 0;
+  let skippedRules = 0;
+
+  // Import rules
+  for (const rule of importData.rules || []) {
+    try {
+      storage.addRule({
+        id: rule.id,
+        text: rule.text,
+        category: rule.category,
+        filePath: rule.filePath,
+        reason: rule.reason,
+        lastUsed: rule.lastUsed,
+        analytics: JSON.stringify(rule.analytics || {}),
+        documentationLinks: JSON.stringify(rule.documentationLinks || []),
+        tags: JSON.stringify(rule.tags || []),
+      });
+      importedRules++;
+    } catch (error) {
+      // Skip duplicates or invalid rules
+      skippedRules++;
+    }
+  }
+
+  // Import sessions
+  let importedSessions = 0;
+  for (const session of importData.sessions || []) {
+    try {
+      storage.updateSessionContext({
+        sessionId: session.sessionId,
+        workingDirectory: session.workingDirectory,
+        fileTypes: JSON.stringify(session.fileTypes || []),
+        recentFiles: JSON.stringify(session.recentFiles || []),
+        lastActivity: session.lastActivity,
+        contextData: JSON.stringify(session.contextData || {}),
+      });
+      importedSessions++;
+    } catch (error) {
+      // Skip invalid sessions
+    }
+  }
+
+  let output = `## Database Import Complete\n\n`;
+  output += `**Import File**: ${params.filePath}\n`;
+  output += `**Rules Imported**: ${importedRules}\n`;
+  output += `**Rules Skipped**: ${skippedRules} (duplicates or invalid)\n`;
+  output += `**Sessions Imported**: ${importedSessions}\n`;
+
+  return {
+    title: "Database Import",
+    metadata: {
+      importPath: params.filePath,
+      importedRules,
+      skippedRules,
+      importedSessions,
+    },
+    output: output.trim(),
   };
 }
