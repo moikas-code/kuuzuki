@@ -1,5 +1,0 @@
-{
-  "plugin": [
-    "./test-simple-plugin.js"
-  ]
-}

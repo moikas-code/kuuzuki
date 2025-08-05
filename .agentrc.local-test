@@ -1,5 +1,0 @@
-{
-  "plugin": [
-    "./test-local-plugin.js"
-  ]
-}
