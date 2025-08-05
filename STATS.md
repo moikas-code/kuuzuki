@@ -1,0 +1,5 @@
+# Download Stats
+
+| Date       | GitHub Downloads | npm Downloads | Total  |
+| ---------- | ---------------- | ------------- | ------ |
+| 2025-08-05 | 0 (+0)           | 0 (+0)        | 0 (+0) |
