@@ -177,41 +177,99 @@ ${args.autofix ? "Attempt to automatically fix issues where possible." : ""}
 Use moidvk tools for comprehensive analysis. Provide specific file locations and line numbers for all issues found.`;
 
         const messageID = Identifier.ascending("message");
-        await Session.chat({
-          sessionID: session.id,
-          messageID,
-          providerID,
-          modelID,
-          mode: "bugfinder",
-          system:
-            "You are an expert debugging agent focused on systematic bug identification, root cause analysis, and providing actionable solutions. Use moidvk tools for comprehensive code analysis, security scanning, and quality checks. Always provide specific file locations and line numbers for issues found.",
-          tools: {
-            bash: true,
-            read: true,
-            write: args.autofix,
-            edit: args.autofix,
-            grep: true,
-            glob: true,
-            todowrite: true,
-            todoread: true,
-            task: true,
-            moidvk_check_code_practices: true,
-            moidvk_scan_security_vulnerabilities: true,
-            moidvk_check_production_readiness: true,
-            moidvk_multi_language_auto_fixer: args.autofix,
-            moidvk_check_safety_rules: true,
-            moidvk_js_performance_analyzer: true,
-            moidvk_python_performance_analyzer: true,
-            moidvk_rust_performance_analyzer: true,
-          },
-          parts: [
-            {
-              id: Identifier.ascending("part"),
-              type: "text",
-              text: prompt,
-            },
-          ],
+
+        // Add timeout handling for bugfinder analysis
+        const timeoutMs = 5 * 60 * 1000; // 5 minutes timeout
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(new Error("Bugfinder analysis timed out after 5 minutes"));
+          }, timeoutMs);
         });
+
+        try {
+          await Promise.race([
+            Session.chat({
+              sessionID: session.id,
+              messageID,
+              providerID,
+              modelID,
+              mode: "bugfinder",
+              system:
+                "You are an expert debugging agent focused on systematic bug identification, root cause analysis, and providing actionable solutions. Use moidvk tools for comprehensive code analysis, security scanning, and quality checks. Always provide specific file locations and line numbers for issues found. If MCP tools are unavailable, fall back to basic analysis using standard tools.",
+              tools: {
+                bash: true,
+                read: true,
+                write: args.autofix,
+                edit: args.autofix,
+                grep: true,
+                glob: true,
+                todowrite: false, // Disable to reduce complexity
+                todoread: false, // Disable to reduce complexity
+                task: false, // Disable to reduce complexity
+                moidvk_check_code_practices: true,
+                moidvk_scan_security_vulnerabilities: true,
+                moidvk_check_production_readiness: true,
+                moidvk_multi_language_auto_fixer: args.autofix,
+                moidvk_check_safety_rules: true,
+                moidvk_js_performance_analyzer: true,
+                moidvk_python_performance_analyzer: true,
+                moidvk_rust_performance_analyzer: true,
+              },
+              parts: [
+                {
+                  id: Identifier.ascending("part"),
+                  type: "text",
+                  text: prompt,
+                },
+              ],
+            }),
+            timeoutPromise,
+          ]);
+        } catch (error) {
+          UI.error(`Bugfinder analysis failed: ${error.message}`);
+
+          // Fall back to basic static analysis
+          UI.println(
+            UI.Style.TEXT_WARNING_BOLD +
+              "⚠️ Falling back to basic static analysis...",
+          );
+
+          const basicPrompt = `Perform basic code analysis of the codebase at path "${args.path}" using only standard tools (bash, read, grep, glob). 
+          
+Focus on:
+- TypeScript/JavaScript syntax and type errors
+- Basic security patterns
+- Code structure issues
+- Build and test status
+
+Minimum severity level: ${args.severity}
+Provide specific file locations and line numbers for all issues found.`;
+
+          await Session.chat({
+            sessionID: session.id,
+            messageID: Identifier.ascending("message"),
+            providerID,
+            modelID,
+            mode: "build", // Use build mode for basic analysis
+            system:
+              "You are a code analysis assistant. Use only basic tools to analyze code quality and identify issues.",
+            tools: {
+              bash: true,
+              read: true,
+              write: false,
+              edit: false,
+              grep: true,
+              glob: true,
+            },
+            parts: [
+              {
+                id: Identifier.ascending("part"),
+                type: "text",
+                text: basicPrompt,
+              },
+            ],
+          });
+        }
 
         unsub();
         UI.empty();

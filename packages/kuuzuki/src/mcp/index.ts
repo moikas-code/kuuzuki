@@ -80,31 +80,50 @@ export namespace MCP {
 
         if (mcp.type === "local") {
           const [cmd, ...args] = mcp.command!;
-          const client = await experimental_createMCPClient({
-            name: key,
-            transport: new StdioClientTransport({
-              stderr: "ignore",
-              command: cmd,
-              args,
-              env: {
-                ...process.env,
-                ...(cmd === "kuuzuki" ? { BUN_BE_BUN: "1" } : {}),
-                ...mcp.environment,
-              },
-            }),
-          }).catch(() => {});
-          if (!client) {
+
+          // Add timeout for MCP client creation
+          const timeoutMs = 10000; // 10 seconds timeout
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => {
+              reject(new Error(`MCP server ${key} initialization timed out`));
+            }, timeoutMs);
+          });
+
+          try {
+            const client = await Promise.race([
+              experimental_createMCPClient({
+                name: key,
+                transport: new StdioClientTransport({
+                  stderr: "ignore",
+                  command: cmd,
+                  args,
+                  env: {
+                    ...process.env,
+                    ...(cmd === "kuuzuki" ? { BUN_BE_BUN: "1" } : {}),
+                    ...mcp.environment,
+                  },
+                }),
+              }),
+              timeoutPromise,
+            ]);
+
+            clients[key] = client;
+            log.info("MCP server started successfully", { key });
+          } catch (error) {
+            log.warn("MCP server failed to start", {
+              key,
+              error: error.message,
+            });
             Bus.publish(Session.Event.Error, {
               error: {
                 name: "UnknownError",
                 data: {
-                  message: `MCP server ${key} failed to start`,
+                  message: `MCP server ${key} failed to start: ${error.message}`,
                 },
               },
             });
             continue;
           }
-          clients[key] = client;
         }
       }
 

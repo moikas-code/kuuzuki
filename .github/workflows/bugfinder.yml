@@ -58,8 +58,14 @@ jobs:
             echo "HAS_API_KEY=true" >> $GITHUB_ENV
           fi
 
+      - name: Install moidvk for enhanced analysis
+        run: |
+          # Try to install moidvk for enhanced analysis
+          bun install -g @moikas/moidvk || echo "Failed to install moidvk, will use basic analysis"
+
       - name: Run bugfinder analysis
         id: bugfinder
+        timeout-minutes: 10
         run: |
           SEVERITY="${{ github.event.inputs.severity || 'medium' }}"
           PATH_TO_ANALYZE="${{ github.event.inputs.path || '.' }}"
@@ -68,8 +74,40 @@ jobs:
           echo "Path: $PATH_TO_ANALYZE"
           echo "Severity: $SEVERITY"
 
-          # Run bugfinder analysis (it will automatically detect API key availability)
-          ./run.sh bugfind "$PATH_TO_ANALYZE" "$SEVERITY" > bugfinder-report.txt 2>&1 || true
+          # Run bugfinder analysis with timeout (it will automatically detect API key availability)
+          timeout 600 ./run.sh bugfind "$PATH_TO_ANALYZE" "$SEVERITY" > bugfinder-report.txt 2>&1 || {
+            echo "Bugfinder timed out or failed, generating basic report..."
+            echo "## Bugfinder Analysis Report" > bugfinder-report.txt
+            echo "Generated on: $(date)" >> bugfinder-report.txt
+            echo "" >> bugfinder-report.txt
+            echo "### Status" >> bugfinder-report.txt
+            echo "❌ Full analysis failed or timed out" >> bugfinder-report.txt
+            echo "" >> bugfinder-report.txt
+            echo "### Basic Checks" >> bugfinder-report.txt
+            
+            # Run basic TypeScript check
+            echo "#### TypeScript Check" >> bugfinder-report.txt
+            cd packages/kuuzuki
+            if bun run typecheck 2>&1; then
+              echo "✅ TypeScript check passed" >> ../../bugfinder-report.txt
+            else
+              echo "❌ TypeScript check failed" >> ../../bugfinder-report.txt
+            fi
+            cd ../..
+            
+            # Run basic build check
+            echo "" >> bugfinder-report.txt
+            echo "#### Build Check" >> bugfinder-report.txt
+            if ./run.sh build server >/dev/null 2>&1; then
+              echo "✅ Build check passed" >> bugfinder-report.txt
+            else
+              echo "❌ Build check failed" >> bugfinder-report.txt
+            fi
+            
+            echo "" >> bugfinder-report.txt
+            echo "### Recommendation" >> bugfinder-report.txt
+            echo "Run bugfinder locally with proper MCP server setup for comprehensive analysis." >> bugfinder-report.txt
+          }
 
           # Check if report was generated and determine analysis type
           if [ -f bugfinder-report.txt ] && [ -s bugfinder-report.txt ]; then

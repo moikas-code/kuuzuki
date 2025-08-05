@@ -210,9 +210,15 @@ run_bugfinder() {
     
     if [ "$frequency" -gt 0 ]; then
         print_info "Running with frequency: every ${frequency}s"
-        bun run src/index.ts bugfind "$path" --severity="$severity" --frequency="$frequency"
+        timeout 600 bun run src/index.ts bugfind "$path" --severity="$severity" --frequency="$frequency" || {
+            print_error "Bugfinder timed out or failed"
+            return 1
+        }
     else
-        bun run src/index.ts bugfind "$path" --severity="$severity"
+        timeout 600 bun run src/index.ts bugfind "$path" --severity="$severity" || {
+            print_error "Bugfinder timed out or failed"
+            return 1
+        }
     fi
 }
 
