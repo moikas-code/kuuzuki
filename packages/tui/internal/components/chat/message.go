@@ -474,6 +474,8 @@ func renderToolName(name string) string {
 	switch name {
 	case "webfetch":
 		return "Fetch"
+	case "invalid":
+		return "Invalid"
 	default:
 		normalizedName := name
 		if after, ok := strings.CutPrefix(name, "opencode_"); ok {
@@ -576,6 +578,11 @@ func renderToolTitle(
 		title = getTodoTitle(toolCall)
 	case "todoread":
 		return "Plan"
+	case "invalid":
+		if actualTool, ok := toolArgsMap["tool"].(string); ok {
+			return fmt.Sprintf("Invalid %s", renderToolName(actualTool))
+		}
+		return "Invalid Tool"
 	default:
 		toolName := renderToolName(toolCall.Tool)
 		title = fmt.Sprintf("%s %s", toolName, toolArgs)

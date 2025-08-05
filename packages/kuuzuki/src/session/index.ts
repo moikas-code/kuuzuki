@@ -806,19 +806,29 @@ export namespace Session {
     // mark session as updated since a message has been added to it
     await update(input.sessionID, (_draft) => {});
 
-    if (isLocked(input.sessionID)) {
-      return new Promise((resolve) => {
-        const queue = state().queued.get(input.sessionID) ?? [];
-        queue.push({
-          input: input,
-          message: userMsg,
-          parts: userParts,
-          processed: false,
-          callback: resolve,
+    // Acquire lock immediately to prevent race conditions
+    let lockHandle;
+    try {
+      lockHandle = lock(input.sessionID);
+    } catch (error) {
+      if (error instanceof BusyError) {
+        return new Promise((resolve) => {
+          const queue = state().queued.get(input.sessionID) ?? [];
+          queue.push({
+            input: input,
+            message: userMsg,
+            parts: userParts,
+            processed: false,
+            callback: resolve,
+          });
+          state().queued.set(input.sessionID, queue);
         });
-        state().queued.set(input.sessionID, queue);
-      });
+      }
+      throw error;
     }
+    
+    // Use the lock handle for the rest of the function
+    using abortSignal = lockHandle;
 
     const model = await Provider.getModel(input.providerID, input.modelID);
     let msgs = await messages(input.sessionID);
@@ -933,7 +943,7 @@ export namespace Session {
       }
     }
 
-    using abortSignal = lock(input.sessionID);
+    // Lock already acquired above
 
     const lastSummary = msgs.findLast(
       (msg) => msg.info.role === "assistant" && msg.info.summary === true,
