@@ -1660,6 +1660,14 @@ export namespace Session {
                 }
                 break;
 
+              case "text" as any:
+                // Fallback for older AI SDK versions or different event types
+                if (currentText) {
+                  currentText.text += (value as any).text;
+                  await updatePart(currentText);
+                }
+                break;
+
               case "text-end":
                 if (currentText && currentText.text) {
                   currentText.time = {
