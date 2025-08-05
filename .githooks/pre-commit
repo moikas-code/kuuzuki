@@ -1,0 +1,148 @@
+#!/bin/bash
+
+# Pre-commit hook for kuuzuki project
+# Prevents common issues that cause CI failures
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}🔍 Running pre-commit validation...${NC}"
+
+# Track if any fixes were applied
+fixes_applied=false
+errors_found=false
+
+# Function to check and fix lockfile sync
+check_lockfile() {
+    echo -e "${BLUE}📦 Checking lockfile synchronization...${NC}"
+    
+    if ! bun install --frozen-lockfile --silent 2>/dev/null; then
+        echo -e "${YELLOW}⚠️  Lockfile is out of sync. Updating...${NC}"
+        if bun install; then
+            git add bun.lock
+            fixes_applied=true
+            echo -e "${GREEN}✅ Lockfile updated and staged${NC}"
+        else
+            echo -e "${RED}❌ Failed to update lockfile${NC}"
+            errors_found=true
+        fi
+    else
+        echo -e "${GREEN}✅ Lockfile is synchronized${NC}"
+    fi
+}
+
+# Function to check TypeScript compilation
+check_typescript() {
+    echo -e "${BLUE}🔧 Checking TypeScript compilation...${NC}"
+    
+    cd packages/kuuzuki || return 1
+    
+    if bun run typecheck 2>/dev/null; then
+        echo -e "${GREEN}✅ TypeScript compilation successful${NC}"
+    else
+        echo -e "${RED}❌ TypeScript compilation failed${NC}"
+        echo -e "${YELLOW}Run 'cd packages/kuuzuki && bun run typecheck' to see errors${NC}"
+        errors_found=true
+    fi
+    
+    cd ../..
+}
+
+# Function to check Go compilation
+check_go() {
+    echo -e "${BLUE}🐹 Checking Go TUI compilation...${NC}"
+    
+    cd packages/tui || return 1
+    
+    if go build ./cmd/kuuzuki >/dev/null 2>&1; then
+        echo -e "${GREEN}✅ Go TUI compilation successful${NC}"
+        # Clean up binary
+        rm -f kuuzuki
+    else
+        echo -e "${RED}❌ Go TUI compilation failed${NC}"
+        echo -e "${YELLOW}Run 'cd packages/tui && go build ./cmd/kuuzuki' to see errors${NC}"
+        errors_found=true
+    fi
+    
+    cd ../..
+}
+
+# Function to run basic tests
+check_tests() {
+    echo -e "${BLUE}🧪 Running critical tests...${NC}"
+    
+    # Run a quick subset of tests to catch major issues
+    if timeout 30 bun test --timeout 10000 test/tool-fallback.test.ts 2>/dev/null; then
+        echo -e "${GREEN}✅ Critical tests passed${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Some tests failed or timed out${NC}"
+        echo -e "${YELLOW}Full test suite will run in CI${NC}"
+    fi
+}
+
+# Function to check for common issues
+check_code_quality() {
+    echo -e "${BLUE}🔍 Checking for common issues...${NC}"
+    
+    # Check for console.log in production code (excluding test files)
+    if git diff --cached --name-only | grep -E '\.(ts|js)$' | grep -v test | xargs grep -l "console\.log" 2>/dev/null; then
+        echo -e "${YELLOW}⚠️  Found console.log statements in production code${NC}"
+        echo -e "${YELLOW}Consider removing them before committing${NC}"
+    fi
+    
+    # Check for TODO/FIXME in committed code
+    if git diff --cached --name-only | xargs grep -l -E "(TODO|FIXME|XXX)" 2>/dev/null; then
+        echo -e "${YELLOW}⚠️  Found TODO/FIXME comments in committed code${NC}"
+        echo -e "${YELLOW}Consider addressing them or documenting in issues${NC}"
+    fi
+    
+    echo -e "${GREEN}✅ Code quality check completed${NC}"
+}
+
+# Function to check package.json versions are consistent
+check_versions() {
+    echo -e "${BLUE}📋 Checking package version consistency...${NC}"
+    
+    # Get main package version
+    main_version=$(node -p "require('./packages/kuuzuki/package.json').version" 2>/dev/null)
+    
+    if [ -n "$main_version" ]; then
+        echo -e "${GREEN}✅ Main package version: $main_version${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Could not read main package version${NC}"
+    fi
+}
+
+# Main execution
+echo -e "${BLUE}🚀 Starting kuuzuki pre-commit validation${NC}"
+echo "----------------------------------------"
+
+# Run all checks
+check_lockfile
+check_typescript
+check_go
+check_tests
+check_code_quality
+check_versions
+
+echo "----------------------------------------"
+
+# Summary
+if [ "$errors_found" = true ]; then
+    echo -e "${RED}❌ Pre-commit validation failed!${NC}"
+    echo -e "${RED}Please fix the errors above before committing.${NC}"
+    exit 1
+elif [ "$fixes_applied" = true ]; then
+    echo -e "${GREEN}✅ Pre-commit validation passed with fixes applied!${NC}"
+    echo -e "${YELLOW}Some files were automatically updated and staged.${NC}"
+    echo -e "${YELLOW}Review the changes and commit again.${NC}"
+    exit 0
+else
+    echo -e "${GREEN}✅ All pre-commit checks passed!${NC}"
+    echo -e "${GREEN}Ready to commit! 🎉${NC}"
+    exit 0
+fi

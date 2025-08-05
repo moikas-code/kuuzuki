@@ -172,3 +172,40 @@ bun link
 # Make sure bin scripts are executable
 chmod +x packages/kuuzuki/bin/kuuzuki
 ```
+## Git Hooks Setup
+
+Kuuzuki includes git hooks that prevent common CI failures and maintain code quality.
+
+### Quick Setup
+```bash
+# Install git hooks (recommended for all developers)
+./scripts/setup-git-hooks.sh
+```
+
+### What the Hooks Do
+- **Pre-commit**: Validates code before commits
+  - Checks lockfile synchronization
+  - Validates TypeScript compilation
+  - Checks Go TUI compilation
+  - Runs critical tests
+  - Checks code quality
+
+- **Pre-push**: Validates packages before version releases
+  - Prevents broken releases
+  - Only runs on version tag pushes
+
+### Benefits
+- ✅ Prevents CI failures from lockfile issues
+- ✅ Catches TypeScript errors before push
+- ✅ Validates Go compilation
+- ✅ Maintains code quality standards
+- ✅ Saves time by catching issues early
+
+### Emergency Bypass (Use Sparingly)
+```bash
+# Skip hooks if absolutely necessary
+git commit --no-verify
+git push --no-verify
+```
+
+For detailed information, see [Git Hooks Guide](../development/GIT_HOOKS_GUIDE.md).
