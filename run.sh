@@ -168,6 +168,44 @@ run_bugfinder() {
     print_info "Analyzing path: $path"
     print_info "Severity level: $severity"
     
+    # Check if API key is available
+    if [ -z "$ANTHROPIC_API_KEY" ]; then
+        print_error "No ANTHROPIC_API_KEY found. Bugfinder requires an API key for AI analysis."
+        print_info "Running static analysis instead..."
+        
+        # Run static analysis
+        echo "## Static Code Analysis Report"
+        echo "Generated on: $(date)"
+        echo ""
+        
+        echo "### TypeScript Check"
+        cd "$SCRIPT_DIR/packages/kuuzuki"
+        if bun run typecheck 2>&1; then
+            echo "✅ TypeScript check passed"
+        else
+            echo "❌ TypeScript check failed"
+        fi
+        cd "$SCRIPT_DIR"
+        echo ""
+        
+        echo "### Build Check"
+        if ./run.sh build server >/dev/null 2>&1; then
+            echo "✅ Build check passed"
+        else
+            echo "❌ Build check failed"
+        fi
+        echo ""
+        
+        echo "### Security Audit"
+        if bun audit --audit-level moderate 2>&1; then
+            echo "✅ Security audit completed"
+        else
+            echo "⚠️ Security audit found issues"
+        fi
+        
+        return 0
+    fi
+    
     cd "$SCRIPT_DIR/packages/kuuzuki"
     
     if [ "$frequency" -gt 0 ]; then

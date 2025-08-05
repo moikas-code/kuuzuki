@@ -49,10 +49,13 @@ jobs:
       - name: Set up environment variables
         run: |
           if [ -z "${{ secrets.ANTHROPIC_API_KEY }}" ]; then
-            echo "WARNING: ANTHROPIC_API_KEY secret not set. Bugfinder will run in analysis-only mode."
-            echo "ANTHROPIC_API_KEY=" >> $GITHUB_ENV
+            echo "⚠️  ANTHROPIC_API_KEY secret not set. Bugfinder will run in static analysis mode."
+            echo "📋 Static analysis includes: TypeScript check, build verification, and security audit."
+            echo "HAS_API_KEY=false" >> $GITHUB_ENV
           else
+            echo "🤖 ANTHROPIC_API_KEY found. Running full AI-powered bugfinder analysis."
             echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> $GITHUB_ENV
+            echo "HAS_API_KEY=true" >> $GITHUB_ENV
           fi
 
       - name: Run bugfinder analysis
@@ -65,41 +68,25 @@ jobs:
           echo "Path: $PATH_TO_ANALYZE"
           echo "Severity: $SEVERITY"
 
-          # Check if API key is available
-          if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo "⚠️  No API key available - running static analysis only" > bugfinder-report.txt
-            echo "" >> bugfinder-report.txt
-            echo "## Static Code Analysis Results" >> bugfinder-report.txt
-            echo "" >> bugfinder-report.txt
-            
-            # Run basic static analysis tools
-            echo "### TypeScript Check" >> bugfinder-report.txt
-            cd packages/kuuzuki && bun run typecheck >> ../../bugfinder-report.txt 2>&1 || echo "TypeScript check failed" >> ../../bugfinder-report.txt
-            cd ../..
-            echo "" >> bugfinder-report.txt
-            
-            echo "### Build Check" >> bugfinder-report.txt  
-            ./run.sh build all >> bugfinder-report.txt 2>&1 || echo "Build check failed" >> bugfinder-report.txt
-            echo "" >> bugfinder-report.txt
-            
-            echo "### Security Audit" >> bugfinder-report.txt
-            bun audit --audit-level moderate >> bugfinder-report.txt 2>&1 || echo "Security audit completed with issues" >> bugfinder-report.txt
-            
+          # Run bugfinder analysis (it will automatically detect API key availability)
+          ./run.sh bugfind "$PATH_TO_ANALYZE" "$SEVERITY" > bugfinder-report.txt 2>&1 || true
+
+          # Check if report was generated and determine analysis type
+          if [ -f bugfinder-report.txt ] && [ -s bugfinder-report.txt ]; then
             echo "report_generated=true" >> $GITHUB_OUTPUT
-            echo "analysis_type=static" >> $GITHUB_OUTPUT
-          else
-            # Run full bugfinder with AI analysis
-            ./run.sh bugfind "$PATH_TO_ANALYZE" "$SEVERITY" > bugfinder-report.txt 2>&1 || true
             
-            if [ -f bugfinder-report.txt ] && [ -s bugfinder-report.txt ]; then
-              echo "report_generated=true" >> $GITHUB_OUTPUT
+            # Check if it was static analysis or AI analysis
+            if grep -q "Static Code Analysis Report" bugfinder-report.txt; then
+              echo "analysis_type=static" >> $GITHUB_OUTPUT
+              echo "Static analysis completed successfully"
+            else
               echo "analysis_type=ai" >> $GITHUB_OUTPUT
               echo "AI-powered analysis completed successfully"
-            else
-              echo "report_generated=false" >> $GITHUB_OUTPUT
-              echo "analysis_type=failed" >> $GITHUB_OUTPUT
-              echo "Bugfinder analysis failed"
             fi
+          else
+            echo "report_generated=false" >> $GITHUB_OUTPUT
+            echo "analysis_type=failed" >> $GITHUB_OUTPUT
+            echo "Analysis failed - no report generated"
           fi
       - name: Upload bugfinder report
         if: steps.bugfinder.outputs.report_generated == 'true'
