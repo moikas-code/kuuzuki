@@ -2,18 +2,18 @@ name: Bugfinder Analysis
 
 on:
   push:
-    branches: [ master, develop ]
+    branches: [master, develop]
   pull_request:
-    branches: [ master, develop ]
+    branches: [master, develop]
   schedule:
     # Run daily at 2 AM UTC
-    - cron: '0 2 * * *'
+    - cron: "0 2 * * *"
   workflow_dispatch:
     inputs:
       severity:
-        description: 'Minimum severity level'
+        description: "Minimum severity level"
         required: false
-        default: 'medium'
+        default: "medium"
         type: choice
         options:
           - low
@@ -21,57 +21,86 @@ on:
           - high
           - critical
       path:
-        description: 'Path to analyze'
+        description: "Path to analyze"
         required: false
-        default: '.'
+        default: "."
         type: string
 
 jobs:
   bugfinder:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
-          
+
       - name: Install dependencies
         run: bun install
-        
+
       - name: Build kuuzuki
         run: ./run.sh build server
-        
+
       - name: Set up environment variables
         run: |
-          echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> $GITHUB_ENV
-          
+          if [ -z "${{ secrets.ANTHROPIC_API_KEY }}" ]; then
+            echo "WARNING: ANTHROPIC_API_KEY secret not set. Bugfinder will run in analysis-only mode."
+            echo "ANTHROPIC_API_KEY=" >> $GITHUB_ENV
+          else
+            echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> $GITHUB_ENV
+          fi
+
       - name: Run bugfinder analysis
         id: bugfinder
         run: |
           SEVERITY="${{ github.event.inputs.severity || 'medium' }}"
           PATH_TO_ANALYZE="${{ github.event.inputs.path || '.' }}"
-          
+
           echo "Running bugfinder analysis..."
           echo "Path: $PATH_TO_ANALYZE"
           echo "Severity: $SEVERITY"
-          
-          # Run bugfinder and capture output
-          ./run.sh bugfind "$PATH_TO_ANALYZE" "$SEVERITY" > bugfinder-report.txt 2>&1 || true
-          
-          # Check if report was generated
-          if [ -f bugfinder-report.txt ]; then
+
+          # Check if API key is available
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "⚠️  No API key available - running static analysis only" > bugfinder-report.txt
+            echo "" >> bugfinder-report.txt
+            echo "## Static Code Analysis Results" >> bugfinder-report.txt
+            echo "" >> bugfinder-report.txt
+            
+            # Run basic static analysis tools
+            echo "### TypeScript Check" >> bugfinder-report.txt
+            cd packages/kuuzuki && bun run typecheck >> ../../bugfinder-report.txt 2>&1 || echo "TypeScript check failed" >> ../../bugfinder-report.txt
+            cd ../..
+            echo "" >> bugfinder-report.txt
+            
+            echo "### Build Check" >> bugfinder-report.txt  
+            ./run.sh build all >> bugfinder-report.txt 2>&1 || echo "Build check failed" >> bugfinder-report.txt
+            echo "" >> bugfinder-report.txt
+            
+            echo "### Security Audit" >> bugfinder-report.txt
+            bun audit --audit-level moderate >> bugfinder-report.txt 2>&1 || echo "Security audit completed with issues" >> bugfinder-report.txt
+            
             echo "report_generated=true" >> $GITHUB_OUTPUT
-            echo "Report generated successfully"
+            echo "analysis_type=static" >> $GITHUB_OUTPUT
           else
-            echo "report_generated=false" >> $GITHUB_OUTPUT
-            echo "No report generated"
+            # Run full bugfinder with AI analysis
+            ./run.sh bugfind "$PATH_TO_ANALYZE" "$SEVERITY" > bugfinder-report.txt 2>&1 || true
+            
+            if [ -f bugfinder-report.txt ] && [ -s bugfinder-report.txt ]; then
+              echo "report_generated=true" >> $GITHUB_OUTPUT
+              echo "analysis_type=ai" >> $GITHUB_OUTPUT
+              echo "AI-powered analysis completed successfully"
+            else
+              echo "report_generated=false" >> $GITHUB_OUTPUT
+              echo "analysis_type=failed" >> $GITHUB_OUTPUT
+              echo "Bugfinder analysis failed"
+            fi
           fi
-          
       - name: Upload bugfinder report
         if: steps.bugfinder.outputs.report_generated == 'true'
         uses: actions/upload-artifact@v4
@@ -79,14 +108,14 @@ jobs:
           name: bugfinder-report-${{ github.sha }}
           path: bugfinder-report.txt
           retention-days: 30
-          
+
       - name: Comment on PR
         if: github.event_name == 'pull_request' && steps.bugfinder.outputs.report_generated == 'true'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            
+
             try {
               const report = fs.readFileSync('bugfinder-report.txt', 'utf8');
               const truncatedReport = report.length > 60000 ? 
@@ -99,18 +128,31 @@ jobs:
               const owner = context.repo.owner;
               const repo = context.repo.repo;
               const runId = context.runId;
+              const analysisType = '${{ steps.bugfinder.outputs.analysis_type }}';
               
-              const body = '## 🔍 Bugfinder Analysis Report\n\n' +
-                '**Severity Level:** ' + severity + '\n' +
-                '**Path Analyzed:** ' + path + '\n' +
-                '**Commit:** ' + commit + '\n\n' +
+              let analysisIcon = '🔍';
+              let analysisTitle = 'Bugfinder Analysis Report';
+              
+              if (analysisType === 'static') {
+                analysisIcon = '⚡';
+                analysisTitle = 'Static Code Analysis Report';
+              } else if (analysisType === 'ai') {
+                analysisIcon = '🤖';
+                analysisTitle = 'AI-Powered Bugfinder Report';
+              }
+              
+              const body = `## ${analysisIcon} ${analysisTitle}\n\n` +
+                `**Analysis Type:** ${analysisType === 'static' ? 'Static Analysis (No API Key)' : 'AI-Powered Analysis'}\n` +
+                `**Severity Level:** ${severity}\n` +
+                `**Path Analyzed:** ${path}\n` +
+                `**Commit:** ${commit}\n\n` +
                 '<details>\n' +
                 '<summary>Click to view full report</summary>\n\n' +
                 '```\n' +
                 truncatedReport + '\n' +
                 '```\n\n' +
                 '</details>\n\n' +
-                '📎 Full report available in [workflow artifacts](https://github.com/' + owner + '/' + repo + '/actions/runs/' + runId + ')';
+                `📎 Full report available in [workflow artifacts](https://github.com/${owner}/${repo}/actions/runs/${runId})`;
 
               await github.rest.issues.createComment({
                 issue_number: context.issue.number,
@@ -120,37 +162,111 @@ jobs:
               });
             } catch (error) {
               console.log('Error reading report file:', error);
+              
+              // Create a fallback comment if report reading fails
+              const fallbackBody = `## ⚠️ Bugfinder Analysis\n\n` +
+                `Analysis completed but report could not be read.\n` +
+                `Check the [workflow logs](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) for details.`;
+              
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: fallbackBody
+              });
             }
-            
+      - name: Create bugfix PR
+        if: github.event_name == 'schedule' && steps.bugfinder.outputs.report_generated == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            try {
+              const report = fs.readFileSync('bugfinder-report.txt', 'utf8');
+              
+              // Check if there are actionable issues
+              const hasIssues = report.includes('ERROR') || report.includes('CRITICAL') || 
+                               report.includes('WARNING') || report.includes('vulnerability');
+              
+              if (hasIssues) {
+                const date = new Date().toISOString().split('T')[0];
+                const branchName = `bugfinder/automated-fixes-${date}`;
+                
+                // Create a new branch
+                const { data: ref } = await github.rest.git.getRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: 'heads/master'
+                });
+                
+                await github.rest.git.createRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `refs/heads/${branchName}`,
+                  sha: ref.object.sha
+                });
+                
+                // Create PR
+                const prBody = `## 🔍 Automated Bugfinder Report\n\n` +
+                  `This PR was automatically created by the bugfinder workflow.\n\n` +
+                  `### Issues Found:\n\n` +
+                  '```\n' +
+                  report.substring(0, 30000) + '\n' +
+                  '```\n\n' +
+                  `### Next Steps:\n` +
+                  `- Review the issues identified above\n` +
+                  `- Apply fixes as needed\n` +
+                  `- Run tests to ensure fixes don't break functionality\n` +
+                  `- Merge when ready\n\n` +
+                  `Generated on: ${new Date().toISOString()}`;
+                
+                await github.rest.pulls.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: `🔧 Automated bugfinder fixes - ${date}`,
+                  head: branchName,
+                  base: 'master',
+                  body: prBody
+                });
+                
+                console.log(`Created PR for branch: ${branchName}`);
+              } else {
+                console.log('No actionable issues found, skipping PR creation');
+              }
+            } catch (error) {
+              console.log('Error creating bugfix PR:', error);
+            }
+
       - name: Fail on critical issues
         if: github.event.inputs.severity == 'critical' || (github.event_name == 'push' && github.ref == 'refs/heads/master')
         run: |
-          if grep -q "CRITICAL\|ERROR" bugfinder-report.txt 2>/dev/null; then
+          if [ -f bugfinder-report.txt ] && grep -q "CRITICAL\|ERROR" bugfinder-report.txt 2>/dev/null; then
             echo "Critical issues found in bugfinder report"
             exit 1
           fi
-          
+
   security-scan:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'push'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
-          
+
       - name: Install dependencies
         run: bun install
-        
+
       - name: Run security vulnerability scan
         run: |
           echo "Running security vulnerability scan..."
           bun audit --audit-level moderate || true
-          
+
       - name: Check for high-risk dependencies
         run: |
           echo "Checking for high-risk dependencies..."
