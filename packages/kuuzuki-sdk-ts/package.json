@@ -1,6 +1,6 @@
 {
   "name": "@moikas/kuuzuki-sdk",
-  "version": "0.1.0",
+  "version": "0.1.24",
   "description": "Kuuzuki SDK for TypeScript/JavaScript",
   "author": "Kuuzuki Community",
   "repository": {

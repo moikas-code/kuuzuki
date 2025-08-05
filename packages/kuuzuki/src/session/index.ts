@@ -230,12 +230,14 @@ export namespace Session {
           message: MessageV2.User;
           parts: MessageV2.Part[];
           processed: boolean;
+          timestamp: number;
           callback: (input: {
             info: MessageV2.Assistant;
             parts: MessageV2.Part[];
           }) => void;
         }[]
       >();
+      const queueLocks = new Map<string, Promise<void>>();
 
       // Track recent summarizations to prevent multiple summarizations
       const recentSummarizations = new Map<string, number>(); // sessionID -> timestamp
@@ -245,6 +247,7 @@ export namespace Session {
         messages,
         pending,
         queued,
+        queueLocks,
         recentSummarizations,
       };
     },
@@ -845,16 +848,34 @@ export namespace Session {
       lockHandle = lock(input.sessionID);
     } catch (error) {
       if (error instanceof BusyError) {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
           const queue = state().queued.get(input.sessionID) ?? [];
           queue.push({
             input: input,
             message: userMsg,
             parts: userParts,
             processed: false,
+            timestamp: Date.now(),
             callback: resolve,
           });
           state().queued.set(input.sessionID, queue);
+
+          // Set timeout to prevent hanging promises
+          setTimeout(() => {
+            const currentQueue = state().queued.get(input.sessionID) ?? [];
+            const itemIndex = currentQueue.findIndex(
+              (item) => item.timestamp === Date.now() && !item.processed,
+            );
+            if (itemIndex >= 0) {
+              currentQueue.splice(itemIndex, 1);
+              if (currentQueue.length === 0) {
+                state().queued.delete(input.sessionID);
+              }
+              reject(
+                new Error("Queue timeout: message processing took too long"),
+              );
+            }
+          }, 30000); // 30 second timeout
         });
       }
       throw error;
@@ -1449,16 +1470,10 @@ export namespace Session {
       }),
     });
     const result = await processor.process(stream);
-    const queued = state().queued.get(input.sessionID) ?? [];
-    const unprocessed = queued.find((x) => !x.processed);
-    if (unprocessed) {
-      unprocessed.processed = true;
-      return chat(unprocessed.input);
-    }
-    for (const item of queued) {
-      item.callback(result);
-    }
-    state().queued.delete(input.sessionID);
+
+    // Process queue safely with proper error handling
+    await processQueue(input.sessionID, result);
+
     return result;
   }
 
@@ -2032,6 +2047,55 @@ export namespace Session {
     return result;
   }
 
+  async function processQueue(
+    sessionID: string,
+    result: { info: MessageV2.Assistant; parts: MessageV2.Part[] },
+  ) {
+    const queued = state().queued.get(sessionID) ?? [];
+
+    if (queued.length === 0) {
+      return;
+    }
+
+    // Find the next unprocessed item
+    const unprocessed = queued.find((x) => !x.processed);
+
+    if (unprocessed) {
+      // Mark as processed and handle recursively
+      unprocessed.processed = true;
+
+      try {
+        const nextResult = await chat(unprocessed.input);
+        unprocessed.callback(nextResult);
+      } catch (error) {
+        log.error("Queue processing error", { error, sessionID });
+        // Still call callback with original result to prevent hanging
+        unprocessed.callback(result);
+      }
+    }
+
+    // Clean up processed items and call their callbacks
+    const processedItems = queued.filter((x) => x.processed);
+    for (const item of processedItems) {
+      try {
+        if (item !== unprocessed) {
+          // Don't double-call the recursive one
+          item.callback(result);
+        }
+      } catch (error) {
+        log.error("Queue callback error", { error, sessionID });
+      }
+    }
+
+    // Remove processed items from queue
+    const remainingItems = queued.filter((x) => !x.processed);
+    if (remainingItems.length === 0) {
+      state().queued.delete(sessionID);
+    } else {
+      state().queued.set(sessionID, remainingItems);
+    }
+  }
+
   export class BusyError extends Error {
     constructor(public readonly sessionID: string) {
       super(`Session ${sessionID} is busy`);
@@ -2047,9 +2111,24 @@ export namespace Session {
     if (state().pending.has(sessionID)) throw new BusyError(sessionID);
     const controller = new AbortController();
     state().pending.set(sessionID, controller);
+
+    // Add automatic unlock after 5 minutes to prevent permanent locks
+    const timeoutId = setTimeout(
+      () => {
+        if (state().pending.has(sessionID)) {
+          log.warn("Force unlocking session due to timeout", { sessionID });
+          state().pending.delete(sessionID);
+          controller.abort();
+          Bus.publish(Event.Idle, { sessionID });
+        }
+      },
+      5 * 60 * 1000,
+    ); // 5 minutes
+
     return {
       signal: controller.signal,
       [Symbol.dispose]() {
+        clearTimeout(timeoutId);
         log.info("unlocking", { sessionID });
         state().pending.delete(sessionID);
         Bus.publish(Event.Idle, {

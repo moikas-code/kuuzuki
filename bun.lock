@@ -25,7 +25,7 @@
     },
     "packages/kuuzuki": {
       "name": "kuuzuki",
-      "version": "0.1.22",
+      "version": "0.1.24",
       "bin": {
         "kuuzuki": "./bin/kuuzuki.js",
       },
