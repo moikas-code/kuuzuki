@@ -1,0 +1,34 @@
+  export function lock(sessionID: string) {
+    log.info("locking", { sessionID });
+    
+    const pendingMap = state().pending;
+    
+    // Atomic lock acquisition using Map's behavior
+    // If the key already exists, has() will return true
+    if (pendingMap.has(sessionID)) {
+      throw new BusyError(sessionID);
+    }
+    
+    const controller = new AbortController();
+    
+    // Use a try-finally pattern to ensure cleanup even if something goes wrong
+    try {
+      // Set the lock immediately after check to minimize race window
+      pendingMap.set(sessionID, controller);
+      
+      return {
+        signal: controller.signal,
+        [Symbol.dispose]() {
+          log.info("unlocking", { sessionID });
+          pendingMap.delete(sessionID);
+          Bus.publish(Event.Idle, {
+            sessionID,
+          });
+        },
+      };
+    } catch (error) {
+      // If anything goes wrong, ensure we don't leave a dangling lock
+      pendingMap.delete(sessionID);
+      throw error;
+    }
+  }

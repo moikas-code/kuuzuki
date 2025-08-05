@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "schema": "https://kuuzuki.com/config.json",
+  "providers": [],
+  "mcpServers": [],
+  "plugin": [
+    "./test/test-plugin.js"
+  ],
+  "codeStyle": {
+    "importStyle": "esm"
+  },
+  "tools": {
+    "database": "sqlite"
+  },
+  "rules": []
+}

@@ -187,6 +187,7 @@ export namespace ConfigSchema {
 
   // Agent Configuration
   export const Agent = Mode.extend({
+    name: z.string().describe("Agent name (automatically set from filename)"),
     description: z.string().describe("Description of the agent's purpose"),
     version: z.string().optional().describe("Agent version"),
     author: z.string().optional().describe("Agent author"),
@@ -693,6 +694,14 @@ export namespace ConfigSchema {
         .optional()
         .describe(
           "Permission configuration supporting both simple array format ['git *', 'rm -rf *'] and OpenCode object format { bash: { 'git push': 'ask', '*': 'allow' }, edit: 'ask' }",
+        ),
+
+      // Plugin Configuration
+      plugin: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "Array of plugin paths to load. Plugins extend kuuzuki functionality through hooks. Paths can be relative to config file or absolute.",
         ),
 
       // Deprecated fields (for backward compatibility)

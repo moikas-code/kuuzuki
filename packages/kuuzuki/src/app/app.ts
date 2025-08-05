@@ -107,17 +107,33 @@ export namespace App {
     shutdown?: (state: Awaited<State>) => Promise<void>,
   ) {
     return () => {
-      const app = ctx.use()
-      const services = app.services
-      if (!services.has(key)) {
-        log.info("registering service", { name: key })
-        services.set(key, {
+      const app = ctx.use();
+      const services = app.services;
+
+      // Atomic get-or-create using Map.get() first
+      let service = services.get(key);
+      if (service === undefined) {
+        log.info("registering service", { name: key });
+
+        // Create new service
+        const newService = {
           state: init(app.info),
           shutdown,
-        })
+        };
+
+        // Set only if still undefined (atomic check-and-set)
+        const currentService = services.get(key);
+        if (currentService === undefined) {
+          services.set(key, newService);
+          service = newService;
+        } else {
+          // Another async operation beat us to it
+          service = currentService;
+        }
       }
-      return services.get(key)?.state as State
-    }
+
+      return service.state as State;
+    };
   }
 
   export function info() {

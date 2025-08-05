@@ -12,6 +12,7 @@ import { TodoWriteTool, TodoReadTool } from "./todo";
 import { WebFetchTool } from "./webfetch";
 import { WriteTool } from "./write";
 import { MemoryTool } from "./memory";
+import { PluginInfoTool } from "./plugin-info";
 
 /**
  * Tool Registry - Internal Management System
@@ -34,6 +35,7 @@ export namespace ToolRegistry {
     ListTool,
     MemoryTool,
     PatchTool,
+    PluginInfoTool,
     ReadTool,
     WriteTool,
     TodoWriteTool,

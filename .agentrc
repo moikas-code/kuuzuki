@@ -630,7 +630,30 @@
     "taskExecution": "always use 3 sub agents to complete tasks",
     "securityLevel": "DEVELOPMENT for coding, STRICT for production",
     "privacyMode": true,
-    "contextPreservation": true
+    "contextPreservation": true,
+    "bugfinder": {
+      "description": "Expert debugging agent for systematic bug identification and analysis",
+      "model": "anthropic/claude-sonnet-4-20250514",
+      "prompt": "You are an expert debugging agent focused on systematic bug identification, root cause analysis, and providing actionable solutions. Use moidvk tools for comprehensive code analysis, security scanning, and quality checks. Always provide specific file locations and line numbers for issues found.",
+      "tools": {
+        "bash": true,
+        "read": true,
+        "write": true,
+        "edit": true,
+        "grep": true,
+        "glob": true,
+        "todowrite": false,
+        "todoread": false,
+        "moidvk_check_code_practices": true,
+        "moidvk_scan_security_vulnerabilities": true,
+        "moidvk_check_production_readiness": true,
+        "moidvk_multi_language_auto_fixer": true,
+        "moidvk_check_safety_rules": true,
+        "moidvk_js_performance_analyzer": true,
+        "moidvk_python_performance_analyzer": true,
+        "moidvk_rust_performance_analyzer": true
+      }
+    }
   },
   "security": {
     "sensitiveFiles": [
@@ -774,5 +797,28 @@
         "context": "Release readiness verified through actual testing"
       }
     ]
+  },
+  "mode": {
+    "parity": {
+      "model": "anthropic/claude-sonnet-4-20250514",
+      "temperature": 0.1,
+      "prompt": "You are an expert fork parity manager focused on maintaining synchronization between the kuuzuki fork (origin/master) and its upstream OpenCode repository (upstream/dev).",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    }
+  },
+  "permission": {
+    "bash": {
+      "ls *": "allow",
+      "echo *": "allow", 
+      "rm *": "ask",
+      "delete *": "ask",
+      "*": "ask"
+    },
+    "edit": "allow",
+    "write": "allow"
   }
 }

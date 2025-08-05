@@ -158,6 +158,22 @@ jobs:
           # Create all npm packages with correct version
           VERSION=$VERSION bun scripts/build-npm-packages.ts
 
+      - name: Build plugin package
+        working-directory: packages/kuuzuki-plugin
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#kuuzuki-v}"
+
+          # Update package.json version
+          node -e "
+            const pkg = require('./package.json');
+            pkg.version = '$VERSION';
+            require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
+          "
+
+          # Build TypeScript
+          bun run build
+
       - name: Publish packages
         working-directory: packages/kuuzuki
         env:
@@ -177,6 +193,13 @@ jobs:
             fi
           done
 
+      - name: Publish plugin package
+        working-directory: packages/kuuzuki-plugin
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+        run: |
+          # Plugin package should already be built and versioned
+          npm publish --access public
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:

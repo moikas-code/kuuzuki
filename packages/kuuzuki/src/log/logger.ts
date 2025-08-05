@@ -1,3 +1,4 @@
+import { getErrorCode } from "../util/error-types";
 import { z } from "zod"
 import { extendZodWithOpenApi } from "zod-openapi"
 import { Transport } from "./transport"
@@ -185,7 +186,7 @@ export namespace Logger {
           name: error.name,
           message: error.message,
           stack: loggerConfig.enableStackTrace ? error.stack : undefined,
-          code: (error as any).code,
+          code: getErrorCode(error),
         }
       }
 
@@ -374,7 +375,7 @@ export namespace Logger {
         name: error.name,
         message: error.message,
         stack: error.stack,
-        code: (error as any).code,
+        code: getErrorCode(error),
         cause: (error as any).cause,
       }
     }

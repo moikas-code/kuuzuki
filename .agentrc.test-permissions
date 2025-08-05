@@ -1,0 +1,13 @@
+{
+  "permission": {
+    "bash": {
+      "ls *": "allow",
+      "echo *": "allow", 
+      "rm *": "ask",
+      "delete *": "ask",
+      "*": "ask"
+    },
+    "edit": "ask",
+    "write": "ask"
+  }
+}

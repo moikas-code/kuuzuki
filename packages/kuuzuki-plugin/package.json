@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@kuuzuki/plugin",
+  "version": "0.1.0",
+  "description": "Plugin system for kuuzuki - AI-powered terminal assistant",
+  "keywords": [
+    "kuuzuki",
+    "plugin",
+    "ai",
+    "terminal",
+    "extensibility"
+  ],
+  "homepage": "https://kuuzuki.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/moikas-code/kuuzuki.git",
+    "directory": "packages/kuuzuki-plugin"
+  },
+  "license": "MIT",
+  "author": "kuuzuki community",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "bun": "^1.1.29"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "typescript": "^5.8.2"
+  },
+  "peerDependencies": {
+    "kuuzuki": "^0.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,7 +1,7 @@
-import { App } from "../app/app"
-import { Config } from "../config/config"
-import z from "zod"
-import { Provider } from "../provider/provider"
+import { App } from "../app/app";
+import { Config } from "../config/config";
+import z from "zod";
+import { Provider } from "../provider/provider";
 
 export namespace Mode {
   export const Info = z
@@ -19,11 +19,11 @@ export namespace Mode {
     })
     .openapi({
       ref: "Mode",
-    })
-  export type Info = z.infer<typeof Info>
+    });
+  export type Info = z.infer<typeof Info>;
   const state = App.state("mode", async () => {
-    const cfg = await Config.get()
-    const model = cfg.model ? Provider.parseModel(cfg.model) : undefined
+    const cfg = await Config.get();
+    const model = cfg.model ? Provider.parseModel(cfg.model) : undefined;
     const result: Record<string, Info> = {
       build: {
         model,
@@ -50,43 +50,58 @@ export namespace Mode {
           todowrite: false,
         },
       },
-    }
+      bugfinder: {
+        name: "bugfinder",
+        model,
+        prompt:
+          "You are an expert bug finder and debugging specialist. Focus on systematic issue identification, error pattern recognition, and root cause analysis. Help developers identify, analyze, and resolve software bugs efficiently.",
+        tools: {
+          read: true,
+          grep: true,
+          bash: true,
+          todowrite: true,
+          write: false,
+          edit: false,
+          patch: false,
+        },
+      },
+    };
     for (const [key, value] of Object.entries(cfg.mode ?? {})) {
       // Type assertion to ensure value conforms to expected mode config structure
       const modeValue = value as {
-        disable?: boolean
-        model?: string
-        prompt?: string
-        temperature?: number
-        tools?: Record<string, boolean>
-      }
-      
-      if (modeValue.disable) continue
-      let item = result[key]
+        disable?: boolean;
+        model?: string;
+        prompt?: string;
+        temperature?: number;
+        tools?: Record<string, boolean>;
+      };
+
+      if (modeValue.disable) continue;
+      let item = result[key];
       if (!item)
         item = result[key] = {
           name: key,
           tools: {},
-        }
-      item.name = key
-      if (modeValue.model) item.model = Provider.parseModel(modeValue.model)
-      if (modeValue.prompt) item.prompt = modeValue.prompt
-      if (modeValue.temperature) item.temperature = modeValue.temperature
+        };
+      item.name = key;
+      if (modeValue.model) item.model = Provider.parseModel(modeValue.model);
+      if (modeValue.prompt) item.prompt = modeValue.prompt;
+      if (modeValue.temperature) item.temperature = modeValue.temperature;
       if (modeValue.tools)
         item.tools = {
           ...modeValue.tools,
           ...item.tools,
-        }
+        };
     }
 
-    return result
-  })
+    return result;
+  });
 
   export async function get(mode: string) {
-    return state().then((x) => x[mode])
+    return state().then((x) => x[mode]);
   }
 
   export async function list() {
-    return state().then((x) => Object.values(x))
+    return state().then((x) => Object.values(x));
   }
 }

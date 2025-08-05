@@ -1,0 +1,154 @@
+name: Bugfinder Analysis
+
+on:
+  push:
+    branches: [ master, develop ]
+  pull_request:
+    branches: [ master, develop ]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      severity:
+        description: 'Minimum severity level'
+        required: false
+        default: 'medium'
+        type: choice
+        options:
+          - low
+          - medium
+          - high
+          - critical
+      path:
+        description: 'Path to analyze'
+        required: false
+        default: '.'
+        type: string
+
+jobs:
+  bugfinder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Build kuuzuki
+        run: ./run.sh build server
+        
+      - name: Set up environment variables
+        run: |
+          echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> $GITHUB_ENV
+          
+      - name: Run bugfinder analysis
+        id: bugfinder
+        run: |
+          SEVERITY="${{ github.event.inputs.severity || 'medium' }}"
+          PATH_TO_ANALYZE="${{ github.event.inputs.path || '.' }}"
+          
+          echo "Running bugfinder analysis..."
+          echo "Path: $PATH_TO_ANALYZE"
+          echo "Severity: $SEVERITY"
+          
+          # Run bugfinder and capture output
+          ./run.sh bugfind "$PATH_TO_ANALYZE" "$SEVERITY" > bugfinder-report.txt 2>&1 || true
+          
+          # Check if report was generated
+          if [ -f bugfinder-report.txt ]; then
+            echo "report_generated=true" >> $GITHUB_OUTPUT
+            echo "Report generated successfully"
+          else
+            echo "report_generated=false" >> $GITHUB_OUTPUT
+            echo "No report generated"
+          fi
+          
+      - name: Upload bugfinder report
+        if: steps.bugfinder.outputs.report_generated == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bugfinder-report-${{ github.sha }}
+          path: bugfinder-report.txt
+          retention-days: 30
+          
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.bugfinder.outputs.report_generated == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            try {
+              const report = fs.readFileSync('bugfinder-report.txt', 'utf8');
+              const truncatedReport = report.length > 60000 ? 
+                report.substring(0, 60000) + '\n\n... (report truncated, see full report in artifacts)' : 
+                report;
+              
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 🔍 Bugfinder Analysis Report
+                
+**Severity Level:** ${{ github.event.inputs.severity || 'medium' }}
+**Path Analyzed:** ${{ github.event.inputs.path || '.' }}
+**Commit:** ${context.sha.substring(0, 7)}
+
+<details>
+<summary>Click to view full report</summary>
+
+\`\`\`
+${truncatedReport}
+\`\`\`
+
+</details>
+
+📎 Full report available in [workflow artifacts](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+              });
+            } catch (error) {
+              console.log('Error reading report file:', error);
+            }
+            
+      - name: Fail on critical issues
+        if: github.event.inputs.severity == 'critical' || (github.event_name == 'push' && github.ref == 'refs/heads/master')
+        run: |
+          if grep -q "CRITICAL\|ERROR" bugfinder-report.txt 2>/dev/null; then
+            echo "Critical issues found in bugfinder report"
+            exit 1
+          fi
+          
+  security-scan:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Run security vulnerability scan
+        run: |
+          echo "Running security vulnerability scan..."
+          bun audit --audit-level moderate || true
+          
+      - name: Check for high-risk dependencies
+        run: |
+          echo "Checking for high-risk dependencies..."
+          # Add custom security checks here
+          echo "Security scan completed"

@@ -1,3 +1,4 @@
+import { safeJsonParse } from "../util/json-utils";
 import { z } from "zod"
 import { Log } from "../util/log"
 import { Providers } from "./providers"
@@ -121,7 +122,7 @@ export namespace ApiKeyManager {
   async function loadStoredKeys(): Promise<Record<string, StoredApiKey>> {
     try {
       const content = await fs.readFile(STORAGE_FILE, "utf-8")
-      return JSON.parse(content)
+      return safeJsonParse(content, "API key storage")
     } catch {
       return {}
     }

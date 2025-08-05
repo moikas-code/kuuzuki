@@ -1,0 +1,31 @@
+  export function lock(sessionID: string) {
+    log.info("locking", { sessionID });
+    
+    // Atomic lock acquisition - check and set in one operation
+    const pendingMap = state().pending;
+    if (pendingMap.has(sessionID)) {
+      throw new BusyError(sessionID);
+    }
+    
+    const controller = new AbortController();
+    
+    // Double-check after creating controller to ensure atomicity
+    // This prevents race condition where another thread could acquire lock
+    // between the has() check and set() operation
+    if (pendingMap.has(sessionID)) {
+      throw new BusyError(sessionID);
+    }
+    
+    pendingMap.set(sessionID, controller);
+    
+    return {
+      signal: controller.signal,
+      [Symbol.dispose]() {
+        log.info("unlocking", { sessionID });
+        state().pending.delete(sessionID);
+        Bus.publish(Event.Idle, {
+          sessionID,
+        });
+      },
+    };
+  }

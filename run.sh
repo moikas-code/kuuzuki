@@ -148,7 +148,34 @@ run_tests() {
     cd "$SCRIPT_DIR/packages/kuuzuki"
     bun test
     
+    # Run bugfinder if enabled
+    if [ "$WITH_BUGFINDER" = "true" ]; then
+        print_info "Running bugfinder analysis..."
+        bun run src/index.ts bugfind --severity=high
+    fi
+    
     print_success "All tests passed"
+}
+
+# Function to run bugfinder analysis
+run_bugfinder() {
+    print_header "Running Bugfinder Analysis"
+    
+    local path="${1:-.}"
+    local severity="${2:-medium}"
+    local frequency="${3:-0}"
+    
+    print_info "Analyzing path: $path"
+    print_info "Severity level: $severity"
+    
+    cd "$SCRIPT_DIR/packages/kuuzuki"
+    
+    if [ "$frequency" -gt 0 ]; then
+        print_info "Running with frequency: every ${frequency}s"
+        bun run src/index.ts bugfind "$path" --severity="$severity" --frequency="$frequency"
+    else
+        bun run src/index.ts bugfind "$path" --severity="$severity"
+    fi
 }
 
 # Function to clean build artifacts
@@ -182,6 +209,7 @@ show_help() {
     echo "    server [port]  Run server mode"
     echo ""
     echo "  test             Run tests"
+    echo "  bugfind [path] [severity] [frequency]  Run bugfinder analysis"
     echo "  clean            Clean build artifacts"
     echo "  check            Check dependencies"
     echo "  help             Show this help message"
@@ -191,6 +219,11 @@ show_help() {
     echo "  ./run.sh build tui        # Build only TUI"
     echo "  ./run.sh dev              # Run TUI in development"
     echo "  ./run.sh dev server 8080  # Run server on port 8080"
+    echo "  ./run.sh bugfind . high   # Run bugfinder with high severity"
+    echo "  ./run.sh bugfind . medium 30  # Run bugfinder every 30 seconds"
+    echo ""
+    echo "Environment Variables:"
+    echo "  WITH_BUGFINDER=true       # Enable bugfinder in tests and builds"
 }
 
 # Main script logic
@@ -226,6 +259,10 @@ case "$1" in
     "test")
         check_dependencies
         run_tests
+        ;;
+    "bugfind")
+        check_dependencies
+        run_bugfinder "$2" "$3" "$4"
         ;;
     "clean")
         clean

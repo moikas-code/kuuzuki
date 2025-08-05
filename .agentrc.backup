@@ -1,0 +1,778 @@
+{
+  "project": {
+    "name": "kuuzuki",
+    "description": "Community-driven fork of OpenCode - AI-powered terminal assistant",
+    "type": "monorepo",
+    "languages": [
+      "typescript",
+      "go",
+      "javascript"
+    ],
+    "frameworks": [
+      "bun",
+      "node.js",
+      "hono",
+      "astro"
+    ],
+    "architecture": "multi-package",
+    "repository": "https://github.com/moikas-code/kuuzuki",
+    "license": "MIT",
+    "version": "0.1.0",
+    "originalProject": "OpenCode by SST",
+    "focus": "Terminal/CLI interface with AI assistance",
+    "distribution": "NPM package for easy installation"
+  },
+  "commands": {
+    "install": "bun install",
+    "run": "bun run index.ts",
+    "build": "./run.sh build all",
+    "buildTui": "./run.sh build tui",
+    "buildServer": "./run.sh build server",
+    "test": "bun test",
+    "testSingle": "bun test {testFile}",
+    "dev": "bun dev",
+    "devTui": "./run.sh dev tui",
+    "devServer": "./run.sh dev server",
+    "devWatch": "./dev.sh watch",
+    "lint": "bun run lint",
+    "typecheck": "bun run typecheck",
+    "clean": "./run.sh clean",
+    "check": "./run.sh check",
+    "link": "./dev.sh link",
+    "unlink": "./dev.sh unlink",
+    "publish": "bun run script/publish.ts",
+    "publishDryRun": "bun run script/publish.ts --dry-run",
+    "generateSdks": "./scripts/generate-sdks.sh",
+    "stainless": "./scripts/stainless"
+  },
+  "codeStyle": {
+    "language": "typescript",
+    "formatter": "prettier",
+    "linter": "eslint",
+    "importStyle": "relative",
+    "quotes": "double",
+    "semicolons": false,
+    "printWidth": 120,
+    "tabWidth": 2,
+    "useTabs": false,
+    "target": "es2022",
+    "module": "es2022",
+    "moduleResolution": "node"
+  },
+  "conventions": {
+    "fileNaming": "camelCase",
+    "functionNaming": "camelCase",
+    "variableNaming": "camelCase",
+    "classNaming": "PascalCase",
+    "testFilePattern": "*.test.ts",
+    "configFiles": [
+      ".agentrc",
+      "package.json",
+      "tsconfig.json",
+      "go.mod"
+    ],
+    "branchNaming": "feature/description, fix/description, hotfix/description",
+    "commitStyle": "conventional",
+    "namespaceOrganization": "Tool.define(), Session.create()",
+    "errorHandling": "Result patterns, avoid throwing exceptions in tools",
+    "validation": "Zod schemas for validation, TypeScript interfaces for structure"
+  },
+  "tools": {
+    "packageManager": "bun",
+    "runtime": "bun",
+    "bundler": "bun",
+    "framework": "hono",
+    "database": null,
+    "testingFramework": "bun:test",
+    "typeChecker": "typescript",
+    "linter": "eslint",
+    "formatter": "prettier",
+    "aiProviders": [
+      "anthropic"
+    ],
+    "preferred": [
+      "bash",
+      "edit",
+      "read",
+      "write",
+      "grep",
+      "glob"
+    ]
+  },
+  "paths": {
+    "src": "packages/kuuzuki/src",
+    "tests": "packages/kuuzuki/test",
+    "docs": "docs",
+    "config": ".",
+    "scripts": "scripts",
+    "binaries": "packages/kuuzuki/bin",
+    "tui": "packages/tui",
+    "web": "packages/web",
+    "infra": "infra",
+    "mainEntry": "packages/kuuzuki/src/index.ts",
+    "cliCommands": "packages/kuuzuki/src/cli/cmd/",
+    "server": "packages/kuuzuki/src/server/server.ts",
+    "toolImplementations": "packages/kuuzuki/src/tool/",
+    "tuiEntry": "packages/tui/cmd/kuuzuki/main.go",
+    "publishScript": "packages/kuuzuki/script/publish.ts"
+  },
+  "git": {
+    "commitMode": "always",
+    "pushMode": "always",
+    "configMode": "never",
+    "preserveAuthor": true,
+    "requireConfirmation": true,
+    "maxCommitSize": 50,
+    "allowedBranches": [
+      "master",
+      "develop",
+      "feature/*",
+      "fix/*",
+      "hotfix/*"
+    ]
+  },
+  "rules": {
+    "critical": [
+      {
+        "id": "test-before-claiming-completion",
+        "text": "NEVER claim something is 'ready', 'working', or '100% complete' without actually running the software, testing all claimed features, verifying integration between components, and checking error cases",
+        "category": "critical",
+        "reason": "Building trust requires accuracy, not appearing capable. False confidence wastes time and breaks trust.",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "honest-communication-about-testing",
+        "text": "Say 'I've implemented this but haven't tested it yet', 'This should work but needs verification', 'I can't test this directly, we need to verify together' - NEVER claim completion without verification",
+        "category": "critical",
+        "reason": "Honest communication builds trust and sets proper expectations",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "mandatory-mcp-workflow",
+        "text": "ALWAYS start with moidvk file analysis tools, run appropriate language-specific code quality checks, check for security vulnerabilities, format code using moidvk formatters, run production readiness checks, use moidvk secure tools for bash/grep operations",
+        "category": "critical",
+        "reason": "Ensures code quality and security standards are maintained",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "knowledge-base-integration",
+        "text": "ALWAYS use kb-mcp knowledge base for project context and memory. Before starting any task: Use kb_read to check for relevant documentation. During work: Use kb_search to find related information. After completing tasks: Use kb_update to document what was done",
+        "category": "critical",
+        "reason": "Prevents duplicate work and maintains project context",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "create-comprehensive-v010-implementation-plan-with-mdopz2cl",
+        "text": "Create comprehensive v0.1.0 implementation plan with stability and improvement features",
+        "category": "critical",
+        "reason": "Planning major version release with focus on stability and user experience",
+        "createdAt": "2025-07-29T15:56:35.109Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "implement-secure-api-key-management-system-with-ke-mdoq6tst",
+        "text": "Implement secure API key management system with keychain storage and provider validation",
+        "category": "critical",
+        "reason": "Creating secure infrastructure for managing API keys across multiple AI providers",
+        "createdAt": "2025-07-29T16:02:37.277Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "memory-tool-should-work-consistently-across-all-pr-mdw94hxr",
+        "text": "Memory tool should work consistently across all projects and handle missing fields gracefully",
+        "category": "critical",
+        "reason": "Ensures .agentrc becomes a reliable standard for all kuuzuki users",
+        "createdAt": "2025-08-03T22:27:04.527Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "always-test-sqlite-integration-when-implementing-d-mdwen4jm",
+        "text": "Always test SQLite integration when implementing database features",
+        "category": "critical",
+        "reason": "Ensures database functionality works correctly in kuuzuki",
+        "createdAt": "2025-08-04T01:01:31.714Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "v0119-comprehensive-testing-completed-successfully-mdwh0r7t",
+        "text": "v0.1.19 comprehensive testing completed successfully - tool fallback 100% pass rate, build successful, version verified",
+        "category": "critical",
+        "reason": "Release readiness verified through actual testing",
+        "createdAt": "2025-08-04T02:08:06.857Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      }
+    ],
+    "preferred": [
+      {
+        "id": "prefer-single-word-variable-names",
+        "text": "Prefer single word variable/function names where possible",
+        "category": "preferred",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "avoid-try-catch",
+        "text": "Avoid try catch where possible - prefer to let exceptions bubble up",
+        "category": "preferred",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "avoid-else-statements",
+        "text": "Avoid else statements where possible",
+        "category": "preferred",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "avoid-useless-helper-functions",
+        "text": "Do not make useless helper functions - inline functionality unless the function is reusable or composable",
+        "category": "preferred",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "prefer-bun-apis",
+        "text": "Prefer Bun APIs like Bun.file() over standard alternatives",
+        "category": "preferred",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "avoid-unnecessary-destructuring",
+        "text": "DO NOT do unnecessary destructuring of variables",
+        "category": "preferred",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "avoid-any-type",
+        "text": "AVOID using 'any' type",
+        "category": "preferred",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "avoid-let-statements",
+        "text": "AVOID 'let' statements, prefer const",
+        "category": "preferred",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "use-relative-imports",
+        "text": "Use relative imports for local modules, named imports preferred",
+        "category": "preferred",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "namespace-based-organization",
+        "text": "Use namespace-based organization (e.g., Tool.define(), Session.create())",
+        "category": "preferred",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      }
+    ],
+    "contextual": [
+      {
+        "id": "command-registration-pattern",
+        "text": "Commands are registered using yargs with cmd() helper function",
+        "category": "contextual",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "tool-development-pattern",
+        "text": "Tools are implemented with schema validation using Zod",
+        "category": "contextual",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "tool-architecture",
+        "text": "Tools implement Tool.Info interface with execute() method, pass sessionID in tool context, use App.provide() for DI",
+        "category": "contextual",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      },
+      {
+        "id": "api-client-communication",
+        "text": "Go TUI communicates with TypeScript server via stainless SDK. When adding/modifying server endpoints, ask user to generate new client SDK before proceeding with client-side changes",
+        "category": "contextual",
+        "createdAt": "2025-08-03T21:57:08.566Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
+      }
+    ],
+    "deprecated": []
+  },
+  "dependencies": {
+    "critical": [
+      "@modelcontextprotocol/sdk",
+      "hono",
+      "yargs",
+      "zod",
+      "ai",
+      "chalk",
+      "@clack/prompts",
+      "typescript",
+      "@types/node"
+    ],
+    "preferred": [
+      "turndown",
+      "diff",
+      "open",
+      "remeda",
+      "gray-matter",
+      "isomorphic-git",
+      "prettier",
+      "stripe"
+    ],
+    "avoided": [
+      "express",
+      "lodash",
+      "moment"
+    ]
+  },
+  "mcp": {
+    "servers": {
+      "moidvk": {
+        "transport": "stdio",
+        "command": [
+          "moidvk",
+          "serve"
+        ],
+        "enabled": true,
+        "notes": "Development tools and code analysis server"
+      },
+      "weather": {
+        "transport": "stdio",
+        "command": [
+          "kuuzuki",
+          "x",
+          "@h1deya/mcp-server-weather"
+        ],
+        "enabled": true,
+        "notes": "Weather information server"
+      },
+      "sequential-thinking": {
+        "transport": "stdio",
+        "command": [
+          "npx",
+          "-y",
+          "@modelcontextprotocol/server-sequential-thinking"
+        ],
+        "enabled": true,
+        "notes": "Complex problem solving and analysis"
+      },
+      "kb-mcp": {
+        "transport": "stdio",
+        "command": [
+          "kb",
+          "serve",
+          "--local"
+        ],
+        "enabled": true,
+        "notes": "Knowledge base and documentation management"
+      },
+      "fork-parity": {
+        "transport": "stdio",
+        "command": [
+          "fork-parity-mcp"
+        ],
+        "env": {
+          "UPSTREAM_REMOTE_NAME": "upstream",
+          "UPSTREAM_BRANCH": "dev",
+          "LOCAL_BRANCH": "master"
+        },
+        "enabled": true,
+        "notes": "Fork parity tracking"
+      },
+      "image-analysis": {
+        "transport": "stdio",
+        "command": [
+          "mcp-image-server",
+          "serve"
+        ],
+        "env": {
+          "NODE_ENV": "production"
+        },
+        "enabled": true,
+        "notes": "Image analysis server"
+      },
+      "svg-generator": {
+        "transport": "stdio",
+        "command": [
+          "mcp-svg-server",
+          "serve"
+        ],
+        "enabled": true,
+        "notes": "SVG generation server"
+      }
+    },
+    "workflow": [
+      "ALWAYS start with moidvk file analysis tools",
+      "ALWAYS run appropriate language-specific code quality checks",
+      "ALWAYS check for security vulnerabilities in dependencies",
+      "ALWAYS format code using moidvk formatters before completion",
+      "ALWAYS run production readiness checks before deployment",
+      "ALWAYS use moidvk secure tools for bash and grep operations",
+      "ALWAYS leverage intelligent development analysis for complex tasks",
+      "ALWAYS maintain session continuity with development session manager",
+      "ALWAYS use kb-mcp knowledge base for project context and memory",
+      "Before starting any task: Use kb_read to check for relevant documentation",
+      "During work: Use kb_search to find related information",
+      "After completing tasks: Use kb_update to document what was done",
+      "For complex analysis: Use kb_semantic_search and kb_graph_query"
+    ]
+  },
+  "agent": {
+    "preferredTools": [
+      "bash",
+      "edit",
+      "read",
+      "write",
+      "grep",
+      "glob",
+      "todowrite",
+      "todoread",
+      "task",
+      "memory"
+    ],
+    "taskExecution": "always use 3 sub agents to complete tasks",
+    "securityLevel": "DEVELOPMENT for coding, STRICT for production",
+    "privacyMode": true,
+    "contextPreservation": true
+  },
+  "security": {
+    "sensitiveFiles": [
+      ".env",
+      ".env.*",
+      "*.key",
+      "*.pem",
+      "auth.json",
+      "*.secret"
+    ],
+    "allowedDomains": [
+      "api.anthropic.com",
+      "api.openai.com",
+      "github.com",
+      "registry.npmjs.org"
+    ],
+    "requireApproval": [
+      "credential_operations",
+      "external_api_calls",
+      "file_deletions",
+      "git_config_changes"
+    ]
+  },
+  "testing": {
+    "framework": "bun:test",
+    "checklist": [
+      "TUI starts and responds correctly",
+      "CLI commands execute properly",
+      "Server mode handles requests",
+      "AI integration works with API key",
+      "NPM package installs correctly",
+      "Build completes successfully",
+      "No TypeScript/Go errors",
+      "Tests pass"
+    ],
+    "requirements": [
+      "Verify TUI starts correctly",
+      "Test CLI commands (run, serve, etc.)",
+      "Ensure AI integration works with API keys",
+      "Test file operations and tool execution",
+      "Verify npm installation works properly"
+    ]
+  },
+  "architecture": {
+    "components": {
+      "cli": {
+        "path": "packages/kuuzuki/src/index.ts",
+        "description": "Main entry point for kuuzuki command, handles command routing (tui, run, serve, etc.), version management and configuration"
+      },
+      "tui": {
+        "path": "packages/tui/",
+        "description": "Go-based terminal UI for interactive sessions, keyboard-driven interface with vim-like bindings, real-time streaming with backend server"
+      },
+      "server": {
+        "path": "packages/kuuzuki/src/server/",
+        "description": "HTTP server for handling AI requests, session management and context tracking, tool execution and file system operations"
+      }
+    },
+    "requestFlow": [
+      "User input in TUI or CLI",
+      "Request sent to server via HTTP",
+      "Server processes with AI/tools",
+      "Response streamed back to client",
+      "Display in terminal interface"
+    ]
+  },
+  "troubleshooting": {
+    "apiKeyNotWorking": [
+      "Ensure ANTHROPIC_API_KEY is set in environment",
+      "Check key validity and permissions",
+      "Verify network connectivity"
+    ],
+    "tuiNotStarting": [
+      "Ensure Go binary is built: ./run.sh build tui",
+      "Check terminal compatibility",
+      "Try with different terminal emulators"
+    ],
+    "npmInstallationIssues": [
+      "Clear npm cache: npm cache clean --force",
+      "Use specific version: npm install -g kuuzuki@0.1.0",
+      "Check Node.js version (>=18.0.0 required)"
+    ]
+  },
+  "documentation": {
+    "readme": "README.md",
+    "contributing": "CONTRIBUTING.md",
+    "changelog": "CHANGELOG.md",
+    "docs_dir": "docs/",
+    "api_docs": "docs/openapi.json",
+    "agents": "docs/AGENTS.md",
+    "claude": "CLAUDE.md"
+  },
+  "deployment": {
+    "npm_package": "kuuzuki",
+    "platforms": [
+      "linux",
+      "macos",
+      "windows"
+    ],
+    "ci_cd": "github_actions",
+    "publish_command": "bun run script/publish.ts",
+    "binaries": {
+      "opencode": "./bin/kuuzuki",
+      "kuuzuki": "./bin/kuuzuki"
+    },
+    "publishProcess": [
+      "Update version in package.json",
+      "Create git tag: git tag v0.1.0",
+      "Push tag: git push origin v0.1.0",
+      "GitHub Actions will publish to npm"
+    ]
+  },
+  "ruleMetadata": {
+    "version": "1.0.0",
+    "lastModified": "2025-08-04T02:08:06.857Z",
+    "totalRules": 23,
+    "sessionRules": [
+      {
+        "ruleId": "create-comprehensive-v010-implementation-plan-with-mdopz2cl",
+        "learnedAt": "2025-07-29T15:56:35.109Z",
+        "context": "Planning major version release with focus on stability and user experience"
+      },
+      {
+        "ruleId": "implement-secure-api-key-management-system-with-ke-mdoq6tst",
+        "learnedAt": "2025-07-29T16:02:37.277Z",
+        "context": "Creating secure infrastructure for managing API keys across multiple AI providers"
+      },
+      {
+        "ruleId": "memory-tool-should-work-consistently-across-all-pr-mdw94hxr",
+        "learnedAt": "2025-08-03T22:27:04.527Z",
+        "context": "Ensures .agentrc becomes a reliable standard for all kuuzuki users"
+      },
+      {
+        "ruleId": "always-test-sqlite-integration-when-implementing-d-mdwen4jm",
+        "learnedAt": "2025-08-04T01:01:31.714Z",
+        "context": "Ensures database functionality works correctly in kuuzuki"
+      },
+      {
+        "ruleId": "v0119-comprehensive-testing-completed-successfully-mdwh0r7t",
+        "learnedAt": "2025-08-04T02:08:06.857Z",
+        "context": "Release readiness verified through actual testing"
+      }
+    ]
+  }
+}

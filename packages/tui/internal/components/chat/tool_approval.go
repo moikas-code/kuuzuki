@@ -2,6 +2,7 @@ package chat
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	tea "github.com/charmbracelet/bubbletea/v2"
@@ -33,6 +34,7 @@ type ToolApprovalMsg struct {
 type ToolApprovalAnswerMsg struct {
 	ID       string
 	Approved bool
+	Response string // "once", "always", or "reject"
 }
 
 // NewToolApprovalMessage creates a new tool approval message
@@ -62,23 +64,34 @@ func (t *ToolApprovalMessage) Update(msg tea.Msg) (*ToolApprovalMessage, tea.Cmd
 			t.Selected = 1
 		case key.Matches(msg, key.NewBinding(key.WithKeys("tab"))):
 			t.Selected = (t.Selected + 1) % 2
-		case key.Matches(msg, key.NewBinding(key.WithKeys("a"))):
+		// Upstream-compatible keyboard shortcuts
+		case key.Matches(msg, key.NewBinding(key.WithKeys("enter"))):
+			// Enter = Accept once (upstream behavior)
 			t.Answered = true
 			t.Approved = true
 			return t, func() tea.Msg {
-				return ToolApprovalAnswerMsg{ID: t.ID, Approved: true}
+				return ToolApprovalAnswerMsg{ID: t.ID, Approved: true, Response: "once"}
 			}
+		case key.Matches(msg, key.NewBinding(key.WithKeys("a", "A"))):
+			// A = Accept always (upstream behavior)
+			t.Answered = true
+			t.Approved = true
+			return t, func() tea.Msg {
+				return ToolApprovalAnswerMsg{ID: t.ID, Approved: true, Response: "always"}
+			}
+		case key.Matches(msg, key.NewBinding(key.WithKeys("esc"))):
+			// Esc = Reject (upstream behavior)
+			t.Answered = true
+			t.Approved = false
+			return t, func() tea.Msg {
+				return ToolApprovalAnswerMsg{ID: t.ID, Approved: false, Response: "reject"}
+			}
+		// Legacy shortcuts for compatibility
 		case key.Matches(msg, key.NewBinding(key.WithKeys("d"))):
 			t.Answered = true
 			t.Approved = false
 			return t, func() tea.Msg {
-				return ToolApprovalAnswerMsg{ID: t.ID, Approved: false}
-			}
-		case key.Matches(msg, key.NewBinding(key.WithKeys("enter"))):
-			t.Answered = true
-			t.Approved = t.Selected == 0
-			return t, func() tea.Msg {
-				return ToolApprovalAnswerMsg{ID: t.ID, Approved: t.Approved}
+				return ToolApprovalAnswerMsg{ID: t.ID, Approved: false, Response: "reject"}
 			}
 		}
 	}
@@ -90,24 +103,50 @@ func (t *ToolApprovalMessage) View(width int) string {
 	theme := theme.CurrentTheme()
 	baseStyle := styles.NewStyle().Foreground(theme.Text())
 
-	// Title
+	// Title with kuuzuki branding
 	titleStyle := baseStyle.
 		Foreground(theme.Warning()).
 		Bold(true).
 		Padding(1, 2, 0, 2)
-	title := titleStyle.Render("🔧 Tool Approval Required")
+	title := titleStyle.Render("🔒 kuuzuki Permission Required")
 
-	// Tool info
+	// Tool info with icon
+	toolIcon := "🔧"
+	switch t.ToolName {
+	case "bash":
+		toolIcon = "⚡"
+	case "edit":
+		toolIcon = "✏️"
+	case "write":
+		toolIcon = "📝"
+	case "read":
+		toolIcon = "📖"
+	}
+
 	toolStyle := baseStyle.
 		Foreground(theme.Primary()).
 		Padding(0, 2)
-	toolInfo := toolStyle.Render(fmt.Sprintf("Tool: %s", t.ToolName))
+	toolInfo := toolStyle.Render(fmt.Sprintf("%s Tool: %s", toolIcon, t.ToolName))
 
-	// Description
+	// Description with danger detection
+	descColor := theme.TextMuted()
+	isDangerous := false
+	if cmd, ok := t.Metadata["command"].(string); ok && t.ToolName == "bash" {
+		if strings.Contains(cmd, "rm ") || strings.Contains(cmd, "delete") || strings.Contains(cmd, "DROP") {
+			isDangerous = true
+			descColor = theme.Warning()
+		}
+	}
+
 	descStyle := baseStyle.
-		Foreground(theme.TextMuted()).
+		Foreground(descColor).
 		Padding(0, 2)
-	desc := descStyle.Render(t.Description)
+
+	description := t.Description
+	if isDangerous {
+		description = "⚠️  " + description
+	}
+	desc := descStyle.Render(description)
 
 	if t.Answered {
 		// Show the answer
@@ -150,9 +189,9 @@ func (t *ToolApprovalMessage) View(width int) string {
 	buttons := lipgloss.JoinHorizontal(lipgloss.Left, approve, baseStyle.Render("  "), deny)
 	buttonsContainer := baseStyle.Padding(1, 2, 0, 2).Render(buttons)
 
-	// Help text
+	// Help text with upstream-compatible shortcuts
 	helpStyle := baseStyle.Foreground(theme.TextMuted()).Italic(true)
-	help := helpStyle.Padding(0, 2, 1, 2).Render("Use ←/→ or Tab to select, Enter to confirm, or press A/D")
+	help := helpStyle.Padding(0, 2, 1, 2).Render("⚡ [Enter] Accept Once    🔄 [A] Always Allow    ❌ [Esc] Reject")
 
 	// Combine all parts
 	content := lipgloss.JoinVertical(
@@ -164,11 +203,16 @@ func (t *ToolApprovalMessage) View(width int) string {
 		help,
 	)
 
-	// Add a border around the whole thing with enhanced visibility for overlay
+	// Add a border around the whole thing with kuuzuki accent colors
+	borderColor := theme.Accent() // Use kuuzuki accent color
+	if isDangerous {
+		borderColor = theme.Warning() // Use warning color for dangerous operations
+	}
+
 	borderStyle := baseStyle.
 		Border(lipgloss.ThickBorder()).
-		BorderForeground(theme.Warning()).
-		Background(theme.Background()).
+		BorderForeground(borderColor).
+		Background(theme.BackgroundPanel()). // Use panel background for better contrast
 		Width(width-4).
 		Margin(1, 2).
 		Padding(1)

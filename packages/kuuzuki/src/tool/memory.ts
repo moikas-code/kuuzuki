@@ -1,3 +1,4 @@
+import { safeJsonParse, safeJsonParseWithFallback } from "../util/json-utils";
 import { z } from "zod";
 import * as path from "path";
 import { Tool } from "./tool";
@@ -248,7 +249,7 @@ async function readAgentRc(agentrcPath: string): Promise<AgentRc> {
   }
 
   const content = await file.text();
-  const agentrc = JSON.parse(content);
+  const agentrc = safeJsonParse(content, "agentrc file");
 
   // Ensure the agentrc has the proper structure
   if (!agentrc.rules) {
@@ -1573,7 +1574,7 @@ async function searchRules(
   output += `Found ${results.length} matching rules:\n\n`;
 
   results.slice(0, 10).forEach((record, index) => {
-    const analytics = JSON.parse(record.analytics || "{}");
+    const analytics = safeJsonParseWithFallback(record.analytics || "{}", {}, "rule analytics");
     output += `### ${index + 1}. ${record.category.toUpperCase()} - ${record.id}\n`;
     output += `**Rule**: ${record.text}\n`;
     if (record.reason) output += `**Reason**: ${record.reason}\n`;
@@ -1708,8 +1709,8 @@ async function manageSessionContext(
     output += `Found ${recentSessions.length} recent sessions:\n\n`;
 
     recentSessions.forEach((session, index) => {
-      const fileTypes = JSON.parse(session.fileTypes || "[]");
-      const contextData = JSON.parse(session.contextData || "{}");
+      const fileTypes = safeJsonParseWithFallback(session.fileTypes || "[]", [], "session file types");
+      const contextData = safeJsonParseWithFallback(session.contextData || "{}", {}, "session context data");
 
       output += `### ${index + 1}. Session ${session.sessionId.substring(0, 8)}...\n`;
       output += `**Directory**: ${session.workingDirectory}\n`;
@@ -1737,7 +1738,7 @@ async function manageSessionContext(
     output += `**Recent Files**: ${context.recentFiles.slice(0, 5).join(", ") || "None"}\n`;
 
     if (currentSession) {
-      const contextData = JSON.parse(currentSession.contextData || "{}");
+      const contextData = safeJsonParseWithFallback(currentSession.contextData || "{}", {}, "current session context data");
       output += `**Last Activity**: ${new Date(currentSession.lastActivity).toLocaleString()}\n`;
       if (contextData.currentTool)
         output += `**Current Tool**: ${contextData.currentTool}\n`;
@@ -1807,16 +1808,16 @@ async function exportDatabase(
     exportedAt: new Date().toISOString(),
     rules: rules.map((rule) => ({
       ...rule,
-      analytics: JSON.parse(rule.analytics || "{}"),
-      documentationLinks: JSON.parse(rule.documentationLinks || "[]"),
-      tags: JSON.parse(rule.tags || "[]"),
+      analytics: safeJsonParseWithFallback(rule.analytics || "{}", {}, "rule analytics"),
+      documentationLinks: safeJsonParseWithFallback(rule.documentationLinks || "[]", [], "rule documentation links"),
+      tags: safeJsonParseWithFallback(rule.tags || "[]", [], "rule tags"),
     })),
     analytics,
     sessions: recentSessions.map((session) => ({
       ...session,
-      fileTypes: JSON.parse(session.fileTypes || "[]"),
-      recentFiles: JSON.parse(session.recentFiles || "[]"),
-      contextData: JSON.parse(session.contextData || "{}"),
+      fileTypes: safeJsonParseWithFallback(session.fileTypes || "[]", [], "session file types"),
+      recentFiles: safeJsonParseWithFallback(session.recentFiles || "[]", [], "session recent files"),
+      contextData: safeJsonParseWithFallback(session.contextData || "{}", {}, "session context data"),
     })),
   };
 
@@ -1866,7 +1867,7 @@ async function importDatabase(
     throw new Error(`Import file not found: ${params.filePath}`);
   }
 
-  const importData = JSON.parse(await file.text());
+  const importData = safeJsonParse(await file.text(), "import file");
   const storage = MemoryStorage.getInstance();
 
   let importedRules = 0;

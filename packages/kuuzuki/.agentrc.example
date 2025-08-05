@@ -6,6 +6,12 @@
   },
   "mcp": {
     "servers": {
+      "moidvk": {
+        "transport": "stdio",
+        "command": ["npx", "@moikas/moidvk", "serve"],
+        "enabled": true,
+        "notes": "Development tools and code analysis server - provides bugfinder capabilities"
+      },
       "kb-mcp": {
         "transport": "stdio",
         "command": ["kb", "serve", "--local"],

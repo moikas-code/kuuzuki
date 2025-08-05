@@ -86,6 +86,7 @@ export namespace Cache {
   let config: CacheConfig = CacheConfig.parse({})
   let isInitialized = false
   let cleanupTimer: NodeJS.Timeout | null = null
+  let initializationInProgress = false
 
   // Cache stores
   const requestCache = new Map<string, CacheEntry>()
@@ -640,6 +641,13 @@ export namespace Cache {
       log.warn("Cache already initialized")
       return
     }
+    
+    if (initializationInProgress) {
+      log.warn("Cache initialization already in progress")
+      return
+    }
+    
+    initializationInProgress = true
 
     const timer = log.time("Cache initialization")
 
@@ -651,7 +659,11 @@ export namespace Cache {
 
       log.info("Initializing cache system", { config })
 
-      // Start cleanup timer
+      // Start cleanup timer (clear existing timer first to prevent leaks)
+      if (cleanupTimer) {
+        clearInterval(cleanupTimer)
+        cleanupTimer = null
+      }
       if (config.memory.cleanupInterval > 0) {
         cleanupTimer = setInterval(() => {
           Memory.cleanup()
@@ -662,12 +674,14 @@ export namespace Cache {
       updateMemoryStats()
 
       isInitialized = true
+      initializationInProgress = false
       log.info("Cache system initialized", {
         requestCacheEnabled: config.request.enabled,
         responseCacheEnabled: config.response.enabled,
         cleanupInterval: config.memory.cleanupInterval,
       })
     } catch (error) {
+      initializationInProgress = false
       log.error("Failed to initialize cache", error as Error)
       throw error
     } finally {
@@ -759,6 +773,7 @@ export namespace Cache {
         cache.set(key, result, options.ttl)
         resolve(result)
       } catch (error) {
+      initializationInProgress = false
         reject(error)
       }
     })

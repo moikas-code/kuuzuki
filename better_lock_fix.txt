@@ -1,0 +1,25 @@
+    // Acquire lock early to prevent race conditions
+    try {
+      using abortSignal = lock(input.sessionID);
+      
+      // Continue with the rest of the function logic here...
+      // (This will require restructuring the function)
+      
+    } catch (error) {
+      // If session is locked, queue the request
+      if (error instanceof BusyError) {
+        return new Promise((resolve) => {
+          const queue = state().queued.get(input.sessionID) ?? [];
+          queue.push({
+            input: input,
+            message: userMsg,
+            parts: userParts,
+            processed: false,
+            callback: resolve,
+          });
+          state().queued.set(input.sessionID, queue);
+        });
+      }
+      // Re-throw other errors
+      throw error;
+    }

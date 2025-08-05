@@ -52,6 +52,7 @@ import { ToolInterceptor } from "../tool/interceptor";
 import { ToolAnalytics } from "../tool/analytics";
 import { ToolResolver } from "../tool/resolver";
 import { validateSessionID, validateMessageID } from "../util/id-validation";
+import { Plugin } from "../plugin";
 
 export namespace Session {
   const log = Log.create({ service: "session" });
@@ -448,9 +449,33 @@ export namespace Session {
       for (const child of await children(sessionID)) {
         await remove(child.id, false);
       }
-      await unshare(sessionID).catch(() => {});
-      await Storage.remove(`session/info/${sessionID}`).catch(() => {});
-      await Storage.removeDir(`session/message/${sessionID}/`).catch(() => {});
+      // Critical cleanup operations - log failures but continue cleanup
+      try {
+        await unshare(sessionID);
+      } catch (error) {
+        log.error("Failed to unshare session during removal", {
+          sessionID,
+          error,
+        });
+      }
+
+      try {
+        await Storage.remove(`session/info/${sessionID}`);
+      } catch (error) {
+        log.error("Failed to remove session info from storage", {
+          sessionID,
+          error,
+        });
+      }
+
+      try {
+        await Storage.removeDir(`session/message/${sessionID}/`);
+      } catch (error) {
+        log.error("Failed to remove session messages from storage", {
+          sessionID,
+          error,
+        });
+      }
       state().sessions.delete(sessionID);
       state().messages.delete(sessionID);
       if (emitEvent) {
@@ -803,6 +828,14 @@ export namespace Session {
     for (const part of userParts) {
       await updatePart(part);
     }
+
+    // Trigger plugin hook for new chat message
+    await Plugin.trigger(
+      "chat.message",
+      {},
+      { message: userMsg, parts: userParts.flat() },
+    );
+
     // mark session as updated since a message has been added to it
     await update(input.sessionID, (_draft) => {});
 
@@ -826,7 +859,7 @@ export namespace Session {
       }
       throw error;
     }
-    
+
     // Use the lock handle for the rest of the function
     using abortSignal = lockHandle;
 
@@ -996,7 +1029,12 @@ export namespace Session {
               draft.title = result.text;
             });
         })
-        .catch(() => {});
+        .catch((error) => {
+          log.error("Failed to generate session title", {
+            sessionID: input.sessionID,
+            error,
+          });
+        });
     }
 
     let system = SystemPrompt.header(input.providerID);
@@ -1114,7 +1152,19 @@ export namespace Session {
             }
           }
 
-          const result = await item.execute(validatedArgs, {
+          // Trigger plugin hook before tool execution
+          const toolArgs = { args: validatedArgs };
+          await Plugin.trigger(
+            "tool.execute.before",
+            {
+              tool: item.id,
+              sessionID: input.sessionID,
+              callID: options.toolCallId,
+            },
+            toolArgs,
+          );
+
+          const result = await item.execute(toolArgs.args, {
             sessionID: input.sessionID,
             abort: abortSignal.signal,
             messageID: assistantMsg.id,
@@ -1137,6 +1187,22 @@ export namespace Session {
               }
             },
           });
+
+          // Trigger plugin hook after tool execution
+          await Plugin.trigger(
+            "tool.execute.after",
+            {
+              tool: item.id,
+              sessionID: input.sessionID,
+              callID: options.toolCallId,
+            },
+            {
+              title: result.title || item.id,
+              output: result.output || "",
+              metadata: result.metadata || {},
+            },
+          );
+
           return result;
         },
         toModelOutput(result) {
@@ -1154,11 +1220,39 @@ export namespace Session {
       if (!execute) continue;
       item.execute = async (args, opts) => {
         await processor.track(opts.toolCallId);
-        const result = await execute(args, opts);
+
+        // Trigger plugin hook before MCP tool execution
+        const toolArgs = { args };
+        await Plugin.trigger(
+          "tool.execute.before",
+          {
+            tool: key,
+            sessionID: input.sessionID,
+            callID: opts.toolCallId,
+          },
+          toolArgs,
+        );
+
+        const result = await execute(toolArgs.args, opts);
         const output = result.content
           .filter((x: any) => x.type === "text")
           .map((x: any) => x.text)
           .join("\n\n");
+
+        // Trigger plugin hook after MCP tool execution
+        await Plugin.trigger(
+          "tool.execute.after",
+          {
+            tool: key,
+            sessionID: input.sessionID,
+            callID: opts.toolCallId,
+          },
+          {
+            title: key,
+            output,
+            metadata: result.metadata || {},
+          },
+        );
 
         return {
           output,
@@ -1305,10 +1399,35 @@ export namespace Session {
         ),
         ...MessageV2.toModelMessage(msgs),
       ],
-      temperature: model.info.temperature
-        ? (mode.temperature ??
-          ProviderTransform.temperature(input.providerID, input.modelID))
-        : undefined,
+      temperature: await (async () => {
+        // Calculate initial temperature
+        const initialTemp = model.info.temperature
+          ? (mode.temperature ??
+            ProviderTransform.temperature(input.providerID, input.modelID))
+          : undefined;
+
+        // Create parameters object for plugin modification
+        const params = {
+          temperature: initialTemp,
+        };
+
+        // Trigger plugin hook to allow parameter modification
+        await Plugin.trigger(
+          "chat.params",
+          {
+            model: model.info,
+            provider: {
+              id: input.providerID,
+              name: input.providerID,
+              type: input.providerID,
+            },
+            message: userMsg,
+          },
+          params,
+        );
+
+        return params.temperature;
+      })(),
       tools: model.info.tool_call === false ? undefined : tools,
       model: wrapLanguageModel({
         model: model.language,

@@ -394,6 +394,7 @@ export namespace SessionPersistence {
       if (timer) {
         clearTimeout(timer)
         s.saveTimers.delete(sessionID)
+        log.debug("Save timer completed and removed", { sessionID })
       }
 
       log.debug("Session state deleted", { sessionID })
@@ -406,6 +407,60 @@ export namespace SessionPersistence {
   /**
    * Cleanup old sessions based on configuration
    */
+  /**
+   * Shutdown the persistence system and cleanup resources
+   */
+  export async function shutdown(): Promise<void> {
+    const s = state()
+    
+    log.info("Shutting down session persistence")
+    
+    // Clear cleanup timer
+    if (s.cleanupTimer) {
+      clearInterval(s.cleanupTimer)
+      s.cleanupTimer = null
+      log.debug("Cleanup timer cleared")
+    }
+    
+    // Clear all pending save timers
+    for (const [sessionID, timer] of s.saveTimers.entries()) {
+      clearTimeout(timer)
+      log.debug("Save timer cleared", { sessionID })
+    }
+    s.saveTimers.clear()
+    
+    log.info("Session persistence shutdown complete")
+  }
+  
+  /**
+   * Force save all pending sessions before shutdown
+   */
+  export async function flushPendingSaves(): Promise<void> {
+    const s = state()
+    const pendingSessions = Array.from(s.saveTimers.keys())
+    
+    if (pendingSessions.length > 0) {
+      log.info("Flushing pending saves", { count: pendingSessions.length })
+      
+      // Clear timers and save immediately
+      for (const sessionID of pendingSessions) {
+        const timer = s.saveTimers.get(sessionID)
+        if (timer) {
+          clearTimeout(timer)
+          s.saveTimers.delete(sessionID)
+        log.debug("Save timer completed and removed", { sessionID })
+        }
+        
+        try {
+          await saveSession(sessionID)
+          log.debug("Flushed pending save", { sessionID })
+        } catch (error) {
+          log.error("Failed to flush pending save", { sessionID, error })
+        }
+      }
+    }
+  }
+  
   export async function cleanup(): Promise<{ removedSessions: number; freedSpace: number }> {
     const config = state().config
     if (!config.enabled) return { removedSessions: 0, freedSpace: 0 }
@@ -522,6 +577,7 @@ export namespace SessionPersistence {
         log.error("Auto-save failed", { sessionID, error })
       } finally {
         s.saveTimers.delete(sessionID)
+        log.debug("Save timer completed and removed", { sessionID })
       }
     }, config.saveInterval)
 

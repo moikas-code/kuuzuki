@@ -9,6 +9,7 @@ import { LSP } from "../lsp";
 import { createTwoFilesPatch } from "diff";
 import { Permission } from "../permission";
 import DESCRIPTION from "./edit.txt";
+import { Log } from "../util/log";
 import { App } from "../app/app";
 import { File } from "../file";
 import { Bus } from "../bus";
@@ -89,7 +90,10 @@ export const EditTool = Tool.define("edit", {
       }
 
       const file = Bun.file(filepath);
-      const stats = await file.stat().catch(() => {});
+      const stats = await file.stat().catch((error) => {
+        Log.create({ service: "edit" }).warn("Failed to stat file", { filepath, error: error.message });
+        return null;
+      });
       if (!stats) throw new Error(`File ${filepath} not found`);
       if (stats.isDirectory())
         throw new Error(`Path is a directory, not a file: ${filepath}`);

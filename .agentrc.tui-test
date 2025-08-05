@@ -1,0 +1,5 @@
+{
+  "plugin": [
+    "./tui-test-plugin.js"
+  ]
+}

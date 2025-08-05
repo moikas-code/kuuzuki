@@ -1,3 +1,4 @@
+import { safeJsonParse } from "../util/json-utils";
 import { homedir } from "os"
 import { join } from "path"
 import { promises as fs } from "fs"
@@ -24,7 +25,7 @@ export async function saveAuth(data: AuthData): Promise<void> {
 export async function getAuth(): Promise<AuthData | null> {
   try {
     const content = await fs.readFile(AUTH_FILE, "utf-8")
-    return JSON.parse(content)
+    return safeJsonParse(content, "auth storage")
   } catch {
     return null
   }

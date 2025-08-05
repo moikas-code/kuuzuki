@@ -1,3 +1,4 @@
+import { isFileNotFoundError } from "../util/error-types";
 import { Log } from "../util/log"
 import { Config } from "../config/config"
 import { z } from "zod"
@@ -202,7 +203,7 @@ export namespace SessionStorage {
         this.log.debug("Data retrieved", { key, size: stored.metadata.size })
         return data
       } catch (error) {
-        if ((error as any)?.code === "ENOENT") {
+        if (isFileNotFoundError(error)) {
           return null
         }
         this.log.error("Failed to retrieve data", { key, error })

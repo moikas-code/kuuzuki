@@ -21,6 +21,7 @@ import { callTui, TuiRoute } from "./tui";
 import { Monitor, Cache } from "../performance";
 import { webhookHandler } from "./billing";
 import { Permission } from "../permission";
+import { Plugin } from "../plugin";
 
 const ERRORS = {
   400: {
@@ -202,6 +203,34 @@ export namespace Server {
         }),
         async (c) => {
           return c.json(await Config.get());
+        },
+      )
+      .get(
+        "/plugin",
+        describeRoute({
+          description: "List all loaded plugins",
+          responses: {
+            200: {
+              description: "List of loaded plugins",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.array(
+                      z.object({
+                        name: z.string(),
+                        metadata: z.any().optional(),
+                        hooks: z.array(z.string()),
+                        path: z.string(),
+                      }),
+                    ),
+                  ),
+                },
+              },
+            },
+          },
+        }),
+        async (c) => {
+          return c.json(await Plugin.getLoadedPlugins());
         },
       )
       .get(

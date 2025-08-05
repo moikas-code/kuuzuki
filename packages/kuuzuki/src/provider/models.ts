@@ -1,3 +1,4 @@
+import { safeJsonParseWithFallback } from "../util/json-utils";
 import { Global } from "../global";
 import { Log } from "../util/log";
 import path from "path";
@@ -52,7 +53,11 @@ export namespace ModelsDev {
 
   export async function get() {
     const file = Bun.file(filepath);
-    const result = await file.json().catch(() => {});
+    const text = await file.text().catch((error) => {
+      Log.create({ service: "models" }).warn("Failed to read models file", { error: error.message });
+      return "{}";
+    });
+    const result = safeJsonParseWithFallback(text, {}, "models configuration");
     if (result) {
       refresh();
       return result as Record<string, Provider>;

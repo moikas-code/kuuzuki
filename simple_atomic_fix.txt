@@ -1,0 +1,27 @@
+  export function lock(sessionID: string) {
+    log.info("locking", { sessionID });
+    
+    const pendingMap = state().pending;
+    const controller = new AbortController();
+    
+    // Atomic check-and-set operation
+    // If the session is already locked, this will throw
+    if (pendingMap.has(sessionID)) {
+      throw new BusyError(sessionID);
+    }
+    
+    // Immediately set the lock to prevent race conditions
+    // This must happen synchronously after the check
+    pendingMap.set(sessionID, controller);
+    
+    return {
+      signal: controller.signal,
+      [Symbol.dispose]() {
+        log.info("unlocking", { sessionID });
+        pendingMap.delete(sessionID);
+        Bus.publish(Event.Idle, {
+          sessionID,
+        });
+      },
+    };
+  }

@@ -1,3 +1,4 @@
+import { isFileNotFoundError } from "../util/error-types";
 import { Log } from "../util/log"
 import { App } from "../app/app"
 import { Bus } from "../bus"
@@ -112,13 +113,27 @@ export namespace Storage {
   export async function remove(key: string) {
     const dir = await state().then((x) => x.dir)
     const target = path.join(dir, key + ".json")
-    await fs.unlink(target).catch(() => {})
+    try {
+      await fs.unlink(target)
+    } catch (error) {
+      // File might not exist, which is acceptable for remove operation
+      if (!isFileNotFoundError(error)) {
+        log.error("Failed to remove storage file", { key, target, error })
+      }
+    }
   }
 
   export async function removeDir(key: string) {
     const dir = await state().then((x) => x.dir)
     const target = path.join(dir, key)
-    await fs.rm(target, { recursive: true, force: true }).catch(() => {})
+    try {
+      await fs.rm(target, { recursive: true, force: true })
+    } catch (error) {
+      // Directory might not exist, which is acceptable for remove operation
+      if (!isFileNotFoundError(error)) {
+        log.error("Failed to remove storage directory", { key, target, error })
+      }
+    }
   }
 
   export async function readJSON<T>(key: string) {
@@ -131,8 +146,27 @@ export namespace Storage {
     const target = path.join(dir, key + ".json")
     const tmp = target + Date.now() + ".tmp"
     await Bun.write(tmp, JSON.stringify(content, null, 2))
-    await fs.rename(tmp, target).catch(() => {})
-    await fs.unlink(tmp).catch(() => {})
+    try {
+      await fs.rename(tmp, target)
+    } catch (error) {
+      log.error("Failed to rename temporary file to target", { key, tmp, target, error })
+      // Try to clean up the temporary file
+      try {
+        await fs.unlink(tmp)
+      } catch (cleanupError) {
+        log.error("Failed to cleanup temporary file after rename failure", { tmp, error: cleanupError })
+      }
+      throw error // Re-throw the original error
+    }
+    // Clean up temporary file if it still exists (should not happen after successful rename)
+    try {
+      await fs.unlink(tmp)
+    } catch (error) {
+      // This is expected after successful rename, so only log if it is not ENOENT
+      if (!isFileNotFoundError(error)) {
+        log.warn("Unexpected error cleaning up temporary file", { tmp, error })
+      }
+    }
     Bus.publish(Event.Write, { key, content })
   }
 

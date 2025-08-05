@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Bus } from "../bus";
 import { Log } from "../util/log";
 import { Identifier } from "../id/id";
+import { Plugin } from "../plugin";
 
 export namespace Permission {
   const log = Log.create({ service: "permission" });
@@ -28,6 +29,7 @@ export namespace Permission {
 
   export const Event = {
     Updated: Bus.event("permission.updated", Info),
+    TuiUpdated: Bus.event("permission.tui.updated", Info),
   };
 
   const state = App.state(
@@ -106,6 +108,34 @@ export namespace Permission {
         created: Date.now(),
       },
     };
+
+    // Trigger plugin hook for permission request
+    const permissionDecision = { status: "ask" as "ask" | "deny" | "allow" };
+    await Plugin.trigger("permission.ask", info, permissionDecision);
+
+    // Handle plugin decision
+    if (permissionDecision.status === "allow") {
+      log.info("Plugin auto-approved permission", {
+        sessionID: input.sessionID,
+        type: input.type,
+        pattern: input.pattern,
+      });
+      // Mark as approved for future use
+      approved[input.sessionID] = approved[input.sessionID] || {};
+      approved[input.sessionID][approvalKey] = true;
+      return;
+    } else if (permissionDecision.status === "deny") {
+      log.info("Plugin denied permission", {
+        sessionID: input.sessionID,
+        type: input.type,
+        pattern: input.pattern,
+      });
+      throw new Error(
+        `Permission denied by plugin: ${input.type} ${input.pattern || ""}`,
+      );
+    }
+
+    // If status is "ask", continue with normal permission flow
     pending[input.sessionID] = pending[input.sessionID] || {};
     return new Promise<void>((resolve, reject) => {
       pending[input.sessionID][info.id] = {
@@ -114,6 +144,7 @@ export namespace Permission {
         reject,
       };
       Bus.publish(Event.Updated, info);
+      Bus.publish(Event.TuiUpdated, info);
     });
   }
 
@@ -168,5 +199,76 @@ export namespace Permission {
     ) {
       super(`The user rejected permission to use this functionality`);
     }
+  }
+
+  // TUI-specific helper functions
+  export function getPendingForSession(sessionID: string): Info[] {
+    const { pending } = state();
+    const sessionPending = pending[sessionID];
+    if (!sessionPending) return [];
+    return Object.values(sessionPending).map((item) => item.info);
+  }
+
+  export function getCurrentPermission(sessionID: string): Info | null {
+    const pendingList = getPendingForSession(sessionID);
+    return pendingList.length > 0 ? pendingList[0] : null;
+  }
+
+  export function getPermissionDisplayInfo(info: Info): {
+    title: string;
+    command?: string;
+    filePath?: string;
+    pattern?: string;
+    isDangerous: boolean;
+    toolIcon: string;
+    shortDescription: string;
+  } {
+    const metadata = info.metadata || {};
+
+    // Determine if operation is dangerous
+    const isDangerous =
+      (info.type === "bash" &&
+        (metadata.command?.includes("rm ") ||
+          metadata.command?.includes("delete") ||
+          metadata.command?.includes("DROP") ||
+          info.pattern?.includes("rm "))) ||
+      (info.type === "edit" && metadata.filePath?.includes("config")) ||
+      (info.type === "write" && metadata.filePath?.includes("config"));
+
+    // Get tool-specific icon and description
+    let toolIcon = "🔧";
+    let shortDescription = info.title;
+
+    switch (info.type) {
+      case "bash":
+        toolIcon = "⚡";
+        shortDescription = `Execute: ${metadata.command || "command"}`;
+        break;
+      case "edit":
+        toolIcon = "✏️";
+        shortDescription = `Edit: ${metadata.filePath || "file"}`;
+        break;
+      case "write":
+        toolIcon = "📝";
+        shortDescription = `Write: ${metadata.filePath || "file"}`;
+        break;
+      case "read":
+        toolIcon = "📖";
+        shortDescription = `Read: ${metadata.filePath || "file"}`;
+        break;
+      default:
+        toolIcon = "🔧";
+        shortDescription = info.title;
+    }
+
+    return {
+      title: info.title,
+      command: metadata.command as string,
+      filePath: metadata.filePath as string,
+      pattern: info.pattern,
+      isDangerous,
+      toolIcon,
+      shortDescription,
+    };
   }
 }

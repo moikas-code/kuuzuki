@@ -1,0 +1,32 @@
+{
+  "$schema": "https://kuuzuki.com/config.json",
+  "mode": {
+    "parity": {
+      "model": "anthropic/claude-sonnet-4-20250514",
+      "temperature": 0.1,
+      "prompt": "{file:.kuuzuki/prompts/parity.txt}",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "todowrite": true,
+        "fork-parity_fork_parity_auto_triage_commits": true,
+        "fork-parity_fork_parity_get_detailed_status": true,
+        "fork-parity_fork_parity_generate_dashboard": true,
+        "fork-parity_fork_parity_get_actionable_items": true,
+        "fork-parity_fork_parity_update_commit_status": true,
+        "fork-parity_fork_parity_batch_analyze_commits": true,
+        "fork-parity_fork_parity_create_review_template": true,
+        "fork-parity_fork_parity_generate_integration_plan": true,
+        "fork-parity_fork_parity_sync_and_analyze": true,
+        "fork-parity_fork_parity_advanced_analysis": true,
+        "fork-parity_fork_parity_conflict_analysis": true,
+        "fork-parity_fork_parity_migration_plan": true,
+        "fork-parity_fork_parity_setup_github_actions": true,
+        "fork-parity_fork_parity_setup_notifications": true,
+        "fork-parity_fork_parity_send_notification": true,
+        "fork-parity_fork_parity_learn_adaptation": true
+      }
+    }
+  }
+}
