@@ -2,7 +2,7 @@
   "name": "kuuzuki-vscode",
   "displayName": "Kuuzuki for VS Code",
   "description": "AI-powered coding assistant for VS Code",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "publisher": "kuuzuki",
   "engines": {
     "vscode": "^1.74.0"

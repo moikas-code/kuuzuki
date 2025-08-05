@@ -1655,15 +1655,9 @@ export namespace Session {
 
               case "text-delta":
                 if (currentText) {
-                  currentText.text += (value as any).textDelta;
-                  await updatePart(currentText);
-                }
-                break;
-
-              case "text" as any:
-                // Fallback for older AI SDK versions or different event types
-                if (currentText) {
-                  currentText.text += (value as any).text;
+                  const textDelta =
+                    (value as any).textDelta || (value as any).text || "";
+                  currentText.text += textDelta;
                   await updatePart(currentText);
                 }
                 break;
