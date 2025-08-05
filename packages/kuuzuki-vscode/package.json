@@ -2,13 +2,23 @@
   "name": "kuuzuki-vscode",
   "displayName": "Kuuzuki for VS Code",
   "description": "AI-powered coding assistant for VS Code",
-  "version": "0.1.24",
+  "version": "0.1.25",
   "publisher": "kuuzuki",
   "engines": {
     "vscode": "^1.74.0"
   },
-  "categories": ["AI", "Programming Languages", "Other"],
-  "keywords": ["ai", "assistant", "kuuzuki", "code", "claude"],
+  "categories": [
+    "AI",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "assistant",
+    "kuuzuki",
+    "code",
+    "claude"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/moikas-code/kuuzuki.git"
