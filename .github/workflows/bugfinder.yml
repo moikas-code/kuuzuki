@@ -88,10 +88,15 @@ jobs:
             # Run basic TypeScript check
             echo "#### TypeScript Check" >> bugfinder-report.txt
             cd packages/kuuzuki
-            if bun run typecheck 2>&1; then
+            if bun run typecheck > typecheck.log 2>&1; then
               echo "✅ TypeScript check passed" >> ../../bugfinder-report.txt
             else
               echo "❌ TypeScript check failed" >> ../../bugfinder-report.txt
+              echo "" >> ../../bugfinder-report.txt
+              echo "**TypeScript Errors:**" >> ../../bugfinder-report.txt
+              echo '```' >> ../../bugfinder-report.txt
+              cat typecheck.log >> ../../bugfinder-report.txt
+              echo '```' >> ../../bugfinder-report.txt
             fi
             cd ../..
             

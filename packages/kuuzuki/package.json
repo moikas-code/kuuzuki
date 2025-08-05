@@ -64,7 +64,7 @@
     "@types/turndown": "5.0.5",
     "@types/yargs": "17.0.33",
     "sst": "3.17.10",
-    "typescript": "5.8.0-dev.20250106",
+    "typescript": "^5.7.2",
     "vscode-languageserver-types": "3.17.5",
     "zod-to-json-schema": "3.24.5"
   },

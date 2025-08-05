@@ -1638,9 +1638,9 @@ export namespace Session {
                 };
                 break;
 
-              case "text":
+              case "text-delta":
                 if (currentText) {
-                  currentText.text += value.text;
+                  currentText.text += (value as any).textDelta;
                   await updatePart(currentText);
                 }
                 break;
@@ -1660,14 +1660,6 @@ export namespace Session {
               case "finish":
                 assistantMsg.time.completed = Date.now();
                 await updateMessage(assistantMsg);
-                break;
-
-              case "text-delta" as any:
-                // Handle text-delta events (new AI SDK event type)
-                if (currentText) {
-                  currentText.text += (value as any).text;
-                  await updatePart(currentText);
-                }
                 break;
 
               default:
