@@ -45,7 +45,7 @@ async function fetchReleases(): Promise<Release[]> {
   const per = 100
 
   while (true) {
-    const url = `https://api.github.com/repos/sst/kuuzuki/releases?page=${page}&per_page=${per}`
+    const url = `https://api.github.com/repos/moikas-code/kuuzuki/releases?page=${page}&per_page=${per}`
 
     const response = await fetch(url)
     if (!response.ok) {
