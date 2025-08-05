@@ -25,7 +25,7 @@
     },
     "packages/kuuzuki": {
       "name": "kuuzuki",
-      "version": "0.1.19",
+      "version": "0.1.21",
       "bin": {
         "kuuzuki": "./bin/kuuzuki.js",
       },
@@ -73,6 +73,20 @@
         "typescript": "5.8.0-dev.20250106",
         "vscode-languageserver-types": "3.17.5",
         "zod-to-json-schema": "3.24.5",
+      },
+    },
+    "packages/kuuzuki-plugin": {
+      "name": "@kuuzuki/plugin",
+      "version": "0.1.0",
+      "dependencies": {
+        "bun": "^1.1.29",
+      },
+      "devDependencies": {
+        "@types/node": "^22.13.9",
+        "typescript": "^5.8.2",
+      },
+      "peerDependencies": {
+        "kuuzuki": "^0.1.0",
       },
     },
     "packages/kuuzuki-sdk-ts": {
@@ -391,6 +405,8 @@
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.9", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.0.3", "@jridgewell/sourcemap-codec": "^1.4.10" } }, "sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ=="],
 
     "@jsdevtools/ono": ["@jsdevtools/ono@7.1.3", "", {}, "sha512-4JQNk+3mVzK3xh2rqd6RB4J46qUR19azEHBneZyTZM+c456qOrbbM/5xcR8huNCCcbVt7+UmizG6GuUvPvKUYg=="],
+
+    "@kuuzuki/plugin": ["@kuuzuki/plugin@workspace:packages/kuuzuki-plugin"],
 
     "@kuuzuki/web": ["@kuuzuki/web@workspace:packages/web"],
 
