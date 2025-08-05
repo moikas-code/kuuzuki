@@ -93,26 +93,30 @@ jobs:
                 report.substring(0, 60000) + '\n\n... (report truncated, see full report in artifacts)' : 
                 report;
               
+              const severity = github.event.inputs.severity || 'medium';
+              const path = github.event.inputs.path || '.';
+              const commit = context.sha.substring(0, 7);
+              const owner = context.repo.owner;
+              const repo = context.repo.repo;
+              const runId = context.runId;
+              
+              const body = '## 🔍 Bugfinder Analysis Report\n\n' +
+                '**Severity Level:** ' + severity + '\n' +
+                '**Path Analyzed:** ' + path + '\n' +
+                '**Commit:** ' + commit + '\n\n' +
+                '<details>\n' +
+                '<summary>Click to view full report</summary>\n\n' +
+                '```\n' +
+                truncatedReport + '\n' +
+                '```\n\n' +
+                '</details>\n\n' +
+                '📎 Full report available in [workflow artifacts](https://github.com/' + owner + '/' + repo + '/actions/runs/' + runId + ')';
+
               await github.rest.issues.createComment({
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                body: `## 🔍 Bugfinder Analysis Report
-                
-**Severity Level:** ${{ github.event.inputs.severity || 'medium' }}
-**Path Analyzed:** ${{ github.event.inputs.path || '.' }}
-**Commit:** ${context.sha.substring(0, 7)}
-
-<details>
-<summary>Click to view full report</summary>
-
-\`\`\`
-${truncatedReport}
-\`\`\`
-
-</details>
-
-📎 Full report available in [workflow artifacts](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+                body: body
               });
             } catch (error) {
               console.log('Error reading report file:', error);
