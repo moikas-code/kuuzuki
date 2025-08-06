@@ -5,6 +5,7 @@ import { LSP } from "../lsp";
 import { Plugin } from "../plugin";
 import { Share } from "../share/share";
 import { Snapshot } from "../snapshot";
+import { Session } from "../session";
 
 export async function bootstrap<T>(
   input: App.Input,
@@ -17,6 +18,7 @@ export async function bootstrap<T>(
     LSP.init();
     Snapshot.init();
     Plugin.init();
+    Session.initializeSystem(); // Clean up stale session locks
 
     return cb(app);
   });

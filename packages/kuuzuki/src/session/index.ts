@@ -226,11 +226,13 @@ export namespace Session {
       const queued = new Map<
         string,
         {
+          id: string; // Add unique ID for each queue item
           input: ChatInput;
           message: MessageV2.User;
           parts: MessageV2.Part[];
           processed: boolean;
           timestamp: number;
+          timeoutHandle?: NodeJS.Timeout; // Handle to clear timeout when processed
           callback: (input: {
             info: MessageV2.Assistant;
             parts: MessageV2.Part[];
@@ -241,6 +243,9 @@ export namespace Session {
 
       // Track recent summarizations to prevent multiple summarizations
       const recentSummarizations = new Map<string, number>(); // sessionID -> timestamp
+
+      // Clean up any stale locks from previous sessions on startup
+      log.info("Session state initialized, cleaning up any stale locks");
 
       return {
         sessions,
@@ -850,32 +855,71 @@ export namespace Session {
       if (error instanceof BusyError) {
         return new Promise((resolve, reject) => {
           const queue = state().queued.get(input.sessionID) ?? [];
-          queue.push({
+          const queueTimestamp = Date.now();
+          const queueItemId = crypto.randomUUID(); // Unique ID for this queue item
+
+          const queueItem = {
+            id: queueItemId,
             input: input,
             message: userMsg,
             parts: userParts,
             processed: false,
-            timestamp: Date.now(),
+            timestamp: queueTimestamp,
+            timeoutHandle: undefined as NodeJS.Timeout | undefined,
             callback: resolve,
-          });
+          };
+
+          queue.push(queueItem);
           state().queued.set(input.sessionID, queue);
 
+          log.info("Request queued due to session busy", {
+            sessionID: input.sessionID,
+            queueItemId,
+            queueLength: queue.length,
+          });
+
+          // Dynamic timeout based on queue position and estimated processing time
+          // Base timeout: 5 minutes for first item, +2 minutes for each additional item
+          const baseTimeout = 5 * 60 * 1000; // 5 minutes
+          const queuePosition = queue.length - 1; // Position of this item (0-based)
+          const additionalTimeout = queuePosition * 2 * 60 * 1000; // 2 minutes per queued item
+          const totalTimeout = baseTimeout + additionalTimeout;
+
+          log.info("Queue timeout set", {
+            sessionID: input.sessionID,
+            queueItemId,
+            queuePosition,
+            timeoutMinutes: totalTimeout / (60 * 1000),
+          });
+
           // Set timeout to prevent hanging promises
-          setTimeout(() => {
+          const timeoutHandle = setTimeout(() => {
             const currentQueue = state().queued.get(input.sessionID) ?? [];
             const itemIndex = currentQueue.findIndex(
-              (item) => item.timestamp === Date.now() && !item.processed,
+              (item) => item.id === queueItemId && !item.processed,
             );
             if (itemIndex >= 0) {
               currentQueue.splice(itemIndex, 1);
               if (currentQueue.length === 0) {
                 state().queued.delete(input.sessionID);
+              } else {
+                state().queued.set(input.sessionID, currentQueue);
               }
+              log.warn("Queue item timed out", {
+                sessionID: input.sessionID,
+                queueItemId,
+                timeoutMinutes: totalTimeout / (60 * 1000),
+              });
               reject(
-                new Error("Queue timeout: message processing took too long"),
+                new Error(
+                  `Queue timeout: message processing took longer than ${Math.round(totalTimeout / (60 * 1000))} minutes`,
+                ),
               );
             }
-          }, 30000); // 30 second timeout
+          }, totalTimeout);
+
+          // Store timeout handle so it can be cleared if item is processed
+          queueItem.timeoutHandle = timeoutHandle;
         });
       }
       throw error;
@@ -1469,10 +1513,66 @@ export namespace Session {
         ],
       }),
     });
-    const result = await processor.process(stream);
+    let result;
+    try {
+      result = await processor.process(stream);
+    } catch (error) {
+      log.error("Error processing stream", {
+        error,
+        sessionID: input.sessionID,
+      });
+
+      // Clean up any pending queue items on error
+      const currentQueue = state().queued.get(input.sessionID) ?? [];
+      if (currentQueue.length > 0) {
+        log.info("Cleaning up queue due to processing error", {
+          sessionID: input.sessionID,
+          queueLength: currentQueue.length,
+        });
+
+        // Call callbacks with error to prevent hanging promises
+        for (const item of currentQueue) {
+          try {
+            // Create a minimal error result to satisfy the callback type
+            const errorResult = {
+              info: {
+                id: Identifier.ascending("message"),
+                role: "assistant" as const,
+                sessionID: input.sessionID,
+                time: { created: Date.now() },
+                error: {
+                  name: "UnknownError" as const,
+                  data: { message: error.message },
+                },
+              },
+              parts: [],
+            };
+            item.callback(errorResult);
+          } catch (callbackError) {
+            log.error("Error calling queue callback", {
+              callbackError,
+              sessionID: input.sessionID,
+            });
+          }
+        }
+
+        // Clear the queue
+        state().queued.delete(input.sessionID);
+      }
+
+      throw error;
+    }
 
     // Process queue safely with proper error handling
-    await processQueue(input.sessionID, result);
+    try {
+      await processQueue(input.sessionID, result);
+    } catch (queueError) {
+      log.error("Error processing queue", {
+        queueError,
+        sessionID: input.sessionID,
+      });
+      // Don't throw here - we still want to return the result
+    }
 
     return result;
   }
@@ -2053,49 +2153,109 @@ export namespace Session {
     sessionID: string,
     result: { info: MessageV2.Assistant; parts: MessageV2.Part[] },
   ) {
-    const queued = state().queued.get(sessionID) ?? [];
+    // Use atomic operations - don't clear queue until we're done
+    let currentQueue = state().queued.get(sessionID) ?? [];
 
-    if (queued.length === 0) {
+    if (currentQueue.length === 0) {
       return;
     }
 
-    // Find the next unprocessed item
-    const unprocessed = queued.find((x) => !x.processed);
+    log.info("Processing queue", {
+      sessionID,
+      queueLength: currentQueue.length,
+    });
 
-    if (unprocessed) {
-      // Mark as processed and handle recursively
-      unprocessed.processed = true;
+    // Process one item at a time atomically
+    while (currentQueue.length > 0) {
+      const item = currentQueue[0]; // Always take first item
 
-      try {
-        const nextResult = await chat(unprocessed.input);
-        unprocessed.callback(nextResult);
-      } catch (error) {
-        log.error("Queue processing error", { error, sessionID });
-        // Still call callback with original result to prevent hanging
-        unprocessed.callback(result);
+      if (item.processed) {
+        // Clear timeout for processed item
+        if (item.timeoutHandle) {
+          clearTimeout(item.timeoutHandle);
+        }
+        // Remove processed item and continue
+        currentQueue = currentQueue.slice(1);
+        if (currentQueue.length === 0) {
+          state().queued.delete(sessionID);
+        } else {
+          state().queued.set(sessionID, currentQueue);
+        }
+        continue;
       }
-    }
 
-    // Clean up processed items and call their callbacks
-    const processedItems = queued.filter((x) => x.processed);
-    for (const item of processedItems) {
+      // Check if we can process this item
+      if (isLocked(sessionID)) {
+        log.warn("Session locked during queue processing, stopping", {
+          sessionID,
+        });
+        break; // Stop processing, don't re-queue
+      }
+
+      // Mark as processed before processing to prevent double-processing
+      item.processed = true;
+
+      // Clear timeout since we're processing the item
+      if (item.timeoutHandle) {
+        clearTimeout(item.timeoutHandle);
+        log.info("Cleared queue item timeout", { sessionID, itemId: item.id });
+      }
+
       try {
-        if (item !== unprocessed) {
-          // Don't double-call the recursive one
-          item.callback(result);
+        log.info("Processing queued item", { sessionID, itemId: item.id });
+
+        // Process the item
+        const nextResult = await chat(item.input);
+
+        // Call callback safely
+        try {
+          item.callback(nextResult);
+          log.info("Queue item processed successfully", {
+            sessionID,
+            itemId: item.id,
+          });
+        } catch (callbackError) {
+          log.error("Queue callback error", {
+            error: callbackError,
+            sessionID,
+            itemId: item.id,
+          });
         }
       } catch (error) {
-        log.error("Queue callback error", { error, sessionID });
+        log.error("Queue processing error", {
+          error,
+          sessionID,
+          itemId: item.id,
+        });
+
+        // Call callback with fallback result safely
+        try {
+          item.callback(result);
+        } catch (callbackError) {
+          log.error("Queue fallback callback error", {
+            error: callbackError,
+            sessionID,
+            itemId: item.id,
+          });
+        }
       }
+
+      // Remove the processed item atomically
+      currentQueue = currentQueue.slice(1);
+      if (currentQueue.length === 0) {
+        state().queued.delete(sessionID);
+      } else {
+        state().queued.set(sessionID, currentQueue);
+      }
+
+      // Refresh queue state for next iteration
+      currentQueue = state().queued.get(sessionID) ?? [];
     }
 
-    // Remove processed items from queue
-    const remainingItems = queued.filter((x) => !x.processed);
-    if (remainingItems.length === 0) {
-      state().queued.delete(sessionID);
-    } else {
-      state().queued.set(sessionID, remainingItems);
-    }
+    log.info("Queue processing completed", {
+      sessionID,
+      remainingItems: currentQueue.length,
+    });
   }
 
   export class BusyError extends Error {
@@ -2108,11 +2268,90 @@ export namespace Session {
     return state().pending.has(sessionID);
   }
 
+  // Export state for testing and debugging
+  export function getState() {
+    return state();
+  }
+
+  // Force cleanup for testing
+  export function forceCleanup(sessionID?: string) {
+    const currentState = state();
+
+    if (sessionID) {
+      // Clean up specific session
+      if (currentState.pending.has(sessionID)) {
+        const controller = currentState.pending.get(sessionID);
+        controller?.abort();
+        currentState.pending.delete(sessionID);
+        log.info("Force cleaned up session", { sessionID });
+      }
+
+      if (currentState.queued.has(sessionID)) {
+        // Clear timeouts for all queued items
+        const queuedItems = currentState.queued.get(sessionID) ?? [];
+        queuedItems.forEach((item) => {
+          if (item.timeoutHandle) {
+            clearTimeout(item.timeoutHandle);
+          }
+        });
+        currentState.queued.delete(sessionID);
+        log.info("Force cleaned up queue", { sessionID });
+      }
+    } else {
+      // Clean up all sessions
+      const pendingCount = currentState.pending.size;
+      const queuedCount = currentState.queued.size;
+
+      for (const [id, controller] of currentState.pending) {
+        controller.abort();
+      }
+      currentState.pending.clear();
+
+      // Clear all timeouts before clearing queues
+      for (const [sessionID, queuedItems] of currentState.queued) {
+        queuedItems.forEach((item) => {
+          if (item.timeoutHandle) {
+            clearTimeout(item.timeoutHandle);
+          }
+        });
+      }
+      currentState.queued.clear();
+
+      log.info("Force cleaned up all sessions", { pendingCount, queuedCount });
+    }
+  }
+
+  // Initialize session system and clean up stale locks
+  export function initializeSystem() {
+    log.info("Initializing session system");
+
+    // Force cleanup any stale state from previous runs
+    forceCleanup();
+
+    // Clear any stale summarization tracking
+    const currentState = state();
+    currentState.recentSummarizations.clear();
+
+    log.info("Session system initialized and cleaned up");
+  }
   export function lock(sessionID: string) {
     log.info("locking", { sessionID });
-    if (state().pending.has(sessionID)) throw new BusyError(sessionID);
+
+    // Atomic check-and-set to prevent race conditions
+    const currentState = state();
+    if (currentState.pending.has(sessionID)) {
+      throw new BusyError(sessionID);
+    }
+
     const controller = new AbortController();
-    state().pending.set(sessionID, controller);
+
+    // Double-check after creating controller to ensure atomicity
+    if (currentState.pending.has(sessionID)) {
+      controller.abort();
+      throw new BusyError(sessionID);
+    }
+
+    currentState.pending.set(sessionID, controller);
 
     // Add automatic unlock after 5 minutes to prevent permanent locks
     const timeoutId = setTimeout(
@@ -2133,6 +2372,10 @@ export namespace Session {
         clearTimeout(timeoutId);
         log.info("unlocking", { sessionID });
         state().pending.delete(sessionID);
+
+        // DON'T process queue here - let it be processed naturally
+        // This prevents infinite loops and race conditions
+
         Bus.publish(Event.Idle, {
           sessionID,
         });

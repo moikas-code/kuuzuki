@@ -1,7 +1,7 @@
-import { Provider } from "../../provider/provider"
-import { Server } from "../../server/server"
-import { bootstrap } from "../bootstrap"
-import { cmd } from "./cmd"
+import { Provider } from "../../provider/provider";
+import { Server } from "../../server/server";
+import { bootstrap } from "../bootstrap";
+import { cmd } from "./cmd";
 
 export const ServeCommand = cmd({
   command: "serve",
@@ -21,48 +21,87 @@ export const ServeCommand = cmd({
       }),
   describe: "starts a headless kuuzuki server",
   handler: async (args) => {
-    const cwd = process.cwd()
+    const cwd = process.cwd();
     await bootstrap({ cwd }, async () => {
-      const providers = await Provider.list()
+      const providers = await Provider.list();
       if (Object.keys(providers).length === 0) {
-        return "needs_provider"
+        return "needs_provider";
       }
 
-      const hostname = args.hostname
-      const port = args.port
+      const hostname = args.hostname;
+      const port = args.port;
 
       const server = Server.listen({
         port,
         hostname,
-      })
+      });
 
-      console.log(`kuuzuki server listening on http://${server.hostname}:${server.port}`)
+      console.log(
+        `kuuzuki server listening on http://${hostname}:${server.port}`,
+      );
 
       // Write server info for auto-detection
       await import("../../server/server-info").then(({ writeServerInfo }) =>
-        writeServerInfo({ port: server.port!, hostname: server.hostname || "127.0.0.1" })
-      )
+        writeServerInfo({
+          port: server.port!,
+          hostname: server.hostname || "127.0.0.1",
+        }),
+      );
 
       // Setup signal handlers for graceful shutdown
-      const cleanup = () => {
-        server.stop()
-        // Clean up server info file
-        import("../../server/server-info").then(({ clearServerInfo }) =>
-          clearServerInfo()
-        ).catch(() => {})
-        process.exit(0)
-      }
-      
-      process.on('SIGINT', cleanup)
-      process.on('SIGTERM', cleanup)
+      const cleanup = async () => {
+        console.log("Shutting down kuuzuki server gracefully...");
 
-      await new Promise(() => {})
+        try {
+          // 1. Stop accepting new requests
+          server.stop();
 
-      server.stop()
+          // 2. Clean up active sessions
+          const { Session } = await import("../../session");
+          const sessionState = Session.getState();
+
+          if (sessionState && sessionState.pending) {
+            console.log(
+              `Cleaning up ${sessionState.pending.size} active sessions...`,
+            );
+            for (const [sessionID, controller] of sessionState.pending) {
+              console.log(`Aborting session: ${sessionID}`);
+              controller.abort();
+              sessionState.pending.delete(sessionID);
+            }
+          }
+
+          // 3. Clear message queues
+          if (sessionState && sessionState.queued) {
+            console.log(
+              `Clearing ${sessionState.queued.size} message queues...`,
+            );
+            sessionState.queued.clear();
+          }
+
+          // 4. Clean up server info file
+          await import("../../server/server-info")
+            .then(({ clearServerInfo }) => clearServerInfo())
+            .catch(() => {});
+
+          console.log("Graceful shutdown complete");
+        } catch (error) {
+          console.error("Error during shutdown:", error);
+        }
+
+        process.exit(0);
+      };
+
+      process.on("SIGINT", cleanup);
+      process.on("SIGTERM", cleanup);
+
+      await new Promise(() => {});
+
+      server.stop();
       // Clean up server info file
       await import("../../server/server-info").then(({ clearServerInfo }) =>
-        clearServerInfo()
-      )
-    })
+        clearServerInfo(),
+      );
+    });
   },
-})
+});

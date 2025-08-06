@@ -1111,6 +1111,31 @@ export namespace Server {
       idleTimeout: 0,
       fetch: app().fetch,
     });
-    return server;
+
+    // Add enhanced server object with cleanup methods
+    return {
+      ...server,
+      port: server.port, // Explicitly preserve port
+      hostname: server.hostname, // Explicitly preserve hostname
+      async stop() {
+        log.info("Stopping server...");
+
+        try {
+          // Clean up active sessions
+          const { Session } = await import("../session");
+          if (Session.forceCleanup) {
+            Session.forceCleanup();
+          }
+
+          // Stop the server
+          server.stop();
+
+          log.info("Server stopped successfully");
+        } catch (error) {
+          log.error("Error stopping server", { error });
+          throw error;
+        }
+      },
+    };
   }
 }

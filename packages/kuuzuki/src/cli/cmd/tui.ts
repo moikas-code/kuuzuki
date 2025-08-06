@@ -134,7 +134,7 @@ export const TuiCommand = cmd({
         // Wait for server to be ready before starting TUI
         const serverUrl = `http://${server.hostname || "127.0.0.1"}:${server.port}`;
         let retries = 0;
-        const maxRetries = 60; // 6 seconds with 100ms intervals - increased for reliability
+        const maxRetries = 120; // 12 seconds with 100ms intervals - increased for session fix compatibility
 
         Log.Default.info("Waiting for server to be ready", { url: serverUrl });
         while (retries < maxRetries) {
@@ -166,7 +166,9 @@ export const TuiCommand = cmd({
             // Server not ready yet or timeout
             Log.Default.debug("Server not ready yet", {
               attempt: retries + 1,
+              maxRetries,
               error: e.message,
+              url: serverUrl,
             });
           }
 
