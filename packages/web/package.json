@@ -1,7 +1,7 @@
 {
   "name": "@kuuzuki/web",
   "type": "module",
-  "version": "0.1.26",
+  "version": "0.1.28",
   "scripts": {
     "dev": "astro dev",
     "dev:remote": "sst shell --stage=dev --target=Web astro dev",
