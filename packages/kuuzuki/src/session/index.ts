@@ -247,6 +247,11 @@ export namespace Session {
       // Clean up any stale locks from previous sessions on startup
       log.info("Session state initialized, cleaning up any stale locks");
 
+      // Initialize the session system with cleanup
+      setTimeout(() => {
+        initializeSystem();
+      }, 100); // Small delay to ensure state is fully initialized
+
       return {
         sessions,
         messages,
@@ -1401,49 +1406,15 @@ export namespace Session {
         throw error;
       },
       async prepareStep({ messages }) {
-        const queue = (state().queued.get(input.sessionID) ?? []).filter(
-          (x) => !x.processed,
-        );
-        if (queue.length) {
-          for (const item of queue) {
-            if (item.processed) continue;
-            messages.push(
-              ...MessageV2.toModelMessage([
-                {
-                  info: item.message,
-                  parts: item.parts,
-                },
-              ]),
-            );
-            item.processed = true;
-          }
-          assistantMsg.time.completed = Date.now();
-          await updateMessage(assistantMsg);
-          Object.assign(assistantMsg, {
-            id: Identifier.ascending("message"),
-            role: "assistant",
-            system,
-            path: {
-              cwd: app.path.cwd,
-              root: app.path.root,
-            },
-            cost: 0,
-            tokens: {
-              input: 0,
-              output: 0,
-              reasoning: 0,
-              cache: { read: 0, write: 0 },
-            },
-            modelID: input.modelID,
-            providerID: input.providerID,
-            mode: inputMode,
-            time: {
-              created: Date.now(),
-            },
-            sessionID: input.sessionID,
-          });
-          await updateMessage(assistantMsg);
-        }
+        // CRITICAL FIX: Don't process queue in prepareStep to prevent infinite recursion
+        // Queue processing is now handled separately in processQueue function
+        // This prevents the infinite loop that was causing session locks
+
+        log.debug("prepareStep called", {
+          sessionID: input.sessionID,
+          messageCount: messages.length,
+        });
+
         return {
           messages,
         };

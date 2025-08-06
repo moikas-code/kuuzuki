@@ -134,7 +134,7 @@ export const TuiCommand = cmd({
         // Wait for server to be ready before starting TUI
         const serverUrl = `http://${server.hostname || "127.0.0.1"}:${server.port}`;
         let retries = 0;
-        const maxRetries = 120; // 12 seconds with 100ms intervals - increased for session fix compatibility
+        const maxRetries = 200; // 20 seconds with 100ms intervals - increased for session management fixes
 
         Log.Default.info("Waiting for server to be ready", { url: serverUrl });
         while (retries < maxRetries) {
@@ -185,8 +185,9 @@ export const TuiCommand = cmd({
         }
 
         // Additional stabilization delay to ensure server is fully ready
+        // Increased delay to allow session management system to initialize properly
         Log.Default.info("Server ready, waiting for stabilization...");
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
         let cmd: string[];
         let cwd: string = process.cwd();
