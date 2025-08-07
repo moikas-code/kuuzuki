@@ -1,6 +1,6 @@
 {
   "name": "kuuzuki-monorepo",
-  "version": "0.1.28",
+  "version": "0.1.29",
   "description": "Kuuzuki monorepo with fork parity tracking",
   "private": true,
   "scripts": {
