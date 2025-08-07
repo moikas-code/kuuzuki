@@ -23,7 +23,7 @@
     "@shikijs/transformers": "3.4.2",
     "@types/luxon": "3.6.2",
     "ai": "catalog:",
-    "astro": "5.7.13",
+    "astro": "5.12.8",
     "diff": "8.0.2",
     "js-base64": "3.7.7",
     "lang-map": "0.4.0",
