@@ -1403,7 +1403,7 @@ export namespace Session {
     const stream = streamText({
       onError(error) {
         log.error("Stream error", { error, sessionID: input.sessionID });
-        throw error;
+        //throw error;
       },
       async prepareStep({ messages }) {
         // CRITICAL FIX: Don't process queue in prepareStep to prevent infinite recursion
