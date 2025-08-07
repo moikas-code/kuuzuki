@@ -30,6 +30,14 @@ jobs:
       # 5. Install dependencies
       - name: Install dependencies
         shell: bash
+        env:
+          # Force C++17 to avoid C++20 compatibility issues
+          CXXFLAGS: "-std=c++17"
+          CPPFLAGS: "-std=c++17"
+          # Skip optional dependencies that might cause issues
+          SHARP_IGNORE_GLOBAL_LIBVIPS: "1"
+          # Use system Python
+          PYTHON: "python3"
         run: |
           set -x
           which bun

@@ -37,12 +37,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
+      - name: Setup build tools for macOS
+        if: runner.os == 'macOS'
+        run: |
+          # Install Xcode command line tools if not present
+          xcode-select --install 2>/dev/null || true
+          # Install Python build tools
+          python3 -m pip install --upgrade pip setuptools wheel || true
+
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        env:
+          # Force C++17 to avoid C++20 compatibility issues
+          CXXFLAGS: "-std=c++17"
+          CPPFLAGS: "-std=c++17"
+          # Skip optional dependencies that might cause issues
+          SHARP_IGNORE_GLOBAL_LIBVIPS: "1"
+          # Disable sharp installation
+          SHARP_DISABLE_DOWNLOAD: "1"
+          # Use system Python
+          PYTHON: "python3"
+        run: |
+          # Try normal install first
+          bun install --frozen-lockfile || {
+            echo "Normal install failed, trying without optional dependencies..."
+            bun install --frozen-lockfile --no-optional
+          }
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -107,7 +134,22 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        env:
+          # Force C++17 to avoid C++20 compatibility issues
+          CXXFLAGS: "-std=c++17"
+          CPPFLAGS: "-std=c++17"
+          # Skip optional dependencies that might cause issues
+          SHARP_IGNORE_GLOBAL_LIBVIPS: "1"
+          # Disable sharp installation
+          SHARP_DISABLE_DOWNLOAD: "1"
+          # Use system Python
+          PYTHON: "python3"
+        run: |
+          # Try normal install first
+          bun install --frozen-lockfile || {
+            echo "Normal install failed, trying without optional dependencies..."
+            bun install --frozen-lockfile --no-optional
+          }
 
       - name: Run tests
         run: |
