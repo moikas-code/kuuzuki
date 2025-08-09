@@ -138,7 +138,7 @@ export namespace Installation {
   export const VERSION = typeof KUUZUKI_VERSION === "string" ? KUUZUKI_VERSION : "dev"
 
   export async function latest() {
-    return fetch("https://api.github.com/repos/sst/kuuzuki/releases/latest")
+    return fetch("https://api.github.com/repos/moikas-code/kuuzuki/releases/latest")
       .then((res) => res.json())
       .then((data) => {
         if (typeof data.tag_name !== "string") {

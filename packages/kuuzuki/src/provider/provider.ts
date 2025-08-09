@@ -29,10 +29,12 @@ export namespace Provider {
     async anthropic(provider) {
       const access = await AuthAnthropic.access()
       if (!access) return { autoload: false }
-      for (const model of Object.values(provider.models)) {
-        model.cost = {
-          input: 0,
-          output: 0,
+      if (provider && provider.models) {
+        for (const model of Object.values(provider.models)) {
+          model.cost = {
+            input: 0,
+            output: 0,
+          }
         }
       }
       return {
@@ -188,7 +190,7 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://kuuzuki.ai/",
+            "HTTP-Referer": "https://kuuzuki.com/",
             "X-Title": "kuuzuki",
           },
         },
@@ -393,7 +395,7 @@ export namespace Provider {
       const existing = s.sdk.get(provider.id)
       if (existing) return existing
       const pkg = provider.npm ?? provider.id
-      const mod = await import(await BunProc.install(pkg, "beta"))
+      const mod = await import(await BunProc.install(pkg, "latest"))
       const fn = mod[Object.keys(mod).find((key) => key.startsWith("create"))!]
       const loaded = fn({
         name: provider.id,

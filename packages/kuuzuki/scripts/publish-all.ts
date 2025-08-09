@@ -2,7 +2,7 @@
 
 /**
  * Publish all Kuuzuki packages to npm
- * This handles the multi-package structure like OpenCode
+ * This handles the multi-package structure like Kuuzuki
  */
 
 import { $ } from "bun";

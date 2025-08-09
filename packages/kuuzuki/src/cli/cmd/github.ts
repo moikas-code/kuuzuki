@@ -185,8 +185,8 @@ export const GithubInstallCommand = cmd({
         // Get repo info
         const info = await $`git remote get-url origin`.quiet().nothrow().text()
         // match https or git pattern
-        // ie. https://github.com/sst/kuuzuki.git
-        // ie. git@github.com:sst/kuuzuki.git
+        // ie. https://github.com/moikas-code/kuuzuki.git
+        // ie. git@github.com:moikas-code/kuuzuki.git
         const parsed = info.match(/git@github\.com:(.*)\.git/) ?? info.match(/github\.com\/(.*)\.git/)
         if (!parsed) {
           prompts.log.error(`Could not find git repository. Please run this command from a git repository.`)
@@ -326,7 +326,7 @@ jobs:
           fetch-depth: 1
 
       - name: Run kuuzuki
-        uses: sst/kuuzuki/github@latest${envStr}
+        uses: moikas-code/kuuzuki/github@latest${envStr}
         with:
           model: ${provider}/${model}
 `.trim(),

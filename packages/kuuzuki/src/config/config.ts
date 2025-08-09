@@ -16,6 +16,8 @@ import { ConfigSchema } from "./schema";
 import { ConfigMigration } from "./migration";
 import { parseAgentrc, mergeAgentrcMcpWithConfig } from "./agentrc";
 import { Auth } from "../auth";
+import { type ParseError as JsoncParseError, parse as parseJsonc, printParseErrorCode } from "jsonc-parser";
+import { Flag } from "../flag/flag";
 
 export namespace Config {
   const log = Log.create({ service: "config" });
@@ -27,6 +29,12 @@ export namespace Config {
     // Merge environment variables
     const envConfig = ConfigSchema.parseEnvironmentVariables();
     result = mergeDeep(result, envConfig);
+
+    // Override with custom config if provided
+    if (Flag.KUUZUKI_CONFIG) {
+      result = mergeDeep(result, await load(Flag.KUUZUKI_CONFIG));
+      log.debug("loaded custom config", { path: Flag.KUUZUKI_CONFIG });
+    }
 
     // Load project-specific configurations
     for (const file of ["kuuzuki.jsonc", "kuuzuki.json"]) {
@@ -699,11 +707,20 @@ export namespace Config {
       }
     }
 
-    let data: any;
-    try {
-      data = JSON.parse(text);
-    } catch (err) {
-      throw new JsonError({ path: configPath }, { cause: err as Error });
+    const errors: JsoncParseError[] = [];
+    const data = parseJsonc(text, errors, { allowTrailingComma: true });
+    if (errors.length) {
+      throw new JsonError({
+        path: configPath,
+        message: errors
+          .map((e) => {
+            const lines = text.substring(0, e.offset).split("\n");
+            const line = lines.length;
+            const column = lines[lines.length - 1].length + 1;
+            return `${printParseErrorCode(e.error)} at line ${line}, column ${column}`;
+          })
+          .join("; "),
+      });
     }
 
     try {
@@ -761,11 +778,20 @@ export namespace Config {
       }
     }
 
-    let data: any;
-    try {
-      data = JSON.parse(text);
-    } catch (err) {
-      throw new JsonError({ path: configPath }, { cause: err as Error });
+    const errors: JsoncParseError[] = [];
+    const data = parseJsonc(text, errors, { allowTrailingComma: true });
+    if (errors.length) {
+      throw new JsonError({
+        path: configPath,
+        message: errors
+          .map((e) => {
+            const lines = text.substring(0, e.offset).split("\n");
+            const line = lines.length;
+            const column = lines[lines.length - 1].length + 1;
+            return `${printParseErrorCode(e.error)} at line ${line}, column ${column}`;
+          })
+          .join("; "),
+      });
     }
 
     try {
@@ -783,6 +809,7 @@ export namespace Config {
     "ConfigJsonError",
     z.object({
       path: z.string(),
+      message: z.string().optional(),
     }),
   );
 

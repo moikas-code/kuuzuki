@@ -20,7 +20,7 @@ function detectPlatformAndArch() {
       platform = "linux"
       break
     case "win32":
-      platform = "win32"
+      platform = "windows"
       break
     default:
       platform = os.platform()

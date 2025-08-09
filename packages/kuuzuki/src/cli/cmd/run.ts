@@ -122,9 +122,15 @@ export const RunCommand = cmd({
       }
       UI.empty();
 
+      // Get mode first to check for mode-specific model
+      const mode = args.mode
+        ? await Mode.get(args.mode)
+        : await Mode.list().then((x) => x[0]);
+
+      // Model priority: CLI arg > mode model > default
       const { providerID, modelID } = args.model
         ? Provider.parseModel(args.model)
-        : await Provider.defaultModel();
+        : mode.model ?? await Provider.defaultModel();
       UI.println(
         UI.Style.TEXT_NORMAL_BOLD + "@ ",
         UI.Style.TEXT_NORMAL + `${providerID}/${modelID}`,
@@ -185,21 +191,12 @@ export const RunCommand = cmd({
         UI.error(err);
       });
 
-      const mode = args.mode
-        ? await Mode.get(args.mode)
-        : await Mode.list().then((x) => x[0]);
-
       const messageID = Identifier.ascending("message");
       const result = await Session.chat({
         sessionID: session.id,
         messageID,
-        // CRITICAL FIX: CLI --model argument should take precedence over mode model
-        // This ensures users can override the model selection via CLI
-        ...(args.model
-          ? { providerID, modelID } // Use CLI-specified model
-          : mode.model
-            ? mode.model // Fall back to mode model
-            : { providerID, modelID }), // Final fallback to default
+        providerID,
+        modelID,
         mode: mode.name,
         parts: [
           {
