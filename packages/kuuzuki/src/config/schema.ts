@@ -196,6 +196,10 @@ export namespace ConfigSchema {
       .array(z.string())
       .optional()
       .describe("Agent tags for categorization"),
+    mode: z
+      .union([z.literal("subagent"), z.literal("primary"), z.literal("all")])
+      .optional()
+      .describe("Agent mode - determines if it can be used as primary, subagent, or both"),
   }).strict();
 
   export type Agent = z.infer<typeof Agent>;
