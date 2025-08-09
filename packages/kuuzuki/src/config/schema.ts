@@ -27,6 +27,7 @@ export namespace ConfigSchema {
     KUUZUKI_API_URL: "apiUrl",
     KUUZUKI_SHARE: "share",
     KUUZUKI_AUTOUPDATE: "autoupdate",
+    KUUZUKI_DISABLE_SNAPSHOTS: "disableSnapshots",
 
     // Feature flags
     KUUZUKI_SUBSCRIPTION_REQUIRED: "subscriptionRequired",
@@ -606,6 +607,10 @@ export namespace ConfigSchema {
         .boolean()
         .default(DEFAULTS.autoupdate)
         .describe("Automatically update to the latest version"),
+      disableSnapshots: z
+        .boolean()
+        .default(false)
+        .describe("Disable snapshot functionality for file operations"),
 
       // API Configuration
       apiUrl: z

@@ -26,6 +26,11 @@ export namespace Snapshot {
   export async function track() {
     const app = App.info()
     if (!app.git) return
+    
+    // Check if snapshots are disabled in configuration
+    const { Config } = await import("../config/config")
+    const config = await Config.get()
+    if (config.disableSnapshots) return
     const git = gitdir()
     if (await fs.mkdir(git, { recursive: true })) {
       await $`git init`

@@ -196,6 +196,17 @@ export namespace Provider {
         },
       }
     },
+    moonshotai: async () => {
+      return {
+        autoload: false,
+        options: {
+          headers: {
+            "HTTP-Referer": "https://kuuzuki.com/",
+            "X-Title": "kuuzuki",
+          },
+        },
+      }
+    },
   }
 
   const state = App.state("provider", async () => {

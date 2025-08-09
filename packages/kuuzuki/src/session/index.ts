@@ -53,6 +53,7 @@ import { ToolAnalytics } from "../tool/analytics";
 import { ToolResolver } from "../tool/resolver";
 import { validateSessionID, validateMessageID } from "../util/id-validation";
 import { Plugin } from "../plugin";
+import { Permission } from "../permission";
 
 export namespace Session {
   const log = Log.create({ service: "session" });
@@ -2068,7 +2069,18 @@ export namespace Session {
       maxRetries: 10,
       maxOutputTokens: outputLimit,
       abortSignal: abortSignal.signal,
-      stopWhen: stepCountIs(1000),
+      stopWhen: async ({ steps }) => {
+        if (steps.length >= 1000) {
+          return true;
+        }
+
+        // Check if processor flagged that we should stop
+        if (processor.getShouldStop()) {
+          return true;
+        }
+
+        return false;
+      },
       providerOptions: {
         [input.providerID]: model.info.options,
       },
@@ -2449,6 +2461,7 @@ export namespace Session {
   ) {
     const toolCalls: Record<string, MessageV2.ToolPart> = {};
     const snapshots: Record<string, string> = {};
+    let shouldStop = false;
     return {
       async track(toolCallID: string) {
         const hash = await Snapshot.track();
@@ -2456,6 +2469,9 @@ export namespace Session {
       },
       partFromToolCall(toolCallID: string) {
         return toolCalls[toolCallID];
+      },
+      getShouldStop() {
+        return shouldStop;
       },
       async process(stream: StreamTextResult<Record<string, AITool>, never>) {
         try {
@@ -2546,6 +2562,9 @@ export namespace Session {
               case "tool-error": {
                 const match = toolCalls[value.toolCallId];
                 if (match && match.state.status === "running") {
+                  if (value.error instanceof Permission.RejectedError) {
+                    shouldStop = true;
+                  }
                   await updatePart({
                     ...match,
                     state: {
