@@ -45,7 +45,7 @@ func main() {
 	}
 
 	modesStr := os.Getenv("KUUZUKI_MODES")
-	var modes []opencode.Mode
+	var modes []opencode.Agent
 	err = json.Unmarshal([]byte(modesStr), &modes)
 	if err != nil {
 		slog.Error("Failed to unmarshal modes", "error", err)

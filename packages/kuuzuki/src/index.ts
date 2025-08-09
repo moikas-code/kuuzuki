@@ -20,12 +20,11 @@ import { StatsCommand } from "./cli/cmd/stats";
 import { McpCommand } from "./cli/cmd/mcp";
 import { GithubCommand } from "./cli/cmd/github";
 import { BugfindCommand } from "./cli/cmd/bugfind";
-import { Trace } from "./trace";
 import { ensureInitialized } from "./global";
 
 // Initialize global paths before any other initialization
 await ensureInitialized();
-await Trace.init();
+// await Trace.init(); // Removed - trace module not implemented yet
 
 const cancel = new AbortController();
 

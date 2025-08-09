@@ -404,7 +404,7 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.showCompletionDialog = false
 	case opencode.EventListResponseEventInstallationUpdated:
 		return a, toast.NewSuccessToast(
-			"opencode updated to "+msg.Properties.Version+", restart to apply.",
+			"kuuzuki updated to "+msg.Properties.Version+", restart to apply.",
 			toast.WithTitle("New version installed"),
 		)
 	case opencode.EventListResponseEventIdeInstalled:
@@ -545,7 +545,7 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case app.ModelSelectedMsg:
 		a.app.Provider = &msg.Provider
 		a.app.Model = &msg.Model
-		a.app.State.ModeModel[a.app.Mode.Name] = app.ModeModel{
+		a.app.State.ModeModel[a.app.Agent.Name] = app.ModeModel{
 			ProviderID: msg.Provider.ID,
 			ModelID:    msg.Model.ID,
 		}
@@ -1019,12 +1019,12 @@ func (a Model) executeCommand(command commands.Command) (tea.Model, tea.Cmd) {
 		}
 		helpDialog := dialog.NewHelpDialog(a.app)
 		a.modal = helpDialog
-	case commands.SwitchModeCommand:
-		updated, cmd := a.app.SwitchMode()
+	case commands.SwitchAgentCommand:
+		updated, cmd := a.app.SwitchAgent()
 		a.app = updated
 		cmds = append(cmds, cmd)
 	case commands.SwitchModeReverseCommand:
-		updated, cmd := a.app.SwitchModeReverse()
+		updated, cmd := a.app.SwitchAgentReverse()
 		a.app = updated
 		cmds = append(cmds, cmd)
 	case commands.EditorOpenCommand:

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { exec } from "child_process";
+import { text } from "stream/consumers";
 import { Tool } from "./tool";
 import DESCRIPTION from "./bash.txt";
 import { App } from "../app/app";
@@ -159,26 +161,34 @@ export const BashTool = Tool.define("bash", {
       });
     }
 
-    // Execute the command
-    const process = Bun.spawn({
-      cmd: ["bash", "-c", params.command],
+    // Execute the command using Node's exec for better stderr handling
+    const process = exec(params.command, {
       cwd: app.path.cwd,
-      maxBuffer: MAX_OUTPUT_LENGTH,
       signal: ctx.abort,
-      timeout: timeout,
-      stdout: "pipe",
-      stderr: "pipe",
+      maxBuffer: MAX_OUTPUT_LENGTH,
+      timeout,
     });
-    await process.exited;
-    const stdout = await new Response(process.stdout).text();
-    const stderr = await new Response(process.stderr).text();
+    
+    const stdoutPromise = text(process.stdout!);
+    const stderrPromise = text(process.stderr!);
+    
+    let exitCode: number | null = null;
+    await new Promise<void>((resolve) => {
+      process.on("close", (code) => {
+        exitCode = code;
+        resolve();
+      });
+    });
+    
+    const stdout = await stdoutPromise;
+    const stderr = await stderrPromise;
 
     return {
       title: params.command,
       metadata: {
         stderr,
         stdout,
-        exit: process.exitCode,
+        exit: exitCode,
         description: params.description,
       },
       output: [

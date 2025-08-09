@@ -305,7 +305,10 @@ func renderToolDetails(
 	defaultStyle := styles.NewStyle().Background(backgroundColor).Width(width - 6).Render
 
 	if toolCall.State.Metadata != nil {
-		metadata := toolCall.State.Metadata.(map[string]any)
+		metadata, ok := toolCall.State.Metadata.(map[string]any)
+		if !ok {
+			metadata = nil
+		}
 		switch toolCall.Tool {
 		case "read":
 			var preview any

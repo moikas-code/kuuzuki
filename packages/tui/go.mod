@@ -2,6 +2,8 @@ module github.com/sst/opencode
 
 go 1.24.0
 
+replace github.com/sst/opencode-sdk-go => ../sdk/go
+
 require (
 	github.com/BurntSushi/toml v1.5.0
 	github.com/alecthomas/chroma/v2 v2.18.0
@@ -10,6 +12,7 @@ require (
 	github.com/charmbracelet/glamour v0.10.0
 	github.com/charmbracelet/lipgloss/v2 v2.0.0-beta.3
 	github.com/charmbracelet/x/ansi v0.9.3
+	github.com/fsnotify/fsnotify v1.8.0
 	github.com/google/uuid v1.6.0
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6
@@ -33,7 +36,6 @@ require (
 	github.com/charmbracelet/x/input v0.3.7 // indirect
 	github.com/charmbracelet/x/windows v0.2.1 // indirect
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
-	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/getkin/kin-openapi v0.127.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
@@ -94,5 +96,3 @@ tool (
 	github.com/atombender/go-jsonschema
 	github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
 )
-
-replace github.com/sst/opencode-sdk-go => ./sdk

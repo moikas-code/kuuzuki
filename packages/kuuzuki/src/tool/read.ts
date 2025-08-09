@@ -68,6 +68,9 @@ export const ReadTool = Tool.define("read", {
     const isImage = isImageFile(filePath)
     if (isImage) throw new Error(`This is an image file of type: ${isImage}\nUse a different tool to process images`)
     
+    const isBinary = await isBinaryFile(file)
+    if (isBinary) throw new Error(`Cannot read binary file: ${filePath}`)
+    
     const fileContent = await file.text()
     const estimatedTokens = TokenUtils.estimateTokens(fileContent)
     
@@ -346,4 +349,15 @@ function isImageFile(filePath: string): string | false {
     default:
       return false
   }
+}
+
+async function isBinaryFile(file: Bun.BunFile): Promise<boolean> {
+  const buffer = await file.arrayBuffer()
+  const bytes = new Uint8Array(buffer.slice(0, 512)) // Check first 512 bytes
+
+  for (let i = 0; i < bytes.length; i++) {
+    if (bytes[i] === 0) return true // Null byte indicates binary
+  }
+
+  return false
 }

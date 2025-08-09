@@ -31,7 +31,7 @@ async function ensureInitialized() {
     fs.mkdir(Global.Path.state, { recursive: true }),
   ]);
 
-  const CACHE_VERSION = "4";
+  const CACHE_VERSION = "5";
 
   const version = await Bun.file(path.join(Global.Path.cache, "version"))
     .text()
