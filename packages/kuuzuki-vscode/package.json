@@ -85,7 +85,7 @@
   "devDependencies": {
     "@types/vscode": "^1.74.0",
     "@types/node": "20.x",
-    "esbuild": "^0.19.0",
+    "esbuild": "^0.25.8",
     "@vscode/vsce": "^2.24.0"
   }
 }
