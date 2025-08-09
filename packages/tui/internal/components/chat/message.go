@@ -182,7 +182,6 @@ func renderText(
 	showToolDetails bool,
 	width int,
 	extra string,
-	fileParts []opencode.FilePart,
 	toolCalls ...opencode.ToolPart,
 ) string {
 	t := theme.CurrentTheme()
@@ -198,28 +197,20 @@ func renderText(
 		ts = time.UnixMilli(int64(casted.Time.Created))
 		base := styles.NewStyle().Foreground(t.Text()).Background(backgroundColor)
 		text = ansi.WordwrapWc(text, width-6, " -")
-
-		var result strings.Builder
-		lastEnd := int64(0)
-
-		// Apply highlighting to filenames and base style to rest of text
-		for _, filePart := range fileParts {
-			highlight := base.Foreground(t.Secondary())
-			start, end := filePart.Source.Text.Start, filePart.Source.Text.End
-
-			if start > lastEnd {
-				result.WriteString(base.Render(text[lastEnd:start]))
+		lines := strings.Split(text, "\n")
+		for i, line := range lines {
+			words := strings.Fields(line)
+			for i, word := range words {
+				if strings.HasPrefix(word, "@") {
+					words[i] = base.Foreground(t.Secondary()).Render(word + " ")
+				} else {
+					words[i] = base.Render(word + " ")
+				}
 			}
-			result.WriteString(highlight.Render(text[start:end]))
-
-			lastEnd = end
+			lines[i] = strings.Join(words, "")
 		}
-
-		if lastEnd < int64(len(text)) {
-			result.WriteString(base.Render(text[lastEnd:]))
-		}
-
-		content = base.Width(width - 6).Render(result.String())
+		text = strings.Join(lines, "\n")
+		content = base.Width(width - 6).Render(text)
 	}
 
 	timestamp := ts.
