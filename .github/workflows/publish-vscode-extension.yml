@@ -1,0 +1,158 @@
+name: Publish Kuuzuki VS Code Extension
+
+on:
+  push:
+    tags:
+      - "kuuzuki-vscode-v*"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  publish-vscode-extension:
+    name: Build and Publish VS Code Extension
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: packages/kuuzuki-vscode
+        run: bun install
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#kuuzuki-vscode-v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Update package.json version
+        working-directory: packages/kuuzuki-vscode
+        run: |
+          # Update version in package.json
+          node -e "
+            const pkg = require('./package.json');
+            pkg.version = '${{ steps.version.outputs.version }}';
+            require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
+          "
+          echo "Updated package.json version to ${{ steps.version.outputs.version }}"
+
+      - name: Build extension
+        working-directory: packages/kuuzuki-vscode
+        run: |
+          npm run build
+          echo "✅ Extension built successfully"
+
+      - name: Install vsce globally
+        run: npm install -g @vscode/vsce
+
+      - name: Package extension
+        working-directory: packages/kuuzuki-vscode
+        run: |
+          vsce package --out kuuzuki-vscode-${{ steps.version.outputs.version }}.vsix
+          echo "✅ Extension packaged successfully"
+
+      - name: Publish to VS Code Marketplace
+        working-directory: packages/kuuzuki-vscode
+        env:
+          VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
+        run: |
+          if [ -n "$VSCE_PAT" ]; then
+            echo "Publishing to VS Code Marketplace..."
+            vsce publish --packagePath kuuzuki-vscode-${{ steps.version.outputs.version }}.vsix
+            echo "✅ Extension published to VS Code Marketplace"
+          else
+            echo "⚠️ VSCODE_MARKETPLACE_TOKEN not set, skipping marketplace publish"
+          fi
+
+      - name: Publish to Open VSX Registry
+        working-directory: packages/kuuzuki-vscode
+        env:
+          OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
+        run: |
+          if [ -n "$OVSX_PAT" ]; then
+            echo "Publishing to Open VSX Registry..."
+            npx ovsx publish kuuzuki-vscode-${{ steps.version.outputs.version }}.vsix --pat $OVSX_PAT
+            echo "✅ Extension published to Open VSX Registry"
+          else
+            echo "⚠️ OPEN_VSX_TOKEN not set, skipping Open VSX publish"
+          fi
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kuuzuki-vscode-${{ steps.version.outputs.version }}
+          path: packages/kuuzuki-vscode/kuuzuki-vscode-${{ steps.version.outputs.version }}.vsix
+          retention-days: 30
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          name: "Kuuzuki VS Code Extension ${{ steps.version.outputs.version }}"
+          body: |
+            ## 🎨 Kuuzuki VS Code Extension v${{ steps.version.outputs.version }}
+
+            ### Installation Options
+
+            #### From VS Code Marketplace
+            1. Open VS Code
+            2. Go to Extensions (Ctrl+Shift+X)
+            3. Search for "Kuuzuki"
+            4. Click Install
+
+            #### From VSIX File
+            1. Download the `.vsix` file from this release
+            2. Open VS Code
+            3. Go to Extensions (Ctrl+Shift+X)
+            4. Click the "..." menu → "Install from VSIX..."
+            5. Select the downloaded `.vsix` file
+
+            #### From Command Line
+            ```bash
+            code --install-extension kuuzuki.kuuzuki-vscode
+            ```
+
+            ### Features
+            - 🚀 Open Kuuzuki in integrated terminal
+            - 📁 Run Kuuzuki with current file context
+            - 🖥️ Start Kuuzuki server mode
+            - 🎯 Launch interactive TUI
+            - ⌨️ Keyboard shortcuts (Ctrl+Shift+K)
+            - 📋 Context menu integration
+            - 📊 Status bar integration
+
+            ### Requirements
+            - VS Code 1.74.0 or higher
+            - Kuuzuki CLI installed and available in PATH
+
+            ---
+            
+            **Marketplace**: https://marketplace.visualstudio.com/items?itemName=kuuzuki.kuuzuki-vscode
+            **Open VSX**: https://open-vsx.org/extension/kuuzuki/kuuzuki-vscode
+          files: |
+            packages/kuuzuki-vscode/kuuzuki-vscode-${{ steps.version.outputs.version }}.vsix
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify Discord
+        if: success()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          if [ -n "$DISCORD_WEBHOOK" ]; then
+            curl -H "Content-Type: application/json" \
+                 -d "{\"content\":\"🎨 **Kuuzuki VS Code Extension v${{ steps.version.outputs.version }}** published successfully!\\n\\n📦 **Install**: \`code --install-extension kuuzuki.kuuzuki-vscode\`\\n🔗 **Release**: https://github.com/moikas-code/kuuzuki/releases/tag/${{ github.ref_name }}\"}" \
+                 "$DISCORD_WEBHOOK"
+          fi

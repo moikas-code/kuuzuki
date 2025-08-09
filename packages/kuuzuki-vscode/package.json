@@ -2,7 +2,7 @@
   "name": "kuuzuki-vscode",
   "displayName": "Kuuzuki for VS Code",
   "description": "AI-powered coding assistant for VS Code",
-  "version": "0.1.28",
+  "version": "0.1.0",
   "publisher": "kuuzuki",
   "engines": {
     "vscode": "^1.74.0"
@@ -32,6 +32,44 @@
         "command": "kuuzuki.openInTerminal",
         "title": "Open Kuuzuki in Terminal",
         "category": "Kuuzuki"
+      },
+      {
+        "command": "kuuzuki.runWithFile",
+        "title": "Run with Current File",
+        "category": "Kuuzuki"
+      },
+      {
+        "command": "kuuzuki.startServer",
+        "title": "Start Kuuzuki Server",
+        "category": "Kuuzuki"
+      },
+      {
+        "command": "kuuzuki.openTUI",
+        "title": "Open Kuuzuki TUI",
+        "category": "Kuuzuki"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "kuuzuki.runWithFile",
+          "group": "kuuzuki",
+          "when": "editorHasSelection || editorTextFocus"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "kuuzuki.runWithFile",
+          "group": "kuuzuki",
+          "when": "resourceExtname =~ /\\.(js|ts|py|go|rs|md)$/"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "kuuzuki.openTUI",
+        "key": "ctrl+shift+k",
+        "mac": "cmd+shift+k"
       }
     ]
   },
@@ -40,11 +78,10 @@
     "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
     "watch": "npm run build -- --watch",
     "package": "vsce package",
-    "publish": "vsce publish"
+    "publish": "vsce publish",
+    "test": "node scripts/test-extension.js"
   },
-  "dependencies": {
-    "@moikas/kuuzuki-sdk": "^0.1.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/vscode": "^1.74.0",
     "@types/node": "20.x",

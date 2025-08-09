@@ -25,7 +25,7 @@
     },
     "packages/kuuzuki": {
       "name": "kuuzuki",
-      "version": "0.1.29",
+      "version": "0.1.31",
       "bin": {
         "kuuzuki": "./bin/kuuzuki.js",
       },
@@ -78,7 +78,7 @@
     },
     "packages/kuuzuki-plugin": {
       "name": "@kuuzuki/plugin",
-      "version": "0.1.29",
+      "version": "0.1.31",
       "dependencies": {
         "bun": "^1.1.29",
       },
@@ -100,9 +100,6 @@
     "packages/kuuzuki-vscode": {
       "name": "kuuzuki-vscode",
       "version": "0.1.28",
-      "dependencies": {
-        "@moikas/kuuzuki-sdk": "^0.1.0",
-      },
       "devDependencies": {
         "@types/node": "20.x",
         "@types/vscode": "^1.74.0",

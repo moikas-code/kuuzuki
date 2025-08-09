@@ -18,8 +18,8 @@ import {
 
 import PROMPT_INITIALIZE from "../session/prompt/initialize.txt";
 import { LegacyFiles } from "../config/legacy";
-import PROMPT_PLAN from "../session/prompt/plan.txt";
-import PROMPT_CHAT from "../session/prompt/chat.txt";
+// import PROMPT_PLAN from "../session/prompt/plan.txt";
+// import PROMPT_CHAT from "../session/prompt/chat.txt";
 
 import { App } from "../app/app";
 import { Bus } from "../bus";
@@ -962,6 +962,7 @@ export namespace Session {
         ];
       }),
     ).then((x) => x.flat());
+    /*
     if (inputMode === "plan")
       userParts.push({
         id: Identifier.ascending("part"),
@@ -971,6 +972,8 @@ export namespace Session {
         text: PROMPT_PLAN,
         synthetic: true,
       });
+      */
+    /*
     if (inputMode === "chat")
       userParts.push({
         id: Identifier.ascending("part"),
@@ -980,6 +983,7 @@ export namespace Session {
         text: PROMPT_CHAT,
         synthetic: true,
       });
+      */
 
     await updateMessage(userMsg);
     for (const part of userParts) {
