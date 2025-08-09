@@ -3,7 +3,7 @@ name: Publish Kuuzuki VS Code Extension
 on:
   push:
     tags:
-      - "kuuzuki-vscode-v*"
+      - "vscode-kuuzuki-v*"
 
 permissions:
   contents: write
