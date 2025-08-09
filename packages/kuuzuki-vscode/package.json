@@ -2,7 +2,7 @@
   "name": "kuuzuki-vscode",
   "displayName": "Kuuzuki for VS Code",
   "description": "AI-powered coding assistant for VS Code",
-  "version": "0.1.28",
+  "version": "0.1.0",
   "publisher": "kuuzuki",
   "engines": {
     "vscode": "^1.74.0"
@@ -78,7 +78,8 @@
     "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
     "watch": "npm run build -- --watch",
     "package": "vsce package",
-    "publish": "vsce publish"
+    "publish": "vsce publish",
+    "test": "node scripts/test-extension.js"
   },
   "dependencies": {},
   "devDependencies": {
