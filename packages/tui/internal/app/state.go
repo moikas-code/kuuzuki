@@ -22,25 +22,25 @@ type ModeModel struct {
 }
 
 type State struct {
-	Theme                string               `toml:"theme"`
-	ScrollSpeed          *int                 `toml:"scroll_speed"`
-	ModeModel            map[string]ModeModel `toml:"mode_model"`
-	Provider             string               `toml:"provider"`
-	Model                string               `toml:"model"`
-	Mode                 string               `toml:"mode"`
-	RecentlyUsedModels   []ModelUsage         `toml:"recently_used_models"`
-	MessagesRight        bool                 `toml:"messages_right"`
-	SplitDiff            bool                 `toml:"split_diff"`
-	MessageHistory       []Prompt             `toml:"message_history"`
+	Theme              string               `toml:"theme"`
+	ScrollSpeed        *int                 `toml:"scroll_speed"`
+	ModeModel          map[string]ModeModel `toml:"mode_model"`
+	Provider           string               `toml:"provider"`
+	Model              string               `toml:"model"`
+	Mode               string               `toml:"mode"`
+	RecentlyUsedModels []ModelUsage         `toml:"recently_used_models"`
+	MessagesRight      bool                 `toml:"messages_right"`
+	SplitDiff          bool                 `toml:"split_diff"`
+	MessageHistory     []Prompt             `toml:"message_history"`
 }
 
 func NewState() *State {
 	return &State{
-		Theme:                "kuuzuki",
-		Mode:                 "build",
-		ModeModel:            make(map[string]ModeModel),
-		RecentlyUsedModels:   make([]ModelUsage, 0),
-		MessageHistory:       make([]Prompt, 0),
+		Theme:              "kuuzuki",
+		Mode:               "build",
+		ModeModel:          make(map[string]ModeModel),
+		RecentlyUsedModels: make([]ModelUsage, 0),
+		MessageHistory:     make([]Prompt, 0),
 	}
 }
 
@@ -120,5 +120,13 @@ func LoadState(filePath string) (*State, error) {
 		}
 		return nil, fmt.Errorf("failed to decode TOML from file %s: %w", filePath, err)
 	}
+
+	// Restore attachment sources types that were deserialized as map[string]any
+	for _, prompt := range state.MessageHistory {
+		for _, att := range prompt.Attachments {
+			att.RestoreSourceType()
+		}
+	}
+
 	return &state, nil
 }
