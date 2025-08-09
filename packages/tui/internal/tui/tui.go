@@ -274,9 +274,15 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, util.CmdHandler(commands.ExecuteCommandMsg(inputClearCommand))
 		}
 
-		// 7. Handle interrupt key debounce for session interrupt
+		// 7. Handle interrupt command for session interrupt
 		interruptCommand := a.app.Commands[commands.SessionInterruptCommand]
 		if interruptCommand.Matches(msg, a.app.IsLeaderSequence) && a.app.IsBusy() {
+			// For ESC key, interrupt immediately without debounce for better UX
+			if msg.String() == "esc" {
+				return a, util.CmdHandler(commands.ExecuteCommandMsg(interruptCommand))
+			}
+
+			// Keep debounce for other interrupt keys (like ctrl+c)
 			switch a.interruptKeyState {
 			case InterruptKeyIdle:
 				// First interrupt key press - start debounce timer
@@ -315,8 +321,8 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// 9. Check again for commands that don't require leader (excluding interrupt when busy and exit when in debounce)
 		matches := a.app.Commands.Matches(msg, a.app.IsLeaderSequence)
 		if len(matches) > 0 {
-			// Skip interrupt key if we're in debounce mode and app is busy
-			if interruptCommand.Matches(msg, a.app.IsLeaderSequence) && a.app.IsBusy() && a.interruptKeyState != InterruptKeyIdle {
+			// Skip interrupt key if we're in debounce mode and app is busy (but not for ESC which interrupts immediately)
+			if interruptCommand.Matches(msg, a.app.IsLeaderSequence) && a.app.IsBusy() && a.interruptKeyState != InterruptKeyIdle && msg.String() != "esc" {
 				return a, nil
 			}
 			return a, util.CmdHandler(commands.ExecuteCommandsMsg(matches))
