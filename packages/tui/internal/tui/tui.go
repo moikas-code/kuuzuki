@@ -408,6 +408,9 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	case dialog.CompletionDialogCloseMsg:
 		a.showCompletionDialog = false
+	case chat.AttachmentInsertedMsg:
+		// Close completion dialog when the editor inserts an attachment
+		a.showCompletionDialog = false
 	case opencode.EventListResponseEventInstallationUpdated:
 		return a, toast.NewSuccessToast(
 			"kuuzuki updated to "+msg.Properties.Version+", restart to apply.",
