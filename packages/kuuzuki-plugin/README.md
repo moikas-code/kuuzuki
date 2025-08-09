@@ -5,7 +5,7 @@
 
 Plugin system for kuuzuki - AI-powered terminal assistant.
 
-**Version**: 0.1.31
+**Version**: 0.1.33
 
 ## What is this?
 

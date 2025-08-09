@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"log/slog"
 
@@ -517,6 +518,16 @@ func (a *App) Cancel(ctx context.Context, sessionID string) error {
 	if a.compactCancel != nil {
 		a.compactCancel()
 		a.compactCancel = nil
+	}
+
+	// Immediately mark the last message as completed to clear busy state
+	// This prevents the TUI from freezing while waiting for server response
+	if len(a.Messages) > 0 {
+		lastMessage := &a.Messages[len(a.Messages)-1]
+		if casted, ok := lastMessage.Info.(opencode.AssistantMessage); ok && casted.Time.Completed == 0 {
+			casted.Time.Completed = float64(time.Now().UnixMilli())
+			lastMessage.Info = casted
+		}
 	}
 
 	_, err := a.Client.Session.Abort(ctx, sessionID)
