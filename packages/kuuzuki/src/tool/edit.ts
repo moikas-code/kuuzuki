@@ -129,7 +129,8 @@ export const EditTool = Tool.define("edit", {
         continue;
       }
       output += `\n<project_diagnostics>\n${file}\n${issues
-        .filter((item) => item.severity === 1)
+        // Include warnings for ESLint diagnostics, errors only for others
+        .filter((item) => item.severity === 1 || (item.source === 'eslint' && item.severity === 2))
         .map(LSP.Diagnostic.pretty)
         .join("\n")}\n</project_diagnostics>\n`;
     }
