@@ -1126,7 +1126,28 @@ func (a Model) executeCommand(command commands.Command) (tea.Model, tea.Cmd) {
 		if a.app.Session.ID == "" {
 			return a, nil
 		}
-		a.app.Cancel(context.Background(), a.app.Session.ID)
+
+		// Immediately clear busy state for better UX - don't wait for server response
+		if len(a.app.Messages) > 0 {
+			lastMessage := &a.app.Messages[len(a.app.Messages)-1]
+			if casted, ok := lastMessage.Info.(opencode.AssistantMessage); ok && casted.Time.Completed == 0 {
+				casted.Time.Completed = float64(time.Now().UnixMilli())
+				lastMessage.Info = casted
+			}
+		}
+
+		// Cancel in background with timeout to prevent UI freeze
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			sessionID := a.app.Session.ID
+			_, err := a.app.Client.Session.Abort(ctx, sessionID)
+			if err != nil {
+				slog.Error("Failed to cancel session", "error", err, "session_id", sessionID)
+			}
+		}()
+
 		return a, nil
 	case commands.SessionCompactCommand:
 		if a.app.Session.ID == "" {
