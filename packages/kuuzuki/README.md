@@ -5,7 +5,7 @@
 
 AI coding agent for the terminal. A community fork of [OpenCode](https://github.com/sst/opencode) with reliability improvements.
 
-**Version**: 0.1.33
+**Version**: 0.1.34
 
 ## Philosophy
 
