@@ -3277,17 +3277,19 @@ export namespace Session {
     
     // AUTO-UNLOCK TIMEOUT: Prevent locks from being held forever during errors
     // This helps prevent "session is busy" errors from stuck locks
+    // Increased to 10 minutes to accommodate complex subagent operations and long-running tools
     const lockTimeout = setTimeout(() => {
       if (state().pending.has(sessionID)) {
         log.warn("auto-unlocking session due to timeout", {
           sessionID,
-          timeout: "5 minutes"
+          timeout: "10 minutes",
+          reason: "session_lock_timeout"
         });
         state().pending.delete(sessionID);
         controller.abort();
         Bus.publish(Event.Idle, { sessionID });
       }
-    }, 5 * 60 * 1000); // 5 minute timeout
+    }, 10 * 60 * 1000); // 10 minute timeout
 
     return {
       signal: controller.signal,

@@ -138,10 +138,31 @@ export namespace Permission {
     // If status is "ask", continue with normal permission flow
     pending[input.sessionID] = pending[input.sessionID] || {};
     return new Promise<void>((resolve, reject) => {
+      // Add 30-second timeout to prevent infinite hanging
+      const timeout = setTimeout(() => {
+        // Clean up pending request
+        if (pending[input.sessionID] && pending[input.sessionID][info.id]) {
+          delete pending[input.sessionID][info.id];
+          log.warn("Permission request timed out", {
+            sessionID: input.sessionID,
+            permissionID: info.id,
+            type: input.type,
+            timeout: "30 seconds"
+          });
+        }
+        reject(new Error(`Permission request timed out after 30 seconds: ${input.type} ${input.pattern || ""}`));
+      }, 30000);
+
       pending[input.sessionID][info.id] = {
         info,
-        resolve,
-        reject,
+        resolve: (value?: void) => {
+          clearTimeout(timeout);
+          resolve(value);
+        },
+        reject: (error?: any) => {
+          clearTimeout(timeout);
+          reject(error);
+        },
       };
       Bus.publish(Event.Updated, info);
       Bus.publish(Event.TuiUpdated, info);
@@ -178,15 +199,16 @@ export namespace Permission {
       approved[input.sessionID][approvalKey] = true;
 
       // Auto-approve any other pending requests with the same pattern/type
-      for (const item of Object.values(pending[input.sessionID])) {
+      // Collect items to approve first to avoid modifying collection during iteration
+      const itemsToApprove = Object.values(pending[input.sessionID]).filter(item => {
         const itemApprovalKey = item.info.pattern ?? item.info.type;
-        if (itemApprovalKey === approvalKey) {
-          respond({
-            sessionID: item.info.sessionID,
-            permissionID: item.info.id,
-            response: input.response,
-          });
-        }
+        return itemApprovalKey === approvalKey && item.info.id !== input.permissionID;
+      });
+      
+      // Approve collected items without recursion
+      for (const item of itemsToApprove) {
+        delete pending[input.sessionID][item.info.id];
+        item.resolve();
       }
     }
   }
@@ -270,5 +292,26 @@ export namespace Permission {
       toolIcon,
       shortDescription,
     };
+  }
+
+  // Cleanup function to cancel all pending permissions for a session
+  export function cancelPendingForSession(sessionID: string, reason = "Session ended") {
+    const { pending } = state();
+    const sessionPending = pending[sessionID];
+    if (!sessionPending) return;
+
+    log.info("Cancelling pending permissions for session", {
+      sessionID,
+      count: Object.keys(sessionPending).length,
+      reason
+    });
+
+    // Reject all pending permissions for this session
+    for (const item of Object.values(sessionPending)) {
+      item.reject(new Error(`Permission cancelled: ${reason}`));
+    }
+
+    // Clear the session's pending permissions
+    delete pending[sessionID];
   }
 }
