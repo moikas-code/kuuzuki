@@ -83,7 +83,7 @@ get_parity_stats() {
     echo ""
 }
 
-# Generate detailed analysis using fork-parity if available
+# Generate detailed analysis using kuuzuki with fork-parity MCP
 generate_detailed_analysis() {
     log_info "Generating detailed parity analysis..."
     
@@ -91,28 +91,36 @@ generate_detailed_analysis() {
     mkdir -p $REPORTS_DIR
     TIMESTAMP=$(date +"%Y-%m-%d_%H%M%S")
     
-    if command -v fork-parity-mcp &> /dev/null; then
-        log_info "Using fork-parity-mcp for detailed analysis..."
+    # Check if kuuzuki is available and can access fork-parity MCP
+    if command -v kuuzuki &> /dev/null; then
+        log_info "Using kuuzuki with fork-parity MCP for detailed analysis..."
         
-        # Generate comprehensive reports
-        fork-parity-mcp status --format json > "$REPORTS_DIR/manual_status_$TIMESTAMP.json" 2>/dev/null || log_warning "Status command failed"
-        fork-parity-mcp dashboard --format markdown > "$REPORTS_DIR/manual_dashboard_$TIMESTAMP.md" 2>/dev/null || log_warning "Dashboard command failed"
-        fork-parity-mcp actionable --limit 20 > "$REPORTS_DIR/manual_actionable_$TIMESTAMP.json" 2>/dev/null || log_warning "Actionable command failed"
+        # Generate comprehensive reports using kuuzuki
+        echo "Getting detailed parity status..." > "$REPORTS_DIR/manual_status_$TIMESTAMP.json"
+        kuuzuki run --prompt "Use fork-parity_fork_parity_get_detailed_status to get comprehensive parity analysis and save the JSON output" > "$REPORTS_DIR/manual_status_$TIMESTAMP.json" 2>/dev/null || log_warning "Status command failed"
+        
+        echo "Generating parity dashboard..." > "$REPORTS_DIR/manual_dashboard_$TIMESTAMP.md"
+        kuuzuki run --prompt "Use fork-parity_fork_parity_generate_dashboard with format=markdown to create a comprehensive dashboard" > "$REPORTS_DIR/manual_dashboard_$TIMESTAMP.md" 2>/dev/null || log_warning "Dashboard command failed"
+        
+        echo "Getting actionable items..." > "$REPORTS_DIR/manual_actionable_$TIMESTAMP.json"
+        kuuzuki run --prompt "Use fork-parity_fork_parity_get_actionable_items with limit=20 to get prioritized action items" > "$REPORTS_DIR/manual_actionable_$TIMESTAMP.json" 2>/dev/null || log_warning "Actionable command failed"
         
         log_success "Detailed reports generated in $REPORTS_DIR/"
         
-        # Show summary from generated report
-        if [ -f "$REPORTS_DIR/manual_status_$TIMESTAMP.json" ]; then
-            echo "=== DETAILED ANALYSIS SUMMARY ==="
-            if command -v jq &> /dev/null; then
-                jq -r '.summary | "Total commits: \(.total_commits // "unknown")\nCritical: \(.critical_count // 0)\nHigh priority: \(.high_count // 0)\nPending: \(.pending_count // 0)"' "$REPORTS_DIR/manual_status_$TIMESTAMP.json"
-            else
-                log_warning "jq not available, cannot parse JSON summary"
-            fi
-            echo ""
-        fi
+        # Show basic summary
+        echo "=== DETAILED ANALYSIS SUMMARY ==="
+        echo "Reports generated at: $TIMESTAMP"
+        echo "- Status report: $REPORTS_DIR/manual_status_$TIMESTAMP.json"
+        echo "- Dashboard: $REPORTS_DIR/manual_dashboard_$TIMESTAMP.md"
+        echo "- Actionable items: $REPORTS_DIR/manual_actionable_$TIMESTAMP.json"
+        echo ""
+        echo "Key findings:"
+        echo "- Commits behind upstream: $COMMITS_BEHIND"
+        echo "- Commits ahead of upstream: $COMMITS_AHEAD"
+        echo "- Check generated reports for detailed analysis"
+        echo ""
     else
-        log_warning "fork-parity-mcp not available, using basic git analysis"
+        log_warning "kuuzuki not available, using basic git analysis"
         
         # Generate basic analysis
         cat > "$REPORTS_DIR/manual_basic_$TIMESTAMP.md" << EOF
@@ -131,13 +139,13 @@ $RECENT_UPSTREAM
 
 ## Recommendations
 1. Review recent upstream commits for critical changes
-2. Install fork-parity-mcp for detailed analysis
+2. Install kuuzuki for detailed MCP-based analysis
 3. Check knowledge base for existing parity documentation
 4. Consider selective integration of important features
 
 ## Next Steps
-- Run \`kb_read active/opencode-parity-status.md\` for current status
-- Use \`fork-parity-mcp\` for detailed commit analysis
+- Run \`kuuzuki run --prompt "Use kb_read to check active/opencode-parity-status.md"\` for current status
+- Use kuuzuki with fork-parity MCP for detailed commit analysis
 - Update integration status after reviewing changes
 EOF
         
@@ -149,8 +157,8 @@ EOF
 update_knowledge_base() {
     log_info "Updating knowledge base..."
     
-    # Check if kb command is available
-    if command -v kb &> /dev/null; then
+    # Check if kuuzuki command is available for KB access
+    if command -v kuuzuki &> /dev/null; then
         # Update automated status
         cat > "kb/active/manual-parity-check.md" << EOF
 # Manual Parity Check - $(date +"%Y-%m-%d %H:%M")
@@ -182,8 +190,11 @@ $RECENT_UPSTREAM
 EOF
         
         log_success "Knowledge base updated: kb/active/manual-parity-check.md"
+        
+        # Also update via kuuzuki MCP if possible
+        kuuzuki run --prompt "Use kb_update to save this parity check report to active/manual-parity-check.md: $(cat kb/active/manual-parity-check.md)" 2>/dev/null || log_warning "Could not update via kuuzuki MCP"
     else
-        log_warning "kb command not available, skipping knowledge base update"
+        log_warning "kuuzuki command not available, skipping knowledge base update"
     fi
 }
 
@@ -210,8 +221,8 @@ show_recommendations() {
     echo ""
     echo "Next steps:"
     echo "1. Review generated reports in $REPORTS_DIR/"
-    echo "2. Check knowledge base: kb_read active/opencode-parity-status.md"
-    echo "3. Use fork-parity-mcp for detailed analysis"
+    echo "2. Check knowledge base: kuuzuki run --prompt \"Use kb_read to check active/opencode-parity-status.md\""
+    echo "3. Use kuuzuki with fork-parity MCP for detailed analysis"
     echo "4. Update integration status after review"
     echo ""
 }
