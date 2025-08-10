@@ -7,6 +7,7 @@ import { Log } from "./util/log";
 import { AuthCommand } from "./cli/cmd/auth";
 import { BillingCommand } from "./cli/cmd/billing";
 import { ApiKeyCommand } from "./cli/cmd/apikey";
+import { MigrationCommand } from "./cli/cmd/migration";
 import { AgentCommand } from "./cli/cmd/agent";
 import { UpgradeCommand } from "./cli/cmd/upgrade";
 import { ModelsCommand } from "./cli/cmd/models";
@@ -21,9 +22,23 @@ import { McpCommand } from "./cli/cmd/mcp";
 import { GithubCommand } from "./cli/cmd/github";
 import { BugfindCommand } from "./cli/cmd/bugfind";
 import { ensureInitialized } from "./global";
+import { AuthMigration } from "./auth/migration";
 
 // Initialize global paths before any other initialization
 await ensureInitialized();
+
+// Check for auth migration on startup (silent check)
+try {
+  if (await AuthMigration.needsMigration()) {
+    // Silent migration attempt - don't block startup if it fails
+    await AuthMigration.migrate().catch(() => {
+      // Migration failed silently - user can run manual migration later
+    });
+  }
+} catch {
+  // Migration check failed silently - continue with startup
+}
+
 // await Trace.init(); // Removed - trace module not implemented yet
 
 const cancel = new AbortController();
@@ -78,6 +93,7 @@ const cli = yargs(hideBin(process.argv))
   .command(AuthCommand)
   .command(BillingCommand)
   .command(ApiKeyCommand)
+  .command(MigrationCommand)
   .command(AgentCommand)
   .command(UpgradeCommand)
   .command(ServeCommand)

@@ -36,9 +36,7 @@
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "bun": "^1.1.29"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "^22.13.9",
     "typescript": "^5.8.2"

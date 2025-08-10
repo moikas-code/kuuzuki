@@ -3,7 +3,6 @@ name: Publish Kuuzuki to NPM
 on:
   push:
     tags:
-      - "v*"
       - "kuuzuki-v*"
 
 permissions:
