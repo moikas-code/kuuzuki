@@ -4,9 +4,46 @@ import { Bus } from "../bus";
 import { Log } from "../util/log";
 import { Identifier } from "../id/id";
 import { Plugin } from "../plugin";
+import { Wildcard } from "../util/wildcard";
+import { NamedError } from "../util/error";
 
 export namespace Permission {
   const log = Log.create({ service: "permission" });
+
+  // Agent-level permission configuration schema
+  export const AgentPermissionConfig = z.object({
+    edit: z.enum(["ask", "allow", "deny"]).optional(),
+    bash: z.union([
+      z.enum(["ask", "allow", "deny"]),
+      z.record(z.string(), z.enum(["ask", "allow", "deny"]))
+    ]).optional(),
+    webfetch: z.enum(["ask", "allow", "deny"]).optional(),
+    write: z.enum(["ask", "allow", "deny"]).optional(),
+    read: z.enum(["ask", "allow", "deny"]).optional(),
+    tools: z.record(z.string(), z.enum(["ask", "allow", "deny"])).optional(),
+  });
+  export type AgentPermissionConfig = z.infer<typeof AgentPermissionConfig>;
+
+  // Enhanced permission configuration supporting agent-level permissions
+  export const PermissionConfig = z.union([
+    // Simple array format (kuuzuki style)
+    z.array(z.string()),
+    // Object format with optional agent-level permissions
+    z.object({
+      edit: z.enum(["ask", "allow", "deny"]).optional(),
+      bash: z.union([
+        z.enum(["ask", "allow", "deny"]),
+        z.record(z.string(), z.enum(["ask", "allow", "deny"]))
+      ]).optional(),
+      webfetch: z.enum(["ask", "allow", "deny"]).optional(),
+      write: z.enum(["ask", "allow", "deny"]).optional(),
+      read: z.enum(["ask", "allow", "deny"]).optional(),
+      tools: z.record(z.string(), z.enum(["ask", "allow", "deny"])).optional(),
+      // Agent-specific permissions override global settings
+      agents: z.record(z.string(), AgentPermissionConfig).optional(),
+    })
+  ]);
+  export type PermissionConfig = z.infer<typeof PermissionConfig>;
 
   export const Info = z
     .object({
@@ -16,6 +53,7 @@ export namespace Permission {
       sessionID: z.string(),
       messageID: z.string(),
       callID: z.string().optional(),
+      agentName: z.string().optional(),
       title: z.string(),
       metadata: z.record(z.any()),
       time: z.object({
@@ -65,11 +103,202 @@ export namespace Permission {
     },
   );
 
+  // Environment variable permission configuration with validation
+  export function getEnvironmentPermissions(): PermissionConfig | null {
+    const envPermissions = process.env.OPENCODE_PERMISSION;
+    if (!envPermissions) return null;
+    
+    try {
+      const parsed = JSON.parse(envPermissions);
+      const result = PermissionConfig.safeParse(parsed);
+      if (result.success) {
+        log.info("Successfully loaded permissions from OPENCODE_PERMISSION environment variable", {
+          type: Array.isArray(result.data) ? "array" : "object",
+          hasAgentPermissions: typeof result.data === "object" && !Array.isArray(result.data) && result.data.agents ? true : false
+        });
+        return result.data;
+      } else {
+        log.error("Invalid OPENCODE_PERMISSION format, ignoring", { 
+          error: result.error.issues,
+          rawValue: envPermissions.substring(0, 100) + (envPermissions.length > 100 ? "..." : "")
+        });
+        return null;
+      }
+    } catch (error) {
+      log.error("Failed to parse OPENCODE_PERMISSION environment variable as JSON", { 
+        error: error instanceof Error ? error.message : String(error),
+        rawValue: envPermissions.substring(0, 100) + (envPermissions.length > 100 ? "..." : "")
+      });
+      return null;
+    }
+  }
+
+  // Enhanced permission checking with priority system: Environment > Config > Defaults
+  export function checkPermission(input: {
+    type: string;
+    pattern?: string;
+    agentName?: string;
+    config?: any;
+  }): "ask" | "allow" | "deny" {
+    const { type, pattern, agentName, config } = input;
+    
+    // Priority 1: Environment permissions (highest priority)
+    const envPermissions = getEnvironmentPermissions();
+    if (envPermissions) {
+      const envResult = evaluatePermissions(envPermissions, type, pattern, agentName);
+      if (envResult !== null) {
+        log.debug("Permission resolved by environment variable", {
+          type,
+          pattern,
+          agentName,
+          result: envResult,
+          source: "OPENCODE_PERMISSION"
+        });
+        return envResult;
+      }
+    }
+    
+    // Priority 2: Config file permissions
+    const configPermissions = config?.permission;
+    if (configPermissions) {
+      const configResult = evaluatePermissions(configPermissions, type, pattern, agentName);
+      if (configResult !== null) {
+        log.debug("Permission resolved by configuration", {
+          type,
+          pattern,
+          agentName,
+          result: configResult,
+          source: "config"
+        });
+        return configResult;
+      }
+    }
+    
+    // Priority 3: Default behavior (allow)
+    log.debug("Permission resolved by default policy", {
+      type,
+      pattern,
+      agentName,
+      result: "allow",
+      source: "default"
+    });
+    return "allow";
+  }
+
+  // Evaluate permissions against a permission configuration
+  function evaluatePermissions(
+    permissions: PermissionConfig,
+    type: string,
+    pattern?: string,
+    agentName?: string
+  ): "ask" | "allow" | "deny" | null {
+    // Handle array format (kuuzuki style)
+    if (Array.isArray(permissions)) {
+      if (pattern && Wildcard.matchAny(permissions, pattern)) {
+        return "ask";
+      }
+      return "allow";
+    }
+    
+    // Handle object format with potential agent-level permissions
+    if (typeof permissions === "object") {
+      // Check agent-specific permissions first
+      if (agentName && permissions.agents?.[agentName]) {
+        const agentPerms = permissions.agents[agentName];
+        const agentResult = checkToolPermission(type, pattern, agentPerms);
+        if (agentResult !== null) return agentResult;
+        
+        // Check agent-specific tool name patterns
+        const agentToolResult = checkToolNamePermission(type, agentPerms.tools);
+        if (agentToolResult !== null) return agentToolResult;
+      }
+      
+      // Check global tool name patterns with enhanced wildcard matching
+      const globalToolResult = checkToolNamePermission(type, permissions.tools);
+      if (globalToolResult !== null) return globalToolResult;
+      
+      // Fall back to global permissions
+      return checkToolPermission(type, pattern, permissions);
+    }
+    
+    return null; // No applicable permissions found
+  }
+
+  // Helper function to check tool name pattern permissions with enhanced wildcard matching
+  function checkToolNamePermission(
+    toolName: string,
+    toolPatterns: Record<string, "ask" | "allow" | "deny"> | undefined
+  ): "ask" | "allow" | "deny" | null {
+    if (!toolPatterns) return null;
+    
+    // Use enhanced wildcard matching with priority system
+    const patterns = Object.keys(toolPatterns);
+    const matchResult = Wildcard.matchToolNameWithResult(toolName, patterns);
+    
+    if (matchResult) {
+      const action = toolPatterns[matchResult.pattern];
+      log.info("Tool name pattern matched with priority", {
+        toolName,
+        matchedPattern: matchResult.pattern,
+        priority: matchResult.priority,
+        specificity: matchResult.specificity,
+        action
+      });
+      return action;
+    }
+    
+    return null;
+  }
+
+  // Helper function to check tool-specific permissions with enhanced pattern matching
+  function checkToolPermission(
+    type: string, 
+    pattern: string | undefined, 
+    permissions: any
+  ): "ask" | "allow" | "deny" | null {
+    const toolPerms = permissions[type];
+    if (!toolPerms) return null;
+    
+    if (typeof toolPerms === "string") {
+      // Validate that the string is a valid permission action
+      if (toolPerms === "ask" || toolPerms === "allow" || toolPerms === "deny") {
+        return toolPerms;
+      }
+      // Return null for invalid values to fall back to default behavior
+      return null;
+    }
+    
+    // Handle pattern-based permissions (mainly for bash)
+    if (typeof toolPerms === "object" && pattern) {
+      // Use enhanced wildcard matching with priority
+      const patterns = Object.keys(toolPerms);
+      const matchResult = Wildcard.matchCommand(pattern, patterns);
+      
+      if (matchResult) {
+        const action = toolPerms[matchResult.pattern];
+        log.info("Pattern matched with priority", {
+          pattern,
+          matchedPattern: matchResult.pattern,
+          priority: matchResult.priority,
+          specificity: matchResult.specificity,
+          action
+        });
+        return action as "ask" | "allow" | "deny";
+      }
+      
+      // If no pattern matched, default to ask for security
+      return "ask";
+    }
+    
+    return null;
+  }
+
   export async function ask(input: {
     type: Info["type"];
     title: Info["title"];
     pattern?: Info["pattern"];
     callID?: Info["callID"];
+    agentName?: Info["agentName"];
     sessionID: Info["sessionID"];
     messageID: Info["messageID"];
     metadata: Info["metadata"];
@@ -82,6 +311,7 @@ export namespace Permission {
       toolCallID: input.callID,
       type: input.type,
       pattern: input.pattern,
+      agentName: input.agentName,
     });
 
     // Check if this pattern/type was previously approved
@@ -91,8 +321,42 @@ export namespace Permission {
         sessionID: input.sessionID,
         type: input.type,
         pattern: input.pattern,
+        agentName: input.agentName,
       });
       return;
+    }
+
+    // Check permissions using priority system (environment > config > defaults)
+    const config = await import("../config/config").then(m => m.Config.get());
+    const permissionResult = checkPermission({
+      type: input.type,
+      pattern: input.pattern,
+      agentName: input.agentName,
+      config,
+    });
+
+    // Handle automatic allow/deny based on permission configuration
+    if (permissionResult === "allow") {
+      log.info("automatically allowed by permission configuration", {
+        sessionID: input.sessionID,
+        type: input.type,
+        pattern: input.pattern,
+        agentName: input.agentName,
+      });
+      // Mark as approved for future use
+      approved[input.sessionID] = approved[input.sessionID] || {};
+      approved[input.sessionID][approvalKey] = true;
+      return;
+    } else if (permissionResult === "deny") {
+      log.info("automatically denied by permission configuration", {
+        sessionID: input.sessionID,
+        type: input.type,
+        pattern: input.pattern,
+        agentName: input.agentName,
+      });
+      throw new Error(
+        `Permission denied by configuration: ${input.type} ${input.pattern || ""}`,
+      );
     }
 
     const info: Info = {
@@ -102,6 +366,7 @@ export namespace Permission {
       sessionID: input.sessionID,
       messageID: input.messageID,
       callID: input.callID,
+      agentName: input.agentName,
       title: input.title,
       metadata: input.metadata,
       time: {
@@ -222,6 +487,25 @@ export namespace Permission {
       super(`The user rejected permission to use this functionality`);
     }
   }
+
+  // Error classes for permission configuration issues
+  export const PermissionConfigError = NamedError.create(
+    "PermissionConfigError",
+    z.object({
+      source: z.enum(["environment", "config", "validation"]),
+      message: z.string(),
+      rawValue: z.string().optional(),
+    }),
+  );
+
+  export const PermissionValidationError = NamedError.create(
+    "PermissionValidationError",
+    z.object({
+      issues: z.array(z.any()),
+      source: z.string(),
+      rawValue: z.string().optional(),
+    }),
+  );
 
   // TUI-specific helper functions
   export function getPendingForSession(sessionID: string): Info[] {

@@ -43,6 +43,7 @@ export interface PartProps {
 
 export function Part(props: PartProps) {
   const [copied, setCopied] = createSignal(false)
+  const [thinkingExpanded, setThinkingExpanded] = createSignal(false)
   const id = createMemo(() => props.message.id + "-" + props.index)
 
   return (
@@ -116,6 +117,9 @@ export function Part(props: PartProps) {
               <Match when={props.part.type === "tool" && props.part.tool === "task"}>
                 <IconRobot width={18} height={18} />
               </Match>
+              <Match when={props.part.type === "thinking"}>
+                <IconSparkles width={18} height={18} />
+              </Match>
               <Match when={true}>
                 <IconSparkles width={18} height={18} />
               </Match>
@@ -147,6 +151,24 @@ export function Part(props: PartProps) {
                 {DateTime.fromMillis(props.message.time.completed).toLocaleString(DateTime.DATETIME_MED)}
               </Footer>
             )}
+          </div>
+        )}
+        {props.message.role === "assistant" && props.part.type === "thinking" && (
+          <div data-component="thinking-block">
+            <div data-component="thinking-header">
+              <span data-slot="icon">🤔</span>
+              <span data-slot="title">Thinking</span>
+              <button type="button" data-slot="toggle" onClick={() => setThinkingExpanded(!thinkingExpanded())}>
+                <Show when={thinkingExpanded()} fallback={<IconChevronRight width={16} height={16} />}>
+                  <IconChevronDown width={16} height={16} />
+                </Show>
+              </button>
+            </div>
+            <Show when={thinkingExpanded()}>
+              <div data-component="thinking-content">
+                <ContentMarkdown expand={props.last} text={props.part.text} />
+              </div>
+            </Show>
           </div>
         )}
         {props.message.role === "user" && props.part.type === "file" && (

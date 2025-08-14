@@ -142,7 +142,15 @@ export const AgentrcSchema = z.object({
   /**
    * Development rules and guidelines
    */
-  rules: z.array(z.string()).optional().describe("Development rules and guidelines"),
+  rules: z.union([
+    z.array(z.string()).describe("Simple array of rules"),
+    z.object({
+      critical: z.array(z.any()).optional(),
+      preferred: z.array(z.any()).optional(),
+      contextual: z.array(z.any()).optional(),
+      deprecated: z.array(z.any()).optional(),
+    }).catchall(z.any()).describe("Structured rules object")
+  ]).optional().describe("Development rules and guidelines"),
 
   /**
    * Dependencies and integrations
@@ -223,7 +231,7 @@ export const AgentrcSchema = z.object({
 
 
   /**
-   * AI agent specific settings
+   * AI agent specific settings and individual agent definitions
    */
   agent: z
     .object({
@@ -232,9 +240,22 @@ export const AgentrcSchema = z.object({
       maxFileSize: z.number().optional().describe("Maximum file size to read (in bytes)"),
       ignorePatterns: z.array(z.string()).optional().describe("File patterns to ignore"),
       contextFiles: z.array(z.string()).optional().describe("Important context files to always consider"),
+      taskExecution: z.string().optional().describe("Task execution strategy"),
+      securityLevel: z.string().optional().describe("Security level for operations"),
+      privacyMode: z.boolean().optional().describe("Enable privacy mode"),
+      contextPreservation: z.boolean().optional().describe("Enable context preservation"),
     })
+    .catchall(
+      z.object({
+        description: z.string().describe("Agent description"),
+        prompt: z.string().describe("Agent system prompt"),
+        model: z.string().optional().describe("Specific model for this agent"),
+        tools: z.record(z.boolean()).describe("Tool availability for this agent"),
+        disable: z.boolean().optional().describe("Disable this agent"),
+      })
+    )
     .optional()
-    .describe("AI agent configuration"),
+    .describe("AI agent configuration and individual agent definitions"),
 
   /**
    * Metadata about this configuration file
@@ -329,12 +350,18 @@ export function agentrcToPrompt(config: AgentrcConfig): string {
   }
 
   // Rules
-  if (config.rules && config.rules.length > 0) {
-    sections.push("## Development Rules")
-    config.rules.forEach((rule) => {
-      sections.push(`- ${rule}`)
-    })
-    sections.push("")
+  if (config.rules) {
+    if (Array.isArray(config.rules) && config.rules.length > 0) {
+      sections.push("## Development Rules")
+      config.rules.forEach((rule: string) => {
+        sections.push(`- ${rule}`)
+      })
+      sections.push("")
+    } else if (typeof config.rules === 'object') {
+      sections.push("## Development Rules")
+      sections.push("See structured rules configuration")
+      sections.push("")
+    }
   }
 
   // Paths
@@ -461,9 +488,14 @@ export function mergeAgentrcConfigs(...configs: Partial<AgentrcConfig>[]): Agent
 
     // Merge rules (concatenate and deduplicate)
     if (config.rules) {
-      const existingRules = merged.rules || []
-      const newRules = config.rules.filter((rule) => !existingRules.includes(rule))
-      merged.rules = [...existingRules, ...newRules]
+      if (Array.isArray(config.rules)) {
+        const existingRules = Array.isArray(merged.rules) ? merged.rules : []
+        const newRules = config.rules.filter((rule: string) => !existingRules.includes(rule))
+        merged.rules = [...existingRules, ...newRules]
+      } else {
+        // If it's an object, just merge it
+        merged.rules = config.rules
+      }
     }
 
     // Merge dependencies

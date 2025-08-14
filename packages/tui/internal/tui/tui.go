@@ -370,12 +370,24 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.focusSupported = true
 		a.editor.SetFocusState(a.hasFocus, a.focusSupported)
 		slog.Debug("TUI gained focus - drag-and-drop enabled")
+
+		// Enhanced focus management - ensure editor gets focus when TUI gains focus
+		if a.modal == nil && a.activeConfirmation == nil && a.activeToolApproval == nil && a.activeTextInput == nil {
+			updated, cmd := a.editor.Focus()
+			a.editor = updated.(chat.EditorComponent)
+			return a, cmd
+		}
 		return a, nil
 	case tea.BlurMsg:
 		a.hasFocus = false
 		a.focusSupported = true
 		a.editor.SetFocusState(a.hasFocus, a.focusSupported)
 		slog.Debug("TUI lost focus - drag-and-drop disabled")
+
+		// Enhanced blur management - save any pending input
+		if a.editor.Value() != "" {
+			// Auto-save draft functionality could be added here
+		}
 		return a, nil
 	case modal.CloseModalMsg:
 		a.editor.Focus()
@@ -401,6 +413,16 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.showCompletionDialog = false
 		a.app, cmd = a.app.SendPrompt(context.Background(), msg)
 		cmds = append(cmds, cmd)
+	case app.ExecuteShellCommand:
+		a.showCompletionDialog = false
+		// Execute shell command asynchronously
+		cmds = append(cmds, func() tea.Msg {
+			_, err := a.app.ExecuteShellCommand(context.Background(), msg.SessionID, msg.Command)
+			if err != nil {
+				return toast.NewErrorToast(fmt.Sprintf("Shell command failed: %v", err))
+			}
+			return nil
+		})
 	case app.SetEditorContentMsg:
 		// Set the editor content without sending
 		a.editor.SetValueWithAttachments(msg.Text)
@@ -1037,6 +1059,14 @@ func (a Model) executeCommand(command commands.Command) (tea.Model, tea.Cmd) {
 		updated, cmd := a.app.SwitchAgentReverse()
 		a.app = updated
 		cmds = append(cmds, cmd)
+	case commands.AgentListCommand:
+		// Skip modal creation during active chat to prevent overlay corruption
+		if a.hasActiveChat() {
+			slog.Warn("Attempted to create agent list modal during active chat")
+			return a, nil
+		}
+		agentDialog := dialog.NewAgentsDialog(a.app)
+		a.modal = agentDialog
 	case commands.EditorOpenCommand:
 		if a.app.IsBusy() {
 			// status.Warn("Agent is working, please wait...")

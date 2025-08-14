@@ -1560,6 +1560,7 @@ export namespace Session {
             abort: abortSignal.signal,
             messageID: assistantMsg.id,
             toolCallID: options.toolCallId,
+            extra: { bypassCwdCheck: true },
             metadata: async (val) => {
               const match = processor.partFromToolCall(options.toolCallId);
               if (match && match.state.status === "running") {
@@ -4116,6 +4117,119 @@ export namespace Session {
       samples: learning.samples.length,
       improvement: Math.round((1 - Math.abs(1 - 2.2/learning.currentRatio)) * 100) + "%"
     });
+  }
+
+  export const ShellInput = z.object({
+    sessionID: z.string(),
+    command: z.string(),
+  });
+  export type ShellInput = z.infer<typeof ShellInput>;
+
+  export async function shell(input: ShellInput) {
+    using abort = lock(input.sessionID);
+    const msg: MessageV2.Assistant = {
+      id: Identifier.ascending("message"),
+      sessionID: input.sessionID,
+      role: "assistant",
+      time: {
+        created: Date.now(),
+      },
+    };
+
+    await create(msg);
+
+    const part: MessageV2.ToolPart = {
+      id: Identifier.ascending("part"),
+      messageID: msg.id,
+      sessionID: input.sessionID,
+      type: "tool",
+      callID: Identifier.ascending("call"),
+      tool: "shell",
+      state: {
+        status: "running",
+        input: {
+          command: input.command,
+        },
+        metadata: {},
+        time: {
+          start: Date.now(),
+        },
+      },
+    };
+
+    await updatePart(part);
+
+
+    const app = App.info();
+    
+    // Import spawn dynamically to avoid issues
+    const { spawn } = await import("child_process");
+    
+    const script = `
+     [[ -f ~/.zshrc ]] && source ~/.zshrc >/dev/null 2>&1 || true
+     [[ -f ~/.bashrc ]] && source ~/.bashrc >/dev/null 2>&1 || true
+     eval "${input.command}"
+   `;
+    
+    const shell = process.env["SHELL"] ?? "bash"
+    const isFish = shell.includes("fish")
+    const args = isFish
+      ? ["-c", script] // fish with just -c
+      : ["-c", "-l", script]
+
+    const proc = spawn(shell, args, {
+      cwd: app.path.cwd,
+      signal: abort.signal,
+      env: {
+        ...process.env,
+        TERM: "dumb",
+      },
+    });
+
+    let output = "";
+
+    proc.stdout?.on("data", (chunk) => {
+      output += chunk.toString();
+      if (part.state.status === "running") {
+        part.state.metadata = {
+          output,
+        };
+        updatePart(part);
+      }
+    });
+
+    proc.stderr?.on("data", (chunk) => {
+      output += chunk.toString();
+      if (part.state.status === "running") {
+        part.state.metadata = {
+          output,
+        };
+        updatePart(part);
+      }
+    });
+
+    await new Promise<void>((resolve) => {
+      proc.on("close", (code) => {
+        part.state = {
+          status: "completed",
+          input: {
+            command: input.command,
+          },
+          output,
+          metadata: {
+            exitCode: code,
+          },
+          time: {
+            start: part.state.time!.start,
+            end: Date.now(),
+          },
+        };
+        updatePart(part);
+        resolve();
+      });
+    });
+
+    return msg;
   }
 
   export async function initialize(input: {

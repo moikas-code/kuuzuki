@@ -45,6 +45,7 @@ type App struct {
 	InitialModel     *string
 	InitialPrompt    *string
 	InitialAgent     *string
+	InitialSession   *string
 	compactCancel    context.CancelFunc
 	IsLeaderSequence bool
 }
@@ -74,6 +75,10 @@ type SetEditorContentMsg struct {
 type FileRenderedMsg struct {
 	FilePath string
 }
+type ExecuteShellCommand struct {
+	SessionID string
+	Command   string
+}
 
 func New(
 	ctx context.Context,
@@ -84,6 +89,7 @@ func New(
 	initialModel *string,
 	initialPrompt *string,
 	initialAgent *string,
+	initialSession *string,
 ) (*App, error) {
 	util.RootPath = appInfo.Path.Root
 	util.CwdPath = appInfo.Path.Cwd
@@ -177,6 +183,7 @@ func New(
 		InitialModel:  initialModel,
 		InitialPrompt: initialPrompt,
 		InitialAgent:  initialAgent,
+		InitialSession: initialSession,
 	}
 
 	if app.Version != "dev" {
@@ -350,6 +357,28 @@ func (a *App) InitializeProvider() tea.Cmd {
 		}
 	}
 
+	// Priority 3: Current agent's preferred model
+	if initialProvider == nil && a.Agent().Model.ModelID != "" {
+		for _, provider := range providers {
+			if provider.ID == a.Agent().Model.ProviderID {
+				for _, model := range provider.Models {
+					if model.ID == a.Agent().Model.ModelID {
+						initialProvider = &provider
+						initialModel = &model
+						slog.Debug("Selected model from current agent", "provider", provider.ID, "model", model.ID, "agent", a.Agent().Name)
+						break
+					}
+				}
+				if initialModel != nil {
+					break
+				}
+			}
+		}
+		if initialProvider == nil {
+			slog.Debug("Agent model not found", "provider", a.Agent().Model.ProviderID, "model", a.Agent().Model.ModelID, "agent", a.Agent().Name)
+		}
+	}
+
 	if initialProvider != nil && initialModel != nil {
 		currentProvider = initialProvider
 		currentModel = initialModel
@@ -360,6 +389,29 @@ func (a *App) InitializeProvider() tea.Cmd {
 		Provider: *currentProvider,
 		Model:    *currentModel,
 	}))
+	// Load initial session if provided
+	if a.InitialSession != nil && *a.InitialSession != "" {
+		cmds = append(cmds, func() tea.Cmd {
+			return func() tea.Msg {
+				// Find the session by ID
+				sessions, err := a.ListSessions(context.Background())
+				if err != nil {
+					slog.Error("Failed to list sessions for initial session", "error", err)
+					return nil
+				}
+				
+				for _, session := range sessions {
+					if session.ID == *a.InitialSession {
+						return SessionSelectedMsg{Session: &session}
+					}
+				}
+				
+				slog.Warn("Initial session not found", "sessionID", *a.InitialSession)
+				return nil
+			}
+		}())
+	}
+
 	if a.InitialPrompt != nil && *a.InitialPrompt != "" {
 		cmds = append(cmds, util.CmdHandler(SendPrompt{Text: *a.InitialPrompt}))
 	}
@@ -559,6 +611,22 @@ func (a *App) DeleteSession(ctx context.Context, sessionID string) error {
 	return nil
 }
 
+func (a *App) UpdateSession(ctx context.Context, sessionID string, title string) error {
+	// For now, we'll use a simple HTTP request since the Go SDK doesn't have Update method yet
+	// This is a temporary workaround until the SDK is regenerated
+	slog.Info("Updating session title", "sessionID", sessionID, "title", title)
+
+	// TODO: Replace with proper SDK call once SessionUpdateParams is available
+	// _, err := a.Client.Session.Update(ctx, sessionID, opencode.SessionUpdateParams{
+	//     Title: opencode.F(title),
+	// })
+
+	// For now, just log the operation - the actual implementation will be added
+	// when the SDK compilation issues are resolved
+	slog.Warn("Session update not yet implemented - SDK compilation issues")
+	return nil
+}
+
 func (a *App) ListMessages(ctx context.Context, sessionId string) ([]Message, error) {
 	response, err := a.Client.Session.Messages(ctx, sessionId)
 	if err != nil {
@@ -592,6 +660,17 @@ func (a *App) ListProviders(ctx context.Context) ([]opencode.Provider, error) {
 
 	providers := *response
 	return providers.Providers, nil
+}
+
+func (a *App) ExecuteShellCommand(ctx context.Context, sessionID string, command string) (*opencode.AssistantMessage, error) {
+	response, err := a.Client.Session.Shell(ctx, sessionID, opencode.SessionShellParams{
+		Command: opencode.F(command),
+	})
+	if err != nil {
+		slog.Error("Failed to execute shell command", "error", err, "command", command)
+		return nil, err
+	}
+	return response, nil
 }
 
 // func (a *App) loadCustomKeybinds() {

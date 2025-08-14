@@ -2,6 +2,8 @@ import { z } from "zod"
 import { Tool } from "./tool"
 import TurndownService from "turndown"
 import DESCRIPTION from "./webfetch.txt"
+import { Config } from "../config/config"
+import { Permission } from "../permission"
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
 const DEFAULT_TIMEOUT = 30 * 1000 // 30 seconds
@@ -25,6 +27,40 @@ export const WebFetchTool = Tool.define("webfetch", {
     // Validate URL
     if (!params.url.startsWith("http://") && !params.url.startsWith("https://")) {
       throw new Error("URL must start with http:// or https://")
+    }
+
+    // Check permissions using enhanced agent-aware system
+    const config = await Config.get()
+    const agentName = ctx.extra?.agentName as string | undefined;
+    const permissionResult = Permission.checkPermission({
+      type: "webfetch",
+      pattern: params.url,
+      agentName,
+      config,
+    });
+
+    // Handle permission result
+    if (permissionResult === "deny") {
+      throw new Error(`Web fetch denied by permission configuration: ${params.url}`);
+    }
+
+    const needsPermission = permissionResult === "ask";
+
+    if (needsPermission) {
+      await Permission.ask({
+        type: "webfetch",
+        pattern: params.url,
+        agentName: ctx.extra?.agentName as string | undefined,
+        sessionID: ctx.sessionID,
+        messageID: ctx.messageID,
+        callID: ctx.toolCallID,
+        title: "Fetch content from: " + params.url,
+        metadata: {
+          url: params.url,
+          format: params.format,
+          timeout: params.timeout,
+        },
+      })
     }
 
     const timeout = Math.min((params.timeout ?? DEFAULT_TIMEOUT / 1000) * 1000, MAX_TIMEOUT)

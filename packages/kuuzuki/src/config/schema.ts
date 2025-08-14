@@ -32,6 +32,11 @@ export namespace ConfigSchema {
     // Feature flags
     KUUZUKI_SUBSCRIPTION_REQUIRED: "subscriptionRequired",
     KUUZUKI_DISABLED_PROVIDERS: "disabled_providers",
+
+    // OpenCode compatibility environment variables
+    OPENCODE: "opencode",
+    OPENCODE_DISABLE_AUTOUPDATE: "disableAutoupdate",
+    OPENCODE_PERMISSION: "permission",
   } as const;
 
   // Default configuration values
@@ -611,12 +616,22 @@ export namespace ConfigSchema {
         .boolean()
         .default(DEFAULTS.autoupdate)
         .describe("Automatically update to the latest version"),
-      disableSnapshots: z
-        .boolean()
-        .default(false)
-        .describe("Disable snapshot functionality for file operations"),
+       disableSnapshots: z
+         .boolean()
+         .default(false)
+         .describe("Disable snapshot functionality for file operations"),
+       disableAutoupdate: z
+         .boolean()
+         .default(false)
+         .describe("Disable automatic updates (OpenCode compatibility)"),
 
-      // API Configuration
+       // OpenCode Compatibility
+       opencode: z
+         .string()
+         .optional()
+         .describe("OpenCode environment variable for configuration path compatibility"),
+
+       // API Configuration
       apiUrl: z
         .string()
         .url()
@@ -670,39 +685,94 @@ export namespace ConfigSchema {
         "Experimental features and configurations",
       ),
 
-      // Permission Configuration - Hybrid format supporting both kuuzuki and OpenCode styles
+      // Permission Configuration - Enhanced format supporting agent-level permissions
       permission: z
         .union([
           // kuuzuki simple array format (easier for users)
           z
             .array(z.string())
             .describe("Simple array of command patterns requiring permission"),
-          // OpenCode object format (full compatibility)
+          // Enhanced object format with agent-level support
           z
             .object({
               edit: z
-                .enum(["ask", "allow"])
+                .enum(["ask", "allow", "deny"])
                 .optional()
                 .describe("Permission for file editing operations"),
-              bash: z
+               bash: z
                 .union([
                   z
-                    .enum(["ask", "allow"])
+                    .enum(["ask", "allow", "deny"])
                     .describe("Global bash permission setting"),
                   z
-                    .record(z.string(), z.enum(["ask", "allow"]))
-                    .describe("Pattern-based bash permissions"),
+                    .record(z.string(), z.enum(["ask", "allow", "deny"]))
+                    .describe("Pattern-based bash permissions with priority matching"),
                 ])
                 .optional()
-                .describe("Permission for bash command execution"),
+                .describe("Permission for bash command execution with enhanced wildcard support"),              webfetch: z
+                .enum(["ask", "allow", "deny"])
+                .optional()
+                .describe("Permission for web content fetching operations"),
+              write: z
+                .enum(["ask", "allow", "deny"])
+                .optional()
+                .describe("Permission for file writing operations"),
+               read: z
+                .enum(["ask", "allow", "deny"])
+                .optional()
+                .describe("Permission for file reading operations"),
+              // Tool name pattern matching for configuration
+              tools: z
+                .record(z.string(), z.enum(["ask", "allow", "deny"]))
+                .optional()
+                .describe("Tool name pattern-based permissions (e.g., '*' for all tools, 'bash*' for bash-like tools)"),
+              // Advanced pattern configuration
+              patterns: z
+                .object({
+                  priority: z
+                    .enum(["specificity", "order", "length"])
+                    .default("specificity")
+                    .optional()
+                    .describe("Pattern matching priority algorithm"),
+                  caseSensitive: z
+                    .boolean()
+                    .default(false)
+                    .optional()
+                    .describe("Enable case-sensitive pattern matching"),
+                  implicitWildcard: z
+                    .boolean()
+                    .default(true)
+                    .optional()
+                    .describe("Add implicit wildcards to command patterns (OpenCode compatibility)"),
+                })
+                .optional()
+                .describe("Advanced pattern matching configuration"),
+              // Agent-specific permissions override global settings
+              agents: z
+                .record(
+                  z.string(),
+                  z.object({
+                    edit: z.enum(["ask", "allow", "deny"]).optional(),
+                    bash: z.union([
+                      z.enum(["ask", "allow", "deny"]),
+                      z.record(z.string(), z.enum(["ask", "allow", "deny"]))
+                    ]).optional(),
+                    webfetch: z.enum(["ask", "allow", "deny"]).optional(),
+                    write: z.enum(["ask", "allow", "deny"]).optional(),
+                    read: z.enum(["ask", "allow", "deny"]).optional(),
+                    tools: z.record(z.string(), z.enum(["ask", "allow", "deny"])).optional(),
+                  })
+                )
+                .optional()
+                .describe("Agent-specific permission overrides with tool pattern support"),
             })
             .describe(
-              "OpenCode-compatible object format with tool-specific permissions",
+              "Enhanced object format with tool-specific, agent-level permissions, and advanced pattern matching",
             ),
         ])
         .optional()
         .describe(
-          "Permission configuration supporting both simple array format ['git *', 'rm -rf *'] and OpenCode object format { bash: { 'git push': 'ask', '*': 'allow' }, edit: 'ask' }",
+          "Permission configuration supporting simple array format, OpenCode compatibility, agent-level permissions, and advanced wildcard pattern matching. Environment variable OPENCODE_PERMISSION can override this setting.",
         ),
 
       // Plugin Configuration
@@ -791,14 +861,25 @@ export namespace ConfigSchema {
     return Config.parse({});
   }
 
-  // Environment variable parsing
+  // Environment variable parsing with enhanced permission support
   export function parseEnvironmentVariables(): Partial<ConfigInput> {
     const config: any = {};
 
     for (const [envVar, configPath] of Object.entries(ENV_MAPPINGS)) {
       const value = process.env[envVar];
       if (value !== undefined) {
-        setNestedValue(config, configPath, parseEnvValue(value));
+        // Special handling for OPENCODE_PERMISSION
+        if (envVar === "OPENCODE_PERMISSION") {
+          try {
+            const parsed = JSON.parse(value);
+            setNestedValue(config, configPath, parsed);
+          } catch (error) {
+            console.warn(`Invalid JSON in OPENCODE_PERMISSION environment variable: ${error}`);
+            continue;
+          }
+        } else {
+          setNestedValue(config, configPath, parseEnvValue(value));
+        }
       }
     }
 

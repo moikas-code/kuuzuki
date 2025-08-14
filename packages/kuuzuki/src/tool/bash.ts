@@ -11,7 +11,9 @@ import { Filesystem } from "../util/filesystem";
 import { Parser } from "../util/parser";
 import { Log } from "../util/log";
 
-const MAX_OUTPUT_LENGTH = 30000;
+const MAX_OUTPUT_LINES = 1000;
+const MAX_OUTPUT_LENGTH = 30000; // Keep for maxBuffer compatibility
+const MAX_OUTPUT_CHARS = 30000; // Character-based truncation limit
 const DEFAULT_TIMEOUT = 1 * 60 * 1000;
 const MAX_TIMEOUT = 10 * 60 * 1000;
 
@@ -87,69 +89,28 @@ export const BashTool = Tool.define("bash", {
       }
     }
 
-    // Check permissions using hybrid approach
-    let needsPermission = false;
+    // Check permissions using enhanced agent-aware system
+    const agentName = ctx.extra?.agentName as string | undefined;
+    const permissionResult = Permission.checkPermission({
+      type: "bash",
+      pattern: params.command,
+      agentName,
+      config,
+    });
 
-    if (config.permission) {
-      if (Array.isArray(config.permission)) {
-        // kuuzuki simple array format
-        needsPermission = Wildcard.matchAny(config.permission, params.command);
-      } else if (
-        typeof config.permission === "object" &&
-        config.permission.bash
-      ) {
-        // OpenCode object format
-        const bashPerms = config.permission.bash;
-
-        if (typeof bashPerms === "string") {
-          // Global bash permission setting
-          needsPermission = bashPerms === "ask";
-        } else {
-          // Pattern-based bash permissions
-          needsPermission = false; // Default to allow
-
-          // Check each command part against patterns
-          for (const parts of commandParts) {
-            if (parts.length === 0) continue;
-
-            const commandText = parts.join(" ");
-
-            // Always allow cd if it passes filesystem check
-            if (parts[0] === "cd") continue;
-
-            // Check patterns in order
-            let matched = false;
-            for (const [pattern, action] of Object.entries(bashPerms)) {
-              if (Wildcard.matchOpenCode(commandText, pattern)) {
-                log.info("checking", {
-                  text: commandText.trim(),
-                  pattern,
-                  match: true,
-                  action,
-                });
-                needsPermission = action === "ask";
-                matched = true;
-                break;
-              }
-            }
-
-            // If no pattern matched, default to ask
-            if (!matched) {
-              needsPermission = true;
-            }
-
-            // If any command needs permission, we need to ask
-            if (needsPermission) break;
-          }
-        }
-      }
+    // Handle permission result
+    if (permissionResult === "deny") {
+      throw new Error(`Bash execution denied by permission configuration: ${params.command}`);
     }
+
+    const needsPermission = permissionResult === "ask";
 
     // Ask for permission if needed
     if (needsPermission) {
       await Permission.ask({
         type: "bash",
         pattern: params.command.split(" ").slice(0, 2).join(" ").trim(),
+        agentName: ctx.extra?.agentName as string | undefined,
         sessionID: ctx.sessionID,
         messageID: ctx.messageID,
         callID: ctx.toolCallID,
@@ -169,19 +130,210 @@ export const BashTool = Tool.define("bash", {
       timeout,
     });
     
-    const stdoutPromise = text(process.stdout!);
-    const stderrPromise = text(process.stderr!);
+    // Progressive output streaming with enhanced real-time indicators
+    let stdoutLines: string[] = [];
+    let stderrLines: string[] = [];
+    let stdoutBuffer = "";
+    let stderrBuffer = "";
+    let stdoutTruncated = false;
+    let stderrTruncated = false;
+    let stdoutCharCount = 0;
+    let stderrCharCount = 0;
+    let startTime = Date.now();
+    let lastUpdateTime = Date.now();
+    let totalBytesReceived = 0;
+    
+    // Enhanced streaming indicators
+    const getStreamingIndicator = (elapsed: number): string => {
+      const dots = "●".repeat((Math.floor(elapsed / 500) % 3) + 1);
+      return `${dots} Streaming...`;
+    };
+    
+    const updateProgress = () => {
+      const elapsed = Date.now() - startTime;
+      const timeSinceLastUpdate = Date.now() - lastUpdateTime;
+      
+      // Update metadata progressively for real-time display
+      ctx.metadata({
+        title: `${params.command} ${getStreamingIndicator(elapsed)}`,
+        metadata: {
+          stdout: stdoutLines.join("\n") + (stdoutBuffer ? "\n" + stdoutBuffer : ""),
+          stderr: stderrLines.join("\n") + (stderrBuffer ? "\n" + stderrBuffer : ""),
+          description: params.description,
+          streaming: true,
+          streamingIndicator: getStreamingIndicator(elapsed),
+          progress: {
+            stdoutLines: stdoutLines.length,
+            stderrLines: stderrLines.length,
+            truncated: { stdout: stdoutTruncated, stderr: stderrTruncated },
+            elapsed: Math.round(elapsed / 1000),
+            bytesReceived: totalBytesReceived,
+            lastUpdate: new Date().toISOString(),
+          },
+          performance: {
+            startTime,
+            elapsed,
+            timeSinceLastUpdate,
+            avgBytesPerSecond: totalBytesReceived > 0 ? Math.round(totalBytesReceived / (elapsed / 1000)) : 0,
+          },
+        },
+      });
+      lastUpdateTime = Date.now();
+    };
+    
+    // Stream stdout with enhanced progress tracking
+    process.stdout?.on("data", (chunk: Buffer) => {
+      if (stdoutTruncated) return;
+      
+      const chunkSize = chunk.length;
+      totalBytesReceived += chunkSize;
+      
+      stdoutBuffer += chunk.toString();
+      const lines = stdoutBuffer.split("\n");
+      stdoutBuffer = lines.pop() || ""; // Keep incomplete line in buffer
+      
+      for (const line of lines) {
+        if (stdoutLines.length >= MAX_OUTPUT_LINES || stdoutCharCount + line.length > MAX_OUTPUT_CHARS) {
+          stdoutTruncated = true;
+          break;
+        }
+        stdoutLines.push(line);
+        stdoutCharCount += line.length + 1; // +1 for newline
+      }
+      
+      updateProgress();
+    });
+    
+    // Stream stderr with enhanced progress tracking
+    process.stderr?.on("data", (chunk: Buffer) => {
+      if (stderrTruncated) return;
+      
+      const chunkSize = chunk.length;
+      totalBytesReceived += chunkSize;
+      
+      stderrBuffer += chunk.toString();
+      const lines = stderrBuffer.split("\n");
+      stderrBuffer = lines.pop() || ""; // Keep incomplete line in buffer
+      
+      for (const line of lines) {
+        if (stderrLines.length >= MAX_OUTPUT_LINES || stderrCharCount + line.length > MAX_OUTPUT_CHARS) {
+          stderrTruncated = true;
+          break;
+        }
+        stderrLines.push(line);
+        stderrCharCount += line.length + 1; // +1 for newline
+      }
+      
+      updateProgress();
+    });
+    
+    // Periodic progress updates for long-running commands
+    const progressInterval = setInterval(() => {
+      if (process.exitCode === null) {
+        updateProgress();
+      }
+    }, 1000);
+    
+    // Handle process errors
+    process.on("error", (error) => {
+      clearInterval(progressInterval);
+      log.error("Process error during bash execution", {
+        command: params.command,
+        error: error.message,
+        sessionID: ctx.sessionID,
+      });
+      
+      ctx.metadata({
+        title: `${params.command} [ERROR]`,
+        metadata: {
+          stdout: stdoutLines.join("\n"),
+          stderr: stderrLines.join("\n") + `\nProcess Error: ${error.message}`,
+          description: params.description,
+          streaming: false,
+          error: true,
+          errorMessage: error.message,
+        },
+      });
+    });
+    
+    // Handle abort signal
+    ctx.abort.addEventListener("abort", () => {
+      clearInterval(progressInterval);
+      if (process.pid) {
+        try {
+          process.kill("SIGTERM");
+          setTimeout(() => {
+            if (process.exitCode === null) {
+              process.kill("SIGKILL");
+            }
+          }, 5000); // Give 5 seconds for graceful shutdown
+        } catch (error) {
+          log.warn("Failed to kill process on abort", { error });
+        }
+      }
+    });
     
     let exitCode: number | null = null;
     await new Promise<void>((resolve) => {
       process.on("close", (code) => {
         exitCode = code;
+        clearInterval(progressInterval);
+        
+        // Add any remaining buffer content
+        if (stdoutBuffer && !stdoutTruncated && stdoutLines.length < MAX_OUTPUT_LINES) {
+          stdoutLines.push(stdoutBuffer);
+        }
+        if (stderrBuffer && !stderrTruncated && stderrLines.length < MAX_OUTPUT_LINES) {
+          stderrLines.push(stderrBuffer);
+        }
+        
+        // Final progress update
+        const totalElapsed = Date.now() - startTime;
+        ctx.metadata({
+          title: params.command,
+          metadata: {
+            stdout: stdoutLines.join("\n"),
+            stderr: stderrLines.join("\n"),
+            description: params.description,
+            streaming: false,
+            completed: true,
+            progress: {
+              stdoutLines: stdoutLines.length,
+              stderrLines: stderrLines.length,
+              truncated: { stdout: stdoutTruncated, stderr: stderrTruncated },
+              elapsed: Math.round(totalElapsed / 1000),
+              bytesReceived: totalBytesReceived,
+              completedAt: new Date().toISOString(),
+            },
+            performance: {
+              startTime,
+              totalElapsed,
+              avgBytesPerSecond: totalBytesReceived > 0 ? Math.round(totalBytesReceived / (totalElapsed / 1000)) : 0,
+            },
+          },
+        });
+        
         resolve();
       });
     });
     
-    const stdout = await stdoutPromise;
-    const stderr = await stderrPromise;
+    // Prepare final output with truncation messages
+    let stdout = stdoutLines.join("\n");
+    let stderr = stderrLines.join("\n");
+    
+    if (stdoutTruncated) {
+      const reason = stdoutLines.length >= MAX_OUTPUT_LINES ? 
+        `${MAX_OUTPUT_LINES} lines` : 
+        `${MAX_OUTPUT_CHARS} characters`;
+      stdout += `\n\n[Output truncated after ${reason}. Use pagination or filtering to see more.]`;
+    }
+    
+    if (stderrTruncated) {
+      const reason = stderrLines.length >= MAX_OUTPUT_LINES ? 
+        `${MAX_OUTPUT_LINES} lines` : 
+        `${MAX_OUTPUT_CHARS} characters`;
+      stderr += `\n\n[Error output truncated after ${reason}. Use pagination or filtering to see more.]`;
+    }
 
     return {
       title: params.command,
@@ -190,6 +342,11 @@ export const BashTool = Tool.define("bash", {
         stdout,
         exit: exitCode,
         description: params.description,
+        truncated: stdoutTruncated || stderrTruncated,
+        lines: {
+          stdout: stdoutLines.length,
+          stderr: stderrLines.length,
+        },
       },
       output: [
         `<stdout>`,

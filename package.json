@@ -1,6 +1,6 @@
 {
   "name": "kuuzuki-monorepo",
-  "version": "0.1.29",
+  "version": "0.2.0",
   "catalog": {
     "@types/node": "22.13.9",
     "@tsconfig/node22": "22.0.2",

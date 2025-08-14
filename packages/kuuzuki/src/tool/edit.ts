@@ -45,26 +45,27 @@ export const EditTool = Tool.define("edit", {
       ? params.filePath
       : path.join(app.path.cwd, params.filePath);
 
-    // Check permissions using hybrid config format
+    // Check permissions using enhanced agent-aware system
     const config = await Config.get();
-    let needsPermission = false;
+    const agentName = ctx.extra?.agentName as string | undefined;
+    const permissionResult = Permission.checkPermission({
+      type: "edit",
+      pattern: params.filePath,
+      agentName,
+      config,
+    });
 
-    if (config.permission) {
-      if (Array.isArray(config.permission)) {
-        // kuuzuki simple array format - edit operations not typically covered by command patterns
-        needsPermission = false;
-      } else if (
-        typeof config.permission === "object" &&
-        config.permission.edit
-      ) {
-        // OpenCode object format with edit permissions
-        needsPermission = config.permission.edit === "ask";
-      }
+    // Handle permission result
+    if (permissionResult === "deny") {
+      throw new Error(`File editing denied by permission configuration: ${params.filePath}`);
     }
+
+    const needsPermission = permissionResult === "ask";
 
     if (needsPermission) {
       await Permission.ask({
         type: "edit",
+        agentName: ctx.extra?.agentName as string | undefined,
         sessionID: ctx.sessionID,
         messageID: ctx.messageID,
         callID: ctx.toolCallID,

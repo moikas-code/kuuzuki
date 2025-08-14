@@ -73,6 +73,53 @@ export const prettier: Info = {
   },
 }
 
+
+export const biome: Info = {
+  name: "biome",
+  command: [BunProc.which(), "x", "@biomejs/biome", "format", "--write", "$FILE"],
+  environment: {
+    BUN_BE_BUN: "1",
+  },
+  extensions: [
+    ".js",
+    ".jsx",
+    ".mjs",
+    ".cjs",
+    ".ts",
+    ".tsx",
+    ".mts",
+    ".cts",
+    ".html",
+    ".htm",
+    ".css",
+    ".scss",
+    ".sass",
+    ".less",
+    ".vue",
+    ".svelte",
+    ".json",
+    ".jsonc",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".xml",
+    ".md",
+    ".mdx",
+    ".graphql",
+    ".gql",
+  ],
+  async enabled() {
+    const app = App.info()
+    const configs = ["biome.json", "biome.jsonc"]
+    for (const config of configs) {
+      const found = await Filesystem.findUp(config, app.path.cwd, app.path.root)
+      if (found.length > 0) {
+        return true
+      }
+    }
+    return false
+  },
+}
 export const zig: Info = {
   name: "zig",
   command: ["zig", "fmt", "$FILE"],

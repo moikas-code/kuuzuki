@@ -147,9 +147,26 @@ export namespace MCP {
     for (const [clientName, client] of Object.entries(await clients())) {
       for (const [toolName, tool] of Object.entries(await client.tools())) {
         const sanitizedClientName = clientName.replace(/\s+/g, "_");
-        result[sanitizedClientName + "_" + toolName] = tool;
+        const sanitizedToolName = toolName.replace(/[-\s]+/g, "_");
+        const fullToolName = `${sanitizedClientName}_${sanitizedToolName}`;
+        result[fullToolName] = tool;
       }
     }
     return result;
+  }
+
+  /**
+   * Sanitize tool names for consistency and compatibility
+   * - Replace spaces and special characters with underscores
+   * - Convert to lowercase for consistency
+   * - Remove consecutive underscores
+   * - Ensure valid identifier format
+   */
+  function sanitizeToolName(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, "_") // Replace non-alphanumeric chars with underscore
+      .replace(/_+/g, "_") // Replace consecutive underscores with single
+      .replace(/^_|_$/g, ""); // Remove leading/trailing underscores
   }
 }

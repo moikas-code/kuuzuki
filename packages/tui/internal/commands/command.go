@@ -108,6 +108,7 @@ const (
 	AppHelpCommand              CommandName = "app_help"
 	SwitchAgentCommand          CommandName = "switch_mode"
 	SwitchModeReverseCommand    CommandName = "switch_mode_reverse"
+	AgentListCommand            CommandName = "agent_list"
 	EditorOpenCommand           CommandName = "editor_open"
 	SessionNewCommand           CommandName = "session_new"
 	SessionListCommand          CommandName = "session_list"
@@ -187,6 +188,12 @@ func LoadFromConfig(config *opencode.Config) CommandRegistry {
 			Keybindings: parseBindings("shift+tab"),
 		},
 		{
+			Name:        AgentListCommand,
+			Description: "list agents",
+			Keybindings: parseBindings("<leader>a"),
+			Trigger:     []string{"agents"},
+		},
+		{
 			Name:        EditorOpenCommand,
 			Description: "open editor",
 			Keybindings: parseBindings("<leader>e"),
@@ -242,7 +249,7 @@ func LoadFromConfig(config *opencode.Config) CommandRegistry {
 		{
 			Name:        ModelListCommand,
 			Description: "list models",
-			Keybindings: parseBindings("<leader>m"),
+			Keybindings: parseBindings("<leader>m", "f2"),
 			Trigger:     []string{"models"},
 		},
 		{

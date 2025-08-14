@@ -12,6 +12,8 @@ import { Bus } from "../../bus";
 import { Log } from "../../util/log";
 import { FileWatcher } from "../../file/watch";
 import { Mode } from "../../session/mode";
+import { Session } from "../../session";
+import { Flag } from "../../flag/flag";
 
 // Global process tracking for cleanup
 const activeProcesses = new Set<any>();
@@ -40,7 +42,7 @@ function spawnAsync(command: string, args: string[], options: any = {}) {
 
       proc.on("exit", (code) => {
         resolve({
-          exited: code,
+          exitCode: code,
           stdout: stdout,
           stderr: stderr,
         });
@@ -94,6 +96,19 @@ export const TuiCommand = cmd({
         type: "boolean",
         describe: "Enable verbose logging",
         default: false,
+      })
+      .option("continue", {
+        describe: "continue the last session",
+        type: "boolean",
+      })
+      .option("command", {
+        type: "string",
+        describe: "command to run after starting TUI",
+      })
+      .option("session", {
+        alias: ["s"],
+        type: "string",
+        describe: "session ID to resume",
       }),
   handler: async (args) => {
     // Enable debug logging if requested
@@ -110,6 +125,19 @@ export const TuiCommand = cmd({
         return;
       }
       const result = await bootstrap({ cwd }, async (app) => {
+        const sessionID = await (async () => {
+          if (args.continue) {
+            const list = Session.list()
+            const first = await list.next()
+            await list.return()
+            if (first.done) return
+            return first.value?.id
+          }
+          if (args.session) {
+            return args.session
+          }
+          return undefined
+        })()
         FileWatcher.init();
         const providers = await Provider.list();
         if (Object.keys(providers).length === 0) {
@@ -338,6 +366,8 @@ export const TuiCommand = cmd({
               ...(args.model ? ["--model", args.model] : []),
               ...(args.prompt ? ["--prompt", args.prompt] : []),
               ...(args.mode ? ["--mode", args.mode] : []),
+              ...(args.command ? ["--command", args.command] : []),
+              ...(sessionID ? ["--session", sessionID] : []),
             ]);
 
           proc = spawn(cmd[0], tuiArgs, {
@@ -430,6 +460,8 @@ export const TuiCommand = cmd({
           if (Installation.isSnapshot()) return;
           const config = await Config.global();
           if (config.autoupdate === false) return;
+          if (config.disableAutoupdate === true) return;
+          if (Flag.isAutoupdateDisabled()) return;
           const latest = await Installation.latest().catch(() => {});
           if (!latest) return;
           if (Installation.VERSION === latest) return;

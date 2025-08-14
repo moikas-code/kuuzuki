@@ -90,16 +90,26 @@ func (tm *ToastManager) Update(msg tea.Msg) (*ToastManager, tea.Cmd) {
 func (tm *ToastManager) renderSingleToast(toast Toast) string {
 	t := theme.CurrentTheme()
 
+	// Enhanced styling with better visual hierarchy
 	baseStyle := styles.NewStyle().
 		Foreground(t.Text()).
 		Background(t.BackgroundElement()).
-		Padding(1, 2)
+		Padding(1, 2).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(toast.Color)
 
 	maxWidth := max(40, layout.Current.Viewport.Width/3)
 	contentMaxWidth := max(maxWidth-6, 20)
 
-	// Build content with wrapping
+	// Build content with enhanced formatting
 	var content strings.Builder
+
+	// Add icon based on toast type
+	icon := getToastIcon(toast.Color, &t)
+	if icon != "" {
+		content.WriteString(icon + " ")
+	}
+
 	if toast.Title != nil {
 		titleStyle := styles.NewStyle().Foreground(toast.Color).
 			Bold(true)
@@ -107,16 +117,39 @@ func (tm *ToastManager) renderSingleToast(toast Toast) string {
 		content.WriteString("\n")
 	}
 
-	// Wrap message text
-	messageStyle := styles.NewStyle()
+	// Wrap message text with better formatting
+	messageStyle := styles.NewStyle().
+		Foreground(t.Text())
 	contentWidth := lipgloss.Width(toast.Message)
 	if contentWidth > contentMaxWidth {
 		messageStyle = messageStyle.Width(contentMaxWidth)
 	}
 	content.WriteString(messageStyle.Render(toast.Message))
 
-	// Render toast with max width
+	// Render toast with max width and enhanced styling
 	return baseStyle.MaxWidth(maxWidth).Render(content.String())
+}
+
+// getToastIcon returns appropriate icon based on toast color/type
+func getToastIcon(color compat.AdaptiveColor, t *theme.Theme) string {
+	// Since we can't directly compare AdaptiveColor values,
+	// we'll use a simple approach based on common color patterns
+	colorStr := fmt.Sprintf("%v", color)
+
+	// Check for common error color patterns
+	if strings.Contains(strings.ToLower(colorStr), "red") {
+		return "❌"
+	}
+	if strings.Contains(strings.ToLower(colorStr), "orange") || strings.Contains(strings.ToLower(colorStr), "yellow") {
+		return "⚠️"
+	}
+	if strings.Contains(strings.ToLower(colorStr), "green") {
+		return "✅"
+	}
+	if strings.Contains(strings.ToLower(colorStr), "blue") {
+		return "ℹ️"
+	}
+	return "📢"
 }
 
 // View renders all active toasts

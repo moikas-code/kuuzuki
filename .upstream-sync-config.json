@@ -1,0 +1,40 @@
+{
+  "upstreamRemote": "upstream",
+  "upstreamBranch": "dev",
+  "localBranch": "master",
+  "pollInterval": 30,
+  "autoMergeThreshold": 0.75,
+  "dryRun": false,
+  "notifyOnChanges": true,
+  "maxChangesPerRun": 5,
+  "excludePatterns": [
+    "*.md",
+    "docs/**",
+    "*.lock",
+    "package-lock.json",
+    ".github/workflows/**",
+    "README*",
+    "CHANGELOG*",
+    "LICENSE*"
+  ],
+  "includePatterns": [
+    "src/**/*.ts",
+    "src/**/*.js",
+    "packages/**/*.ts",
+    "packages/**/*.js",
+    "*.sh",
+    "*.bash",
+    "*.fish",
+    "*.zsh",
+    "scripts/**/*",
+    "bin/**/*",
+    "*.json",
+    "*.yaml",
+    "*.yml",
+    "*.toml",
+    "Dockerfile*",
+    "docker-compose*",
+    ".github/**/*.yml",
+    ".github/**/*.yaml"
+  ]
+}

@@ -24,11 +24,13 @@ type SessionDialog interface {
 	layout.Modal
 }
 
-// sessionItem is a custom list item for sessions that can show delete confirmation
+// sessionItem is a custom list item for sessions that can show delete confirmation and rename
 type sessionItem struct {
 	title              string
 	isDeleteConfirming bool
 	isCurrentSession   bool
+	isRenaming         bool
+	newTitle           string
 }
 
 func (s sessionItem) Render(
@@ -42,6 +44,8 @@ func (s sessionItem) Render(
 	var text string
 	if s.isDeleteConfirming {
 		text = "Press again to confirm delete"
+	} else if s.isRenaming {
+		text = "Rename: " + s.newTitle + "_"
 	} else {
 		if s.isCurrentSession {
 			text = "● " + s.title
@@ -61,6 +65,14 @@ func (s sessionItem) Render(
 				Foreground(t.BackgroundElement()).
 				Width(width).
 				PaddingLeft(1)
+		} else if s.isRenaming {
+			// Blue background for rename mode
+			itemStyle = baseStyle.
+				Background(t.Primary()).
+				Foreground(t.BackgroundElement()).
+				Width(width).
+				PaddingLeft(1).
+				Italic(true)
 		} else if s.isCurrentSession {
 			// Different style for current session when selected
 			itemStyle = baseStyle.
@@ -83,6 +95,12 @@ func (s sessionItem) Render(
 			itemStyle = baseStyle.
 				Foreground(t.Error()).
 				PaddingLeft(1)
+		} else if s.isRenaming {
+			// Blue text for rename mode when not selected
+			itemStyle = baseStyle.
+				Foreground(t.Primary()).
+				PaddingLeft(1).
+				Italic(true)
 		} else if s.isCurrentSession {
 			// Highlight current session when not selected
 			itemStyle = baseStyle.
@@ -110,6 +128,7 @@ type sessionDialog struct {
 	list               list.List[sessionItem]
 	app                *app.App
 	deleteConfirmation int // -1 means no confirmation, >= 0 means confirming deletion of session at this index
+	renamingIndex      int // -1 means no renaming, >= 0 means renaming session at this index
 }
 
 func (s *sessionDialog) Init() tea.Cmd {
@@ -127,6 +146,20 @@ func (s *sessionDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if s.deleteConfirmation >= 0 {
 				s.deleteConfirmation = -1
+				s.updateListItems()
+				return s, nil
+			}
+			if s.renamingIndex >= 0 {
+				// Confirm rename
+				if _, idx := s.list.GetSelectedItem(); idx >= 0 && idx < len(s.sessions) {
+					sessionToRename := s.sessions[idx]
+					item, _ := s.list.GetSelectedItem()
+					newTitle := strings.TrimSpace(item.newTitle)
+					if newTitle != "" && newTitle != sessionToRename.Title {
+						return s, s.renameSession(sessionToRename.ID, newTitle)
+					}
+				}
+				s.renamingIndex = -1
 				s.updateListItems()
 				return s, nil
 			}
@@ -165,11 +198,45 @@ func (s *sessionDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return s, nil
 				}
 			}
+		case "r":
+			if s.deleteConfirmation >= 0 || s.renamingIndex >= 0 {
+				return s, nil
+			}
+			if _, idx := s.list.GetSelectedItem(); idx >= 0 && idx < len(s.sessions) {
+				s.renamingIndex = idx
+				s.updateListItems()
+				return s, nil
+			}
 		case "esc":
 			if s.deleteConfirmation >= 0 {
 				s.deleteConfirmation = -1
 				s.updateListItems()
 				return s, nil
+			}
+			if s.renamingIndex >= 0 {
+				s.renamingIndex = -1
+				s.updateListItems()
+				return s, nil
+			}
+		default:
+			// Handle text input during rename mode
+			if s.renamingIndex >= 0 {
+				if _, idx := s.list.GetSelectedItem(); idx >= 0 && idx < len(s.sessions) {
+					item, _ := s.list.GetSelectedItem()
+					switch msg.String() {
+					case "backspace":
+						if len(item.newTitle) > 0 {
+							item.newTitle = item.newTitle[:len(item.newTitle)-1]
+							s.updateListItems()
+						}
+					default:
+						if len(msg.String()) == 1 && len(item.newTitle) < 100 {
+							item.newTitle += msg.String()
+							s.updateListItems()
+						}
+					}
+					return s, nil
+				}
 			}
 		}
 	}
@@ -187,7 +254,7 @@ func (s *sessionDialog) Render(background string) string {
 	keyStyle := styles.NewStyle().Foreground(t.Text()).Background(t.BackgroundPanel()).Render
 	mutedStyle := styles.NewStyle().Foreground(t.TextMuted()).Background(t.BackgroundPanel()).Render
 
-	leftHelp := keyStyle("n") + mutedStyle(" new session")
+	leftHelp := keyStyle("n") + mutedStyle(" new session") + "  " + keyStyle("r") + mutedStyle(" rename")
 	rightHelp := keyStyle("x/del") + mutedStyle(" delete session")
 
 	bgColor := t.BackgroundPanel()
@@ -214,6 +281,8 @@ func (s *sessionDialog) updateListItems() {
 			title:              sess.Title,
 			isDeleteConfirming: s.deleteConfirmation == i,
 			isCurrentSession:   s.app.Session != nil && s.app.Session.ID == sess.ID,
+			isRenaming:         s.renamingIndex == i,
+			newTitle:           sess.Title, // Initialize with current title
 		}
 		items = append(items, item)
 	}
@@ -227,6 +296,25 @@ func (s *sessionDialog) deleteSession(sessionID string) tea.Cmd {
 		if err := s.app.DeleteSession(ctx, sessionID); err != nil {
 			return toast.NewErrorToast("Failed to delete session: " + err.Error())()
 		}
+		return nil
+	}
+}
+
+func (s *sessionDialog) renameSession(sessionID string, newTitle string) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		if err := s.app.UpdateSession(ctx, sessionID, newTitle); err != nil {
+			return toast.NewErrorToast("Failed to rename session: " + err.Error())()
+		}
+		// Update the local session title
+		for i, session := range s.sessions {
+			if session.ID == sessionID {
+				s.sessions[i].Title = newTitle
+				break
+			}
+		}
+		s.renamingIndex = -1
+		s.updateListItems()
 		return nil
 	}
 }
@@ -250,6 +338,8 @@ func NewSessionDialog(app *app.App) SessionDialog {
 			title:              sess.Title,
 			isDeleteConfirming: false,
 			isCurrentSession:   app.Session != nil && app.Session.ID == sess.ID,
+			isRenaming:         false,
+			newTitle:           sess.Title,
 		})
 	}
 
@@ -274,6 +364,7 @@ func NewSessionDialog(app *app.App) SessionDialog {
 		list:               listComponent,
 		app:                app,
 		deleteConfirmation: -1,
+		renamingIndex:      -1,
 		modal: modal.New(
 			modal.WithTitle("Switch Session"),
 			modal.WithMaxWidth(layout.Current.Container.Width-8),

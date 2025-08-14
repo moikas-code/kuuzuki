@@ -18,6 +18,7 @@ export namespace Tool {
     messageID: string;
     toolCallID: string;
     abort: AbortSignal;
+    extra?: { [key: string]: any };
     metadata(input: { title?: string; metadata?: M }): void;
   };
   export interface Info<

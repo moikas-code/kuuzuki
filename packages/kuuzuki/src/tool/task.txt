@@ -1,19 +1,77 @@
-Launch a new agent to handle complex, multi-step tasks autonomously. 
+Launch a specialized agent to handle complex, multi-step tasks autonomously. Each agent is optimized for specific types of work and has access to curated tools.
 
-Available agent types and the tools they have access to:
+Available agent types and their specialized capabilities:
 {agents}
 
-When using the Task tool, you must specify a subagent_type parameter to select which agent type to use.
+## Agent Selection Guidelines
 
-When to use the Agent tool:
-- When you are instructed to execute custom slash commands. Use the Agent tool with the slash command invocation as the entire prompt. The slash command can take arguments. For example: Task(description="Check the file", prompt="/check-file path/to/file.py")
+**When to use the Task tool:**
+- Complex multi-step workflows requiring specialized expertise
+- Tasks that benefit from focused agent capabilities (debugging, testing, documentation)
+- Custom slash command execution: Task(prompt="/command-name args")
+- Analysis requiring deep domain knowledge (security, performance, architecture)
+- Tasks requiring sustained focus across multiple files/components
 
-When NOT to use the Agent tool:
-- If you want to read a specific file path, use the Read or Glob tool instead of the Agent tool, to find the match more quickly
-- If you are searching for a specific class definition like "class Foo", use the Glob tool instead, to find the match more quickly
-- If you are searching for code within a specific file or set of 2-3 files, use the Read tool instead of the Agent tool, to find the match more quickly
-- Other tasks that are not related to the agent descriptions above
+**When NOT to use the Task tool:**
+- Simple file operations: Use Read, Write, Edit tools directly
+- Single file searches: Use Grep tool for content, Glob for filenames  
+- Quick code lookups: Use Read tool for 1-3 specific files
+- Basic bash commands: Use Bash tool directly
+- Simple questions that don't require multi-step analysis
+- Tasks that can be completed with 1-2 direct tool calls
+- Immediate responses to user questions about existing code
+- Quick syntax fixes or typo corrections
+- Single-purpose operations like "show me the contents of file X"
 
+## Agent Selection Strategy
+
+Choose agents based on task complexity and domain:
+- **High complexity + specialized domain**: Use domain-specific agents (debugger, architect, security)
+- **Multi-file analysis**: Use agents with broad tool access
+- **Code quality tasks**: Use code-reviewer or testing agents
+- **Documentation tasks**: Use documentation-focused agents
+- **Unknown/general tasks**: Use general-purpose agents with comprehensive tool sets
+
+### Realistic Agent Selection Examples
+
+**For bug investigation:**
+- Use `debugger` agent: "Analyze the authentication flow in src/auth/ and identify why users are getting 401 errors"
+- Use `security-scanner` agent: "Check for potential security vulnerabilities in the payment processing code"
+
+**For feature development:**
+- Use `architect` agent: "Design a caching system for API responses that integrates with our existing Redis setup"
+- Use `full-stack-developer` agent: "Implement user profile editing with form validation and database updates"
+
+**For code quality:**
+- Use `code-reviewer` agent: "Review the new user registration flow for best practices and potential issues"
+- Use `performance-optimizer` agent: "Analyze database queries in the reporting module and suggest optimizations"
+
+**For documentation:**
+- Use `technical-writer` agent: "Create comprehensive API documentation for the new webhook endpoints"
+- Use `docs-updater` agent: "Update the deployment guide to reflect the new Docker configuration"
+
+### Concurrent Agent Usage
+
+Launch multiple agents simultaneously for complex tasks:
+- **Parallel analysis**: Use `security-scanner` + `performance-optimizer` + `code-reviewer` on the same codebase
+- **Multi-domain tasks**: Use `frontend-specialist` + `backend-specialist` for full-stack features
+- **Comprehensive reviews**: Use `architect` + `testing-specialist` + `docs-updater` for major changes
+
+
+## Stateless Agent Communication
+
+**Critical Guidelines:**
+1. **Single interaction only**: Each agent invocation is completely stateless - you cannot send follow-up messages
+2. **Comprehensive prompts**: Include ALL necessary context, requirements, and expected outputs in your initial prompt
+3. **Specific deliverables**: Clearly specify what format and information the agent should return
+4. **Action clarity**: Explicitly state whether the agent should write code, perform research, or both
+
+**Prompt Structure Best Practices:**
+- **Context**: Provide relevant background about the codebase and current situation
+- **Task**: Clearly define what needs to be accomplished
+- **Constraints**: Specify any limitations, requirements, or preferences
+- **Output format**: Define exactly what information should be returned and how
+- **Success criteria**: Explain how to determine if the task is complete
 
 Usage notes:
 1. Launch multiple agents concurrently whenever possible, to maximize performance; to do that, use a single message with multiple tool uses
@@ -26,35 +84,89 @@ Usage notes:
 Example usage:
 
 <example_agent_descriptions>
-"code-reviewer": use this agent after you are done writing a signficant piece of code
-"greeting-responder": use this agent when to respond to user greetings with a friendly joke
+"code-reviewer": "Expert code review agent for quality, security, and best practices analysis. Use after writing significant code changes."
+"debugger": "Systematic bug identification and root cause analysis specialist. Use when investigating errors or unexpected behavior."
+"architect": "System design and architecture planning expert. Use for complex feature design and technical decision-making."
+"security-scanner": "Security vulnerability detection and analysis specialist. Use for security audits and threat assessment."
+"performance-optimizer": "Code and system performance analysis expert. Use for optimization and bottleneck identification."
+"testing-specialist": "Comprehensive testing strategy and implementation expert. Use for test planning and quality assurance."
+"technical-writer": "Documentation creation and maintenance specialist. Use for creating clear, comprehensive documentation."
+"frontend-specialist": "UI/UX and frontend development expert. Use for client-side implementation and user interface tasks."
+"backend-specialist": "Server-side development and API design expert. Use for backend logic and data management tasks."
+"devops-engineer": "Infrastructure, deployment, and CI/CD specialist. Use for deployment automation and system administration."
 </example_agent_description>
 
+## Detailed Usage Examples
+
 <example>
-user: "Please write a function that checks if a number is prime"
-assistant: Sure let me write a function that checks if a number is prime
-assistant: First let me use the Write tool to write a function that checks if a number is prime
-assistant: I'm going to use the Write tool to write the following code:
-<code>
-function isPrime(n) {
-  if (n <= 1) return false
-  for (let i = 2; i * i <= n; i++) {
-    if (n % i === 0) return false
-  }
-  return true
-}
-</code>
-<commentary>
-Since a signficant piece of code was written and the task was completed, now use the code-reviewer agent to review the code
-</commentary>
-assistant: Now let me use the code-reviewer agent to review the code
-assistant: Uses the Task tool to launch the with the code-reviewer agent 
+user: "The authentication system is failing with 401 errors intermittently"
+assistant: I'll investigate this authentication issue systematically. Let me use the debugger agent to analyze the authentication flow.
+
+Task(agent="debugger", prompt="Analyze the authentication system in src/auth/ to identify the root cause of intermittent 401 errors. 
+
+Context: Users are reporting random authentication failures despite valid credentials.
+
+Tasks to perform:
+1. Examine the authentication middleware and token validation logic
+2. Check for race conditions or timing issues
+3. Review error handling and logging
+4. Identify potential session management problems
+
+Please return:
+- Specific file locations and line numbers where issues are found
+- Root cause analysis of the 401 errors
+- Recommended fixes with code examples
+- Any security concerns discovered")
 </example>
 
 <example>
-user: "Hello"
-<commentary>
-Since the user is greeting, use the greeting-responder agent to respond with a friendly joke
-</commentary>
-assistant: "I'm going to use the Task tool to launch the with the greeting-responder agent"
+user: "I need to add a new user profile feature with photo uploads"
+assistant: I'll design and implement the user profile feature. Let me use multiple agents to handle different aspects.
+
+Task(agent="architect", prompt="Design a user profile system with photo upload functionality.
+
+Requirements:
+- User profile editing (name, bio, contact info)
+- Photo upload with image processing
+- Privacy controls
+- Integration with existing user system
+
+Please provide:
+- Database schema changes needed
+- API endpoint design
+- File storage strategy
+- Security considerations
+- Implementation plan with task breakdown")
+
+Task(agent="security-scanner", prompt="Review the proposed user profile feature design for security vulnerabilities.
+
+Focus areas:
+- File upload security (type validation, size limits, malware scanning)
+- Data privacy and access controls
+- Input validation and sanitization
+- Authentication and authorization
+
+Return specific security recommendations and implementation guidelines.")
+</example>
+
+<example>
+user: "The dashboard is loading slowly"
+assistant: I'll analyze the performance issues in the dashboard. Let me use the performance-optimizer agent.
+
+Task(agent="performance-optimizer", prompt="Analyze dashboard performance issues and identify optimization opportunities.
+
+Current situation: Dashboard loading is slow for users
+
+Investigation areas:
+1. Database query performance in dashboard data fetching
+2. Frontend rendering bottlenecks
+3. API response times and payload sizes
+4. Caching opportunities
+
+Please provide:
+- Specific performance bottlenecks with measurements
+- Database query optimization suggestions
+- Frontend optimization recommendations
+- Caching strategy proposals
+- Before/after performance estimates")
 </example>

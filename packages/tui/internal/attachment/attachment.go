@@ -1,6 +1,9 @@
 package attachment
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/google/uuid"
 )
 
@@ -74,4 +77,76 @@ func (a *Attachment) GetSymbolSource() (*SymbolSource, bool) {
 	}
 	ss, ok := a.Source.(*SymbolSource)
 	return ss, ok
+}
+
+// GetFileIcon returns an appropriate icon for the file type
+func (a *Attachment) GetFileIcon() string {
+	if a.Type != "file" {
+		return "📄"
+	}
+
+	// Get file extension
+	ext := ""
+	if fs, ok := a.GetFileSource(); ok && fs.Path != "" {
+		parts := strings.Split(fs.Path, ".")
+		if len(parts) > 1 {
+			ext = strings.ToLower(parts[len(parts)-1])
+		}
+	}
+
+	// Return appropriate icon based on file type
+	switch ext {
+	case "go":
+		return "🐹"
+	case "js", "ts", "jsx", "tsx":
+		return "📜"
+	case "py":
+		return "🐍"
+	case "rs":
+		return "🦀"
+	case "java":
+		return "☕"
+	case "cpp", "c", "cc", "cxx":
+		return "⚙️"
+	case "html", "htm":
+		return "🌐"
+	case "css", "scss", "sass":
+		return "🎨"
+	case "json":
+		return "📋"
+	case "md", "markdown":
+		return "📝"
+	case "txt":
+		return "📄"
+	case "pdf":
+		return "📕"
+	case "png", "jpg", "jpeg", "gif", "svg":
+		return "🖼️"
+	case "zip", "tar", "gz", "rar":
+		return "📦"
+	default:
+		return "📄"
+	}
+}
+
+// GetFormattedSize returns human-readable file size
+func (a *Attachment) GetFormattedSize() string {
+	if fs, ok := a.GetFileSource(); ok && len(fs.Data) > 0 {
+		return formatBytes(int64(len(fs.Data)))
+	}
+	return ""
+}
+
+// formatBytes formats byte count into human readable format
+func formatBytes(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }

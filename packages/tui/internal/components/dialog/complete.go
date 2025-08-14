@@ -170,17 +170,33 @@ func (c *completionDialogComponent) View() string {
 	t := theme.CurrentTheme()
 	c.list.SetMaxWidth(c.width)
 
+	listView := c.list.View()
+
+	// Add loading indicator if list is empty and we're searching
+	if c.list.IsEmpty() && c.query != "" {
+		loadingText := "🔍 Searching..."
+		loadingStyle := styles.NewStyle().
+			Foreground(t.TextMuted()).
+			Background(t.BackgroundElement()).
+			Italic(true).
+			Padding(1)
+		listView = loadingStyle.Render(loadingText)
+	}
+
+	// Enhanced border with rounded corners and better visual hierarchy
 	return styles.NewStyle().
 		Padding(0, 1).
 		Foreground(t.Text()).
 		Background(t.BackgroundElement()).
-		BorderStyle(lipgloss.ThickBorder()).
+		BorderStyle(lipgloss.RoundedBorder()).
 		BorderLeft(true).
 		BorderRight(true).
-		BorderForeground(t.Border()).
+		BorderTop(true).
+		BorderBottom(true).
+		BorderForeground(t.Primary()).
 		BorderBackground(t.Background()).
 		Width(c.width).
-		Render(c.list.View())
+		Render(listView)
 }
 
 func (c *completionDialogComponent) SetWidth(width int) {

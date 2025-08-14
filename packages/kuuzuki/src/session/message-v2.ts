@@ -197,6 +197,20 @@ export namespace MessageV2 {
   })
   export type StepFinishPart = z.infer<typeof StepFinishPart>
 
+  export const ThinkingPart = PartBase.extend({
+    type: z.literal("thinking"),
+    text: z.string(),
+    time: z
+      .object({
+        start: z.number(),
+        end: z.number().optional(),
+      })
+      .optional(),
+  }).openapi({
+    ref: "ThinkingPart",
+  })
+  export type ThinkingPart = z.infer<typeof ThinkingPart>
+
   const Base = z.object({
     id: z.string(),
     sessionID: z.string(),
@@ -213,7 +227,7 @@ export namespace MessageV2 {
   export type User = z.infer<typeof User>
 
   export const Part = z
-    .discriminatedUnion("type", [TextPart, FilePart, ToolPart, StepStartPart, StepFinishPart, SnapshotPart, PatchPart])
+    .discriminatedUnion("type", [TextPart, FilePart, ToolPart, StepStartPart, StepFinishPart, SnapshotPart, PatchPart, ThinkingPart])
     .openapi({
       ref: "Part",
     })

@@ -276,6 +276,22 @@
         },
         "documentationLinks": [],
         "tags": []
+      },
+      {
+        "id": "never-use-sudo-su-or-other-privilege-escalation-co-meawakxf",
+        "text": "NEVER use sudo, su, or other privilege escalation commands in sub-agents or any automated processes",
+        "category": "critical",
+        "reason": "Prevents UI breakage and security risks when running sub-agents",
+        "createdAt": "2025-08-14T04:24:25.971Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
       }
     ],
     "preferred": [
@@ -530,7 +546,7 @@
           "moidvk",
           "serve"
         ],
-        "enabled": true,
+        "enabled": false,
         "notes": "Development tools and code analysis server"
       },
       "weather": {
@@ -546,8 +562,8 @@
       "sequential-thinking": {
         "transport": "stdio",
         "command": [
-          "npx",
-          "-y",
+          "bun",
+          "x",
           "@modelcontextprotocol/server-sequential-thinking"
         ],
         "enabled": true,
@@ -556,12 +572,19 @@
       "kb-mcp": {
         "transport": "stdio",
         "command": [
-          "kb",
+          "env",
+          "-u",
+          "BUN_INSTALL",
+          "node",
+          "/home/moika/Documents/code/kb-mcp/scripts/kb-cli.js",
           "serve",
           "--local"
         ],
-        "enabled": true,
-        "notes": "Knowledge base and documentation management"
+        "env": {
+          "NODE_ENV": "production"
+        },
+        "enabled": false,
+        "notes": "Knowledge base and documentation management - disabled due to Bun detection"
       },
       "fork-parity": {
         "transport": "stdio",
@@ -631,6 +654,96 @@
     "securityLevel": "DEVELOPMENT for coding, STRICT for production",
     "privacyMode": true,
     "contextPreservation": true,
+    "grounding": {
+      "description": "Fact-checking and verification agent for ensuring accuracy and grounding responses in reality",
+      "prompt": "You are a grounding agent focused on fact-checking, verification, and ensuring accuracy. Always verify information against authoritative sources, check local documentation for consistency, and validate code against existing patterns. Use webfetch for external verification, read/grep for local validation, and memory for project context.",
+      "tools": {
+        "webfetch": true,
+        "read": true,
+        "grep": true,
+        "bash": true,
+        "memory": true,
+        "moidvk_check_code_practices": true,
+        "kb_search": true,
+        "kb_read": true,
+        "todowrite": false,
+        "todoread": false
+      }
+    },
+    "code-reviewer": {
+      "description": "Expert code review agent for quality, security, and best practices analysis",
+      "prompt": "You are an expert code reviewer focused on code quality, security vulnerabilities, and best practices. Analyze code for maintainability, performance, security issues, and adherence to project standards. Provide specific, actionable feedback with file locations and line numbers.",
+      "tools": {
+        "read": true,
+        "moidvk_check_code_practices": true,
+        "moidvk_scan_security_vulnerabilities": true,
+        "moidvk_check_production_readiness": true,
+        "bash": true,
+        "grep": true,
+        "memory": true,
+        "todowrite": false,
+        "todoread": false
+      }
+    },
+    "documentation": {
+      "description": "Specialized agent for creating, updating, and maintaining project documentation",
+      "prompt": "You are a documentation specialist focused on creating clear, comprehensive, and maintainable documentation. Ensure documentation is accurate, up-to-date, and follows project standards. Use knowledge base integration to maintain consistency across all documentation.",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "glob": true,
+        "grep": true,
+        "kb_update": true,
+        "memory": true,
+        "todowrite": false,
+        "todoread": false
+      }
+    },
+    "testing": {
+      "description": "Comprehensive testing agent for unit tests, integration tests, and test automation",
+      "prompt": "You are a testing specialist focused on comprehensive test coverage, test quality, and test automation. Create robust tests that cover edge cases, ensure proper mocking, and maintain test maintainability. Follow project testing patterns and frameworks.",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "grep": true,
+        "glob": true,
+        "moidvk_check_production_readiness": true,
+        "todowrite": false,
+        "todoread": false
+      }
+    },
+    "debugger": {
+      "description": "Expert debugging agent for systematic bug identification and root cause analysis",
+      "prompt": "You are an expert debugging agent focused on systematic bug identification, root cause analysis, and providing actionable solutions. Use comprehensive analysis tools to identify issues, trace execution paths, and provide specific fixes with clear explanations.",
+      "tools": {
+        "read": true,
+        "bash": true,
+        "grep": true,
+        "glob": true,
+        "moidvk_check_code_practices": true,
+        "moidvk_scan_security_vulnerabilities": true,
+        "memory": true,
+        "todowrite": false,
+        "todoread": false
+      }
+    },
+    "architect": {
+      "description": "System design and architecture planning agent for complex feature implementation",
+      "prompt": "You are a software architect focused on system design, architecture planning, and complex feature implementation. Design scalable, maintainable solutions that follow project patterns and best practices. Create comprehensive implementation plans with clear task breakdown.",
+      "tools": {
+        "read": true,
+        "write": true,
+        "grep": true,
+        "glob": true,
+        "kb_search": true,
+        "memory": true,
+        "todowrite": true,
+        "todoread": false
+      }
+    },
     "bugfinder": {
       "description": "Expert debugging agent for systematic bug identification and analysis",
       "model": "anthropic/claude-sonnet-4-20250514",
@@ -768,8 +881,8 @@
   },
   "ruleMetadata": {
     "version": "1.0.0",
-    "lastModified": "2025-08-04T02:08:06.857Z",
-    "totalRules": 23,
+    "lastModified": "2025-08-14T04:24:25.971Z",
+    "totalRules": 24,
     "sessionRules": [
       {
         "ruleId": "create-comprehensive-v010-implementation-plan-with-mdopz2cl",
@@ -795,6 +908,11 @@
         "ruleId": "v0119-comprehensive-testing-completed-successfully-mdwh0r7t",
         "learnedAt": "2025-08-04T02:08:06.857Z",
         "context": "Release readiness verified through actual testing"
+      },
+      {
+        "ruleId": "never-use-sudo-su-or-other-privilege-escalation-co-meawakxf",
+        "learnedAt": "2025-08-14T04:24:25.971Z",
+        "context": "Prevents UI breakage and security risks when running sub-agents"
       }
     ]
   },
@@ -813,12 +931,68 @@
   "permission": {
     "bash": {
       "ls *": "allow",
-      "echo *": "allow", 
+      "echo *": "allow",
+      "git *": "allow",
+      "npm *": "allow",
+      "bun *": "allow",
       "rm *": "ask",
       "delete *": "ask",
-      "*": "ask"
+      "sudo *": "deny",
+      "su *": "deny",
+      "chmod +x *": "ask",
+      "chown *": "deny",
+      "*": "allow"
     },
     "edit": "allow",
-    "write": "allow"
+    "write": "allow",
+    "webfetch": "allow",
+    "read": "allow",
+    "agents": {
+      "bugfinder": {
+        "bash": {
+          "sudo *": "deny",
+          "su *": "deny",
+          "chown *": "deny",
+          "chmod +x *": "ask",
+          "*": "allow"
+        },
+        "edit": "allow",
+        "write": "deny",
+        "read": "allow"
+      },
+      "code-reviewer": {
+        "bash": {
+          "git *": "allow",
+          "npm *": "allow",
+          "rm *": "deny",
+          "sudo *": "deny",
+          "su *": "deny",
+          "chown *": "deny",
+          "*": "ask"
+        },
+        "edit": "allow",
+        "write": "deny",
+        "read": "allow"
+      },
+      "documentation": {
+        "bash": "deny",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow"
+      },
+      "general": {
+        "bash": {
+          "sudo *": "deny",
+          "su *": "deny",
+          "chown *": "deny",
+          "chmod +x *": "ask",
+          "rm *": "ask",
+          "*": "allow"
+        },
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow"
+      }
+    }
   }
 }

@@ -342,10 +342,10 @@ function isImageFile(filePath: string): string | false {
       return "GIF"
     case ".bmp":
       return "BMP"
-    case ".svg":
-      return "SVG"
     case ".webp":
       return "WebP"
+    // SVG files are text-based and should be readable, not treated as images
+    // case ".svg": return "SVG" - removed to allow SVG reading
     default:
       return false
   }
