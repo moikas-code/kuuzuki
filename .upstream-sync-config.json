@@ -12,6 +12,8 @@
   "beastModeAutoMergeThreshold": 0.85,
   "useWorktree": true,
   "worktreePath": "../kuuzuki-daemon",
+  "useKuuzukiAnalysis": true,
+  "skipDuplicateBranches": true,
   "pathMappings": {
     "packages/opencode/": "packages/kuuzuki/",
     "packages/opencode-": "packages/kuuzuki-"

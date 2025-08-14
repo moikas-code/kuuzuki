@@ -34,6 +34,8 @@ interface DaemonConfig {
   includePatterns: string[];
   useWorktree: boolean; // Run daemon in isolated worktree
   worktreePath: string; // Path to daemon worktree
+  useKuuzukiAnalysis: boolean; // Use kuuzuki subprocess for analysis
+  skipDuplicateBranches: boolean; // Skip creating branches if they already exist
 }
 
 interface UpstreamChange {
@@ -92,6 +94,8 @@ const DEFAULT_CONFIG: DaemonConfig = {
   beastModeAutoMergeThreshold: 0.85,
   useWorktree: true,
   worktreePath: "../kuuzuki-daemon",
+  useKuuzukiAnalysis: true,
+  skipDuplicateBranches: false,
   pathMappings: {
     "packages/opencode/": "packages/kuuzuki/",
     "packages/opencode-": "packages/kuuzuki-",
@@ -264,6 +268,58 @@ class UpstreamSyncDaemon {
     writeFileSync(TRACKER_FILE, JSON.stringify(this.tracker, null, 2));
   }
 
+  public cleanupFailedBranches(): void {
+    try {
+      this.log("🧹 Cleaning up failed review branches...");
+      
+      // Get all review branches
+      const branches = execSync("git branch --list 'review-*'", { encoding: "utf8" })
+        .toString()
+        .split("\n")
+        .map(b => b.trim().replace(/^\*?\s*/, ""))
+        .filter(b => b.startsWith("review-"));
+
+      let cleaned = 0;
+      for (const branch of branches) {
+        if (!branch) continue;
+        
+        const commitHash = branch.replace("review-", "");
+        const trackedCommit = Object.values(this.tracker.processedCommits).find(c => 
+          c.commit.startsWith(commitHash) && (c.status === "failed" || c.status === "skipped")
+        );
+        
+        // Also clean up branches for commits that are old (more than 7 days)
+        const isOld = trackedCommit && 
+          new Date().getTime() - new Date(trackedCommit.processedAt).getTime() > 7 * 24 * 60 * 60 * 1000;
+        
+        if (trackedCommit && (trackedCommit.status === "failed" || isOld)) {
+          try {
+            // Check if branch is being used by worktree
+            const worktrees = execSync("git worktree list", { encoding: "utf8" });
+            if (worktrees.includes(branch)) {
+              this.log(`⚠️  Skipping branch ${branch} (in use by worktree)`);
+              continue;
+            }
+            
+            execSync(`git branch -D ${branch}`, { stdio: "pipe" });
+            this.log(`🧹 Cleaned up branch: ${branch} (${trackedCommit.status})`);
+            cleaned++;
+          } catch (error) {
+            this.log(`⚠️  Could not delete branch ${branch}: ${error}`);
+          }
+        }
+      }
+      
+      if (cleaned > 0) {
+        this.log(`✅ Cleaned up ${cleaned} review branches`);
+      } else {
+        this.log("✅ No branches to clean up");
+      }
+    } catch (error) {
+      this.log(`⚠️  Branch cleanup error: ${error}`);
+    }
+  }
+
   private markCommitProcessed(
     commit: string,
     status: ProcessedCommit["status"],
@@ -405,6 +461,17 @@ class UpstreamSyncDaemon {
   private async analyzeChangeWithKuuzuki(
     change: UpstreamChange,
   ): Promise<UpstreamChange> {
+    // Skip kuuzuki analysis if disabled in config
+    if (!this.config.useKuuzukiAnalysis) {
+      this.log(
+        `📊 Using fallback analysis for ${change.commit.substring(0, 8)} (kuuzuki analysis disabled)`,
+      );
+      return {
+        ...change,
+        analysis: this.createFallbackAnalysis(change),
+      };
+    }
+
     try {
       this.log(
         `🤖 Analyzing commit ${change.commit.substring(0, 8)} with kuuzuki...`,
@@ -439,14 +506,14 @@ Respond in JSON format:
 }
       `.trim();
 
-      // Use kuuzuki to analyze the change with Claude Sonnet 4
+      // Use kuuzuki to analyze the change with Claude 4
       const kuuzukiProcess = spawn(
         "bun",
         [
           "packages/kuuzuki/src/index.ts",
           "run",
           "--model",
-          "anthropic/claude-sonnet-4-20250514",
+          "anthropic/claude-4-20250514",
         ],
         {
           stdio: ["pipe", "pipe", "pipe"],
@@ -503,16 +570,6 @@ Respond in JSON format:
         // Send the analysis prompt to kuuzuki
         kuuzukiProcess.stdin?.write(analysisPrompt);
         kuuzukiProcess.stdin?.end();
-
-        // Timeout after 10 seconds for faster processing
-        setTimeout(() => {
-          kuuzukiProcess.kill();
-          this.log(`⏱️  Kuuzuki analysis timeout, using fallback`);
-          resolve({
-            ...change,
-            analysis: this.createFallbackAnalysis(change),
-          });
-        }, 10000);
       });
     } catch (error) {
       this.log(`Error analyzing with kuuzuki: ${error}`);
@@ -1395,15 +1452,32 @@ Respond in JSON format:
         return true;
       }
 
-      // Check if branch already exists and delete it
+      // Check if branch already exists
       try {
-        execSync(`git branch -D ${branchName}`, { stdio: "pipe" });
-        this.log(`🧹 Deleted existing branch: ${branchName}`);
-      } catch {
-        // Branch doesn't exist, which is fine
+        const branches = this.execInWorktree(`git branch --list ${branchName}`, { encoding: "utf8" }) as string;
+        if (branches.trim()) {
+          if (this.config.skipDuplicateBranches) {
+            this.log(`⏭️  Skipping duplicate branch: ${branchName} (already exists)`);
+            return false;
+          } else {
+            this.execInWorktree(`git branch -D ${branchName}`, { stdio: "pipe" });
+            this.log(`🧹 Deleted existing branch: ${branchName}`);
+          }
+        }
+      } catch (error) {
+        this.log(`⚠️  Branch cleanup warning: ${error}`);
+        // Try to force delete anyway if not skipping duplicates
+        if (!this.config.skipDuplicateBranches) {
+          try {
+            this.execInWorktree(`git branch -D ${branchName}`, { stdio: "pipe" });
+            this.log(`🧹 Force deleted existing branch: ${branchName}`);
+          } catch {
+            // Branch doesn't exist or can't be deleted, continue
+          }
+        }
       }
 
-      execSync(`git checkout -b ${branchName}`, { stdio: "pipe" });
+      this.execInWorktree(`git checkout -b ${branchName}`, { stdio: "pipe" });
 
       try {
         // Use smart cherry-pick for review branches too
@@ -1412,7 +1486,7 @@ Respond in JSON format:
           throw new Error("Smart cherry-pick failed for review branch");
         }
 
-        execSync(`git checkout ${this.config.localBranch}`, { stdio: "pipe" });
+        this.execInWorktree(`git checkout ${this.config.localBranch}`, { stdio: "pipe" });
 
         this.log(`✅ Review branch created: ${branchName}`);
         this.log(`   To review: git checkout ${branchName}`);
@@ -1424,21 +1498,30 @@ Respond in JSON format:
       } catch (cherryPickError) {
         // Cleanup failed cherry-pick for review branch
         try {
-          const status = execSync(`git status`, { encoding: "utf8" });
+          const status = this.execInWorktree(`git status`, { encoding: "utf8" }) as string;
           if (status.includes("cherry-pick")) {
-            execSync(`git cherry-pick --abort`, { stdio: "pipe" });
+            this.execInWorktree(`git cherry-pick --abort`, { stdio: "pipe" });
           }
         } catch (abortError) {
           // Continue cleanup
         }
 
         try {
-          execSync(`git checkout ${this.config.localBranch}`, {
+          this.execInWorktree(`git checkout ${this.config.localBranch}`, {
             stdio: "pipe",
           });
-          execSync(`git branch -D ${branchName}`, { stdio: "pipe" });
+          this.execInWorktree(`git branch -D ${branchName}`, { stdio: "pipe" });
+          this.log(`🧹 Cleaned up failed branch: ${branchName}`);
         } catch (cleanupError) {
           this.log(`⚠️  Review branch cleanup warning: ${cleanupError}`);
+          // Try cleanup in main repo as fallback
+          try {
+            execSync(`git checkout ${this.config.localBranch}`, { stdio: "pipe" });
+            execSync(`git branch -D ${branchName}`, { stdio: "pipe" });
+            this.log(`🧹 Cleaned up failed branch in main repo: ${branchName}`);
+          } catch (mainRepoCleanupError) {
+            this.log(`⚠️  Failed to cleanup branch in both worktree and main repo: ${branchName}`);
+          }
         }
 
         this.log(
@@ -1589,6 +1672,9 @@ Respond in JSON format:
 
     this.isRunning = true;
     writeFileSync(PID_FILE, process.pid.toString());
+
+    // Clean up any leftover failed branches from previous runs
+    this.cleanupFailedBranches();
 
     this.log(
       `🚀 Upstream sync daemon started${this.config.beastMode ? " 🦁 BEAST MODE" : ""}`,
@@ -1836,6 +1922,7 @@ async function main() {
       break;
     case "cleanup":
       daemon.cleanup();
+      daemon.cleanupFailedBranches();
       break;
     case "reset":
       const startCommit = process.argv[3];
