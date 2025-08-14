@@ -628,7 +628,7 @@ Respond in JSON format:
         return true;
       }
 
-      // Method 3: Check if the file changes are already present (content-based)
+      // Method 3: Check if the file changes are already present (content-based with path translation)
       if (change.files.length > 0 && change.files.length <= 5) { // Only check for small changes
         let allChangesPresent = true;
         
@@ -640,9 +640,12 @@ Respond in JSON format:
               { encoding: "utf8" }
             );
             
-            // Get the current file content
+            // Use translated path for our local file
+            const translatedPath = this.translatePath(file);
+            
+            // Get the current file content using translated path
             const currentContent = execSync(
-              `git show ${this.config.localBranch}:${file}`,
+              `git show ${this.config.localBranch}:${translatedPath}`,
               { encoding: "utf8" }
             );
             
@@ -651,8 +654,9 @@ Respond in JSON format:
               allChangesPresent = false;
               break;
             }
-          } catch {
+          } catch (error) {
             // File doesn't exist or can't be compared, assume not implemented
+            this.log(`⚠️  Could not compare ${file}: ${error}`);
             allChangesPresent = false;
             break;
           }
@@ -709,7 +713,8 @@ Respond in JSON format:
             }
             
             // If we found most of the added lines, consider it implemented
-            if (foundChanges >= addedLines.length * 0.8) {
+            // Use a lower threshold (70%) for better detection of already-implemented changes
+            if (foundChanges >= addedLines.length * 0.7) {
               this.log(`🔍 Specific changes already present in translated files (${foundChanges}/${addedLines.length} lines found)`);
               return true;
             }
@@ -937,18 +942,43 @@ Respond in JSON format:
         } catch (threewayError) {
           this.log(`⚠️  3-way patch failed: ${threewayError}`);
           
+          // Check if 3-way merge created conflicts that we can resolve
           try {
-            // Try 3: Ignore whitespace and context
-            this.execInWorktree(`git apply --ignore-whitespace --ignore-space-change ${tempPatchFile}`, { stdio: "pipe" });
-            this.log(`✅ Applied patch ignoring whitespace`);
-            patchApplied = true;
-          } catch (whitespaceError) {
-            this.log(`⚠️  Whitespace-tolerant patch failed: ${whitespaceError}`);
+            const status = this.execInWorktree(`git status --porcelain`, { encoding: "utf8" }) as string;
+            const conflictedFiles = status.split('\n').filter(line => line.startsWith('UU ') || line.startsWith('U '));
             
-            // Try 4: Manual application for small changes
-            if (change.files.length <= 2 && (change.additions + change.deletions) <= 20) {
-              this.log(`🔧 Attempting manual application for small change...`);
-              patchApplied = await this.manuallyApplyChanges(change);
+            if (conflictedFiles.length > 0 && conflictedFiles.length <= 3) {
+              this.log(`🔧 Found ${conflictedFiles.length} conflicted files, attempting resolution...`);
+              
+              // For review branches, we can leave conflicts for manual resolution
+              // Just stage the non-conflicted files and create a commit
+              const cleanFiles = status.split('\n').filter(line => 
+                (line.startsWith('M ') || line.startsWith('A ')) && !line.startsWith('U')
+              );
+              
+              if (cleanFiles.length > 0) {
+                this.log(`✅ Applied ${cleanFiles.length} files cleanly, ${conflictedFiles.length} need manual resolution`);
+                patchApplied = true; // We'll handle conflicts in the review branch
+              }
+            }
+          } catch (statusError) {
+            this.log(`⚠️  Could not check git status: ${statusError}`);
+          }
+          
+          if (!patchApplied) {
+            try {
+              // Try 3: Ignore whitespace and context
+              this.execInWorktree(`git apply --ignore-whitespace --ignore-space-change ${tempPatchFile}`, { stdio: "pipe" });
+              this.log(`✅ Applied patch ignoring whitespace`);
+              patchApplied = true;
+            } catch (whitespaceError) {
+              this.log(`⚠️  Whitespace-tolerant patch failed: ${whitespaceError}`);
+              
+              // Try 4: Manual application for small changes
+              if (change.files.length <= 2 && (change.additions + change.deletions) <= 20) {
+                this.log(`🔧 Attempting manual application for small change...`);
+                patchApplied = await this.manuallyApplyChanges(change);
+              }
             }
           }
         }
