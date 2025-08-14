@@ -513,11 +513,12 @@ Respond in JSON format:
           "packages/kuuzuki/src/index.ts",
           "run",
           "--model",
-          "anthropic/claude-4-20250514",
+          "anthropic/claude-sonnet-4-20250514",
         ],
         {
           stdio: ["pipe", "pipe", "pipe"],
-          cwd: process.cwd(),
+          cwd: this.mainRepoPath, // Use main repo path instead of current working directory
+          env: process.env, // Inherit environment variables (API keys, etc.)
         },
       );
 
@@ -559,7 +560,9 @@ Respond in JSON format:
               });
             }
           } else {
-            this.log(`Kuuzuki analysis failed: ${error}`);
+            this.log(`Kuuzuki analysis failed with exit code ${code}`);
+            this.log(`Kuuzuki stderr: ${error}`);
+            this.log(`Kuuzuki stdout: ${output}`);
             resolve({
               ...change,
               analysis: this.createFallbackAnalysis(change),
