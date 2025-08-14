@@ -118,6 +118,10 @@ type listKeyMap struct {
 	Down      key.Binding
 	UpAlpha   key.Binding
 	DownAlpha key.Binding
+	Home      key.Binding
+	End       key.Binding
+	PageUp    key.Binding
+	PageDown  key.Binding
 }
 
 var simpleListKeys = listKeyMap{
@@ -137,6 +141,22 @@ var simpleListKeys = listKeyMap{
 		key.WithKeys("j"),
 		key.WithHelp("j", "next list item"),
 	),
+	Home: key.NewBinding(
+		key.WithKeys("home", "g"),
+		key.WithHelp("home/g", "go to first item"),
+	),
+	End: key.NewBinding(
+		key.WithKeys("end", "G"),
+		key.WithHelp("end/G", "go to last item"),
+	),
+	PageUp: key.NewBinding(
+		key.WithKeys("pgup", "ctrl+u"),
+		key.WithHelp("pgup", "page up"),
+	),
+	PageDown: key.NewBinding(
+		key.WithKeys("pgdown", "ctrl+d"),
+		key.WithHelp("pgdown", "page down"),
+	),
 }
 
 func (c *listComponent[T]) Init() tea.Cmd {
@@ -153,13 +173,25 @@ func (c *listComponent[T]) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, simpleListKeys.Down) || (c.useAlphaNumericKeys && key.Matches(msg, simpleListKeys.DownAlpha)):
 			c.moveDown()
 			return c, nil
+		case key.Matches(msg, simpleListKeys.Home):
+			c.moveToFirst()
+			return c, nil
+		case key.Matches(msg, simpleListKeys.End):
+			c.moveToLast()
+			return c, nil
+		case key.Matches(msg, simpleListKeys.PageUp):
+			c.pageUp()
+			return c, nil
+		case key.Matches(msg, simpleListKeys.PageDown):
+			c.pageDown()
+			return c, nil
 		}
 	}
 
 	return c, nil
 }
 
-// moveUp moves the selection up, skipping non-selectable items
+// moveUp moves the selection up, skipping non-selectable items with wrap-around
 func (c *listComponent[T]) moveUp() {
 	if len(c.items) == 0 {
 		return
@@ -173,31 +205,87 @@ func (c *listComponent[T]) moveUp() {
 		}
 	}
 
-	// If no selectable item found above, stay at current position
+	// Wrap around to the bottom - find the last selectable item
+	for i := len(c.items) - 1; i >= 0; i-- {
+		if c.isSelectable(c.items[i]) {
+			c.selectedIdx = i
+			return
+		}
+	}
 }
 
-// moveDown moves the selection down, skipping non-selectable items
+// moveDown moves the selection down, skipping non-selectable items with wrap-around
 func (c *listComponent[T]) moveDown() {
 	if len(c.items) == 0 {
 		return
 	}
 
-	originalIdx := c.selectedIdx
-	for {
-		if c.selectedIdx < len(c.items)-1 {
-			c.selectedIdx++
-		} else {
-			break
-		}
-
-		if c.isSelectable(c.items[c.selectedIdx]) {
+	// Find the next selectable item
+	for i := c.selectedIdx + 1; i < len(c.items); i++ {
+		if c.isSelectable(c.items[i]) {
+			c.selectedIdx = i
 			return
 		}
+	}
 
-		// Prevent infinite loop
-		if c.selectedIdx == originalIdx {
-			break
+	// Wrap around to the top - find the first selectable item
+	for i := 0; i < len(c.items); i++ {
+		if c.isSelectable(c.items[i]) {
+			c.selectedIdx = i
+			return
 		}
+	}
+}
+
+// moveToFirst moves selection to the first selectable item
+func (c *listComponent[T]) moveToFirst() {
+	if len(c.items) == 0 {
+		return
+	}
+
+	for i := 0; i < len(c.items); i++ {
+		if c.isSelectable(c.items[i]) {
+			c.selectedIdx = i
+			return
+		}
+	}
+}
+
+// moveToLast moves selection to the last selectable item
+func (c *listComponent[T]) moveToLast() {
+	if len(c.items) == 0 {
+		return
+	}
+
+	for i := len(c.items) - 1; i >= 0; i-- {
+		if c.isSelectable(c.items[i]) {
+			c.selectedIdx = i
+			return
+		}
+	}
+}
+
+// pageUp moves selection up by approximately half the visible height
+func (c *listComponent[T]) pageUp() {
+	if len(c.items) == 0 {
+		return
+	}
+
+	pageSize := max(1, c.maxVisibleHeight/2)
+	for i := 0; i < pageSize; i++ {
+		c.moveUp()
+	}
+}
+
+// pageDown moves selection down by approximately half the visible height
+func (c *listComponent[T]) pageDown() {
+	if len(c.items) == 0 {
+		return
+	}
+
+	pageSize := max(1, c.maxVisibleHeight/2)
+	for i := 0; i < pageSize; i++ {
+		c.moveDown()
 	}
 }
 

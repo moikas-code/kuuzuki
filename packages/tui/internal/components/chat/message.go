@@ -21,6 +21,20 @@ import (
 	"golang.org/x/text/language"
 )
 
+// formatBytes formats byte count into human readable format
+func formatBytes(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
 type blockRenderer struct {
 	textColor        compat.AdaptiveColor
 	border           bool
@@ -120,6 +134,8 @@ func renderContentBlock(
 		paddingBottom: 1,
 		paddingLeft:   2,
 		paddingRight:  2,
+		marginTop:     0,
+		marginBottom:  1, // Add default bottom margin for better spacing
 	}
 	for _, option := range options {
 		option(renderer)
@@ -137,7 +153,8 @@ func renderContentBlock(
 		PaddingBottom(renderer.paddingBottom).
 		PaddingLeft(renderer.paddingLeft).
 		PaddingRight(renderer.paddingRight).
-		AlignHorizontal(lipgloss.Left)
+		AlignHorizontal(lipgloss.Left).
+		MaxWidth(width) // Ensure content doesn't exceed width
 
 	if renderer.border {
 		style = style.
@@ -378,15 +395,90 @@ func renderToolDetails(
 			}
 		case "bash":
 			command := toolInputMap["command"].(string)
-			body = fmt.Sprintf("```console\n$ %s\n", command)
+
+			// Check if streaming and add progress indicators
+			isStreaming := false
+			streamingIndicator := ""
+			progressInfo := ""
+			executionTime := ""
+
+			if metadata != nil {
+				if streaming, ok := metadata["streaming"].(bool); ok && streaming {
+					isStreaming = true
+					if indicator, ok := metadata["streamingIndicator"].(string); ok {
+						streamingIndicator = indicator
+					} else {
+						// Enhanced streaming indicators with animation
+						streamingIndicator = "⚡ Running..."
+					}
+
+					// Add progress information with better formatting
+					if progress, ok := metadata["progress"].(map[string]any); ok {
+						if elapsed, ok := progress["elapsed"].(float64); ok {
+							if bytesReceived, ok := progress["bytesReceived"].(float64); ok {
+								progressInfo = fmt.Sprintf(" [%ds, %s]", int(elapsed), formatBytes(int64(bytesReceived)))
+							} else {
+								progressInfo = fmt.Sprintf(" [%ds]", int(elapsed))
+							}
+						}
+					}
+				}
+
+				// Add execution time for completed commands
+				if !isStreaming {
+					if startTime, ok := metadata["startTime"].(float64); ok {
+						if endTime, ok := metadata["endTime"].(float64); ok {
+							duration := int64(endTime - startTime)
+							if duration > 0 {
+								executionTime = fmt.Sprintf(" (completed in %dms)", duration)
+							}
+						}
+					}
+				}
+			}
+
+			// Build command header with enhanced indicators
+			commandHeader := fmt.Sprintf("$ %s", command)
+			if isStreaming {
+				commandHeader += fmt.Sprintf(" %s%s", streamingIndicator, progressInfo)
+			} else if executionTime != "" {
+				commandHeader += executionTime
+			}
+
+			body = fmt.Sprintf("```console\n%s\n", commandHeader)
+
 			stdout := metadata["stdout"]
 			if stdout != nil {
-				body += ansi.Strip(fmt.Sprintf("%s", stdout))
+				stdoutStr := ansi.Strip(fmt.Sprintf("%s", stdout))
+				body += stdoutStr
+
+				// Add cursor indicator for streaming stdout
+				if isStreaming && stdoutStr != "" && !strings.HasSuffix(stdoutStr, "\n") {
+					body += "█" // Block cursor to show active streaming
+				}
 			}
+
 			stderr := metadata["stderr"]
 			if stderr != nil {
-				body += ansi.Strip(fmt.Sprintf("%s", stderr))
+				stderrStr := ansi.Strip(fmt.Sprintf("%s", stderr))
+				if stderrStr != "" {
+					if stdout != nil && fmt.Sprintf("%s", stdout) != "" {
+						body += "\n"
+					}
+					body += stderrStr
+
+					// Add cursor indicator for streaming stderr
+					if isStreaming && stderrStr != "" && !strings.HasSuffix(stderrStr, "\n") {
+						body += "█" // Block cursor to show active streaming
+					}
+				}
 			}
+
+			// Add streaming indicator at the end if no output yet
+			if isStreaming && (stdout == nil || fmt.Sprintf("%s", stdout) == "") && (stderr == nil || fmt.Sprintf("%s", stderr) == "") {
+				body += "█" // Show cursor when waiting for output
+			}
+
 			body += "```"
 			body = util.ToMarkdown(body, width, backgroundColor)
 		case "webfetch":
@@ -451,11 +543,21 @@ func renderToolDetails(
 	}
 
 	if error != "" {
+		// Enhanced error formatting with better visual hierarchy
+		errorIcon := "❌ "
+		errorTitle := "Error"
+
+		// Format error with icon and title
+		formattedError := fmt.Sprintf("%s%s\n%s", errorIcon, errorTitle, error)
+
 		body = styles.NewStyle().
 			Width(width - 6).
 			Foreground(t.Error()).
 			Background(backgroundColor).
-			Render(error)
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(t.Error()).
+			Padding(1).
+			Render(formattedError)
 	}
 
 	if body == "" && error == "" && result != nil {
@@ -565,6 +667,19 @@ func renderToolTitle(
 	case "bash":
 		if description, ok := toolArgsMap["description"].(string); ok {
 			title = fmt.Sprintf("%s %s", title, description)
+		}
+
+		// Add streaming indicator to bash tool title
+		if toolCall.State.Status == opencode.ToolPartStateStatusRunning {
+			if metadata, ok := toolCall.State.Metadata.(map[string]any); ok {
+				if streaming, ok := metadata["streaming"].(bool); ok && streaming {
+					if indicator, ok := metadata["streamingIndicator"].(string); ok {
+						title = fmt.Sprintf("%s %s", title, indicator)
+					} else {
+						title = fmt.Sprintf("%s ●●● Streaming...", title)
+					}
+				}
+			}
 		}
 	case "task":
 		description := toolArgsMap["description"]
@@ -738,4 +853,69 @@ func renderDiagnostics(
 	// 	return ""
 	// }
 
+}
+
+func renderThinkingBlock(
+	app *app.App,
+	content string,
+	width int,
+	expanded bool,
+) string {
+	t := theme.CurrentTheme()
+
+	// Enhanced thinking header with better visual indicators
+	var header string
+	if expanded {
+		header = "🧠 Thinking ▼"
+	} else {
+		header = "🧠 Thinking ▶"
+	}
+
+	// Add content preview when collapsed
+	if !expanded && content != "" {
+		preview := strings.Split(content, "\n")[0]
+		if len(preview) > 50 {
+			preview = preview[:47] + "..."
+		}
+		header += " • " + preview
+	}
+
+	headerStyle := styles.NewStyle().
+		Foreground(t.Text()).
+		Background(t.BackgroundPanel()).
+		Bold(true).
+		Italic(true)
+
+	header = headerStyle.Render(header)
+
+	if !expanded {
+		// Show header with preview when collapsed
+		return renderContentBlock(
+			app,
+			header,
+			width,
+			WithBorderColor(t.Accent()),
+			WithPaddingTop(0),
+			WithPaddingBottom(0),
+		)
+	}
+
+	// Show full content when expanded with enhanced formatting
+	thinkingContent := util.ToMarkdown(content, width-6, t.BackgroundPanel())
+
+	// Add separator line between header and content
+	separator := strings.Repeat("─", width-8)
+	separatorStyle := styles.NewStyle().
+		Foreground(t.TextMuted()).
+		Background(t.BackgroundPanel())
+	separator = separatorStyle.Render(separator)
+
+	fullContent := header + "\n" + separator + "\n" + thinkingContent
+
+	return renderContentBlock(
+		app,
+		fullContent,
+		width,
+		WithBorderColor(t.Accent()),
+	)
 }

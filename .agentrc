@@ -276,6 +276,22 @@
         },
         "documentationLinks": [],
         "tags": []
+      },
+      {
+        "id": "never-use-sudo-su-or-other-privilege-escalation-co-meawakxf",
+        "text": "NEVER use sudo, su, or other privilege escalation commands in sub-agents or any automated processes",
+        "category": "critical",
+        "reason": "Prevents UI breakage and security risks when running sub-agents",
+        "createdAt": "2025-08-14T04:24:25.971Z",
+        "usageCount": 0,
+        "analytics": {
+          "timesApplied": 0,
+          "timesIgnored": 0,
+          "effectivenessScore": 0,
+          "userFeedback": []
+        },
+        "documentationLinks": [],
+        "tags": []
       }
     ],
     "preferred": [
@@ -530,7 +546,7 @@
           "moidvk",
           "serve"
         ],
-        "enabled": true,
+        "enabled": false,
         "notes": "Development tools and code analysis server"
       },
       "weather": {
@@ -546,8 +562,8 @@
       "sequential-thinking": {
         "transport": "stdio",
         "command": [
-          "npx",
-          "-y",
+          "bun",
+          "x",
           "@modelcontextprotocol/server-sequential-thinking"
         ],
         "enabled": true,
@@ -556,12 +572,19 @@
       "kb-mcp": {
         "transport": "stdio",
         "command": [
-          "kb",
+          "env",
+          "-u",
+          "BUN_INSTALL",
+          "node",
+          "/home/moika/Documents/code/kb-mcp/scripts/kb-cli.js",
           "serve",
           "--local"
         ],
-        "enabled": true,
-        "notes": "Knowledge base and documentation management"
+        "env": {
+          "NODE_ENV": "production"
+        },
+        "enabled": false,
+        "notes": "Knowledge base and documentation management - disabled due to Bun detection"
       },
       "fork-parity": {
         "transport": "stdio",
@@ -858,8 +881,8 @@
   },
   "ruleMetadata": {
     "version": "1.0.0",
-    "lastModified": "2025-08-04T02:08:06.857Z",
-    "totalRules": 23,
+    "lastModified": "2025-08-14T04:24:25.971Z",
+    "totalRules": 24,
     "sessionRules": [
       {
         "ruleId": "create-comprehensive-v010-implementation-plan-with-mdopz2cl",
@@ -885,6 +908,11 @@
         "ruleId": "v0119-comprehensive-testing-completed-successfully-mdwh0r7t",
         "learnedAt": "2025-08-04T02:08:06.857Z",
         "context": "Release readiness verified through actual testing"
+      },
+      {
+        "ruleId": "never-use-sudo-su-or-other-privilege-escalation-co-meawakxf",
+        "learnedAt": "2025-08-14T04:24:25.971Z",
+        "context": "Prevents UI breakage and security risks when running sub-agents"
       }
     ]
   },
@@ -903,12 +931,68 @@
   "permission": {
     "bash": {
       "ls *": "allow",
-      "echo *": "allow", 
+      "echo *": "allow",
+      "git *": "allow",
+      "npm *": "allow",
+      "bun *": "allow",
       "rm *": "ask",
       "delete *": "ask",
-      "*": "ask"
+      "sudo *": "deny",
+      "su *": "deny",
+      "chmod +x *": "ask",
+      "chown *": "deny",
+      "*": "allow"
     },
     "edit": "allow",
-    "write": "allow"
+    "write": "allow",
+    "webfetch": "allow",
+    "read": "allow",
+    "agents": {
+      "bugfinder": {
+        "bash": {
+          "sudo *": "deny",
+          "su *": "deny",
+          "chown *": "deny",
+          "chmod +x *": "ask",
+          "*": "allow"
+        },
+        "edit": "allow",
+        "write": "deny",
+        "read": "allow"
+      },
+      "code-reviewer": {
+        "bash": {
+          "git *": "allow",
+          "npm *": "allow",
+          "rm *": "deny",
+          "sudo *": "deny",
+          "su *": "deny",
+          "chown *": "deny",
+          "*": "ask"
+        },
+        "edit": "allow",
+        "write": "deny",
+        "read": "allow"
+      },
+      "documentation": {
+        "bash": "deny",
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow"
+      },
+      "general": {
+        "bash": {
+          "sudo *": "deny",
+          "su *": "deny",
+          "chown *": "deny",
+          "chmod +x *": "ask",
+          "rm *": "ask",
+          "*": "allow"
+        },
+        "edit": "allow",
+        "write": "allow",
+        "read": "allow"
+      }
+    }
   }
 }

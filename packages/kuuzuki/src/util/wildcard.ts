@@ -6,6 +6,15 @@
 
 export namespace Wildcard {
   /**
+   * Pattern matching result with priority information
+   */
+  export interface MatchResult {
+    pattern: string;
+    priority: number;
+    specificity: number;
+  }
+
+  /**
    * Check if a string matches a wildcard pattern
    * @param pattern - The wildcard pattern (e.g., "git *", "rm -rf *", "**")
    * @param text - The text to match against
@@ -21,6 +30,79 @@ export namespace Wildcard {
     // Convert glob pattern to regex
     const regex = globToRegex(pattern);
     return regex.test(text);
+  }
+
+  /**
+   * Find all matching patterns with priority ordering
+   * Returns the most specific match first, following OpenCode v0.4.3+ pattern priority
+   * @param patterns - Array of wildcard patterns to test
+   * @param text - The text to match against
+   * @returns Array of matching patterns ordered by priority (most specific first)
+   */
+  export function all(patterns: string[], text: string): MatchResult[] {
+    const matches: MatchResult[] = [];
+
+    for (const pattern of patterns) {
+      if (match(pattern, text)) {
+        const priority = calculatePriority(pattern, text);
+        const specificity = calculateSpecificity(pattern);
+        
+        matches.push({
+          pattern,
+          priority,
+          specificity
+        });
+      }
+    }
+
+    // Sort by priority (higher first), then by specificity (higher first)
+    return matches.sort((a, b) => {
+      if (a.priority !== b.priority) {
+        return b.priority - a.priority;
+      }
+      return b.specificity - a.specificity;
+    });
+  }
+
+  /**
+   * Calculate pattern priority based on match quality
+   * Higher priority = more specific/exact match
+   */
+  function calculatePriority(pattern: string, text: string): number {
+    // Exact match gets highest priority
+    if (pattern === text) return 1000;
+
+    // Count literal characters vs wildcards
+    const literalChars = pattern.replace(/[*?]/g, '').length;
+    const wildcardCount = (pattern.match(/[*?]/g) || []).length;
+    
+    // More literal characters = higher priority
+    // Fewer wildcards = higher priority
+    return literalChars * 10 - wildcardCount * 2;
+  }
+
+  /**
+   * Calculate pattern specificity for tie-breaking
+   * Higher specificity = more constrained pattern
+   */
+  function calculateSpecificity(pattern: string): number {
+    let specificity = 0;
+    
+    // Exact characters add to specificity
+    specificity += pattern.replace(/[*?]/g, '').length * 4;
+    
+    // Single-char wildcards (?) are more specific than multi-char (*)
+    specificity += (pattern.match(/\?/g) || []).length * 2;
+    specificity -= (pattern.match(/\*/g) || []).length * 1;
+    
+    // Patterns with word boundaries are more specific
+    if (pattern.includes(' ')) specificity += 5;
+    
+    // Patterns starting/ending with literals are more specific
+    if (pattern.length > 0 && !/[*?]/.test(pattern[0])) specificity += 3;
+    if (pattern.length > 0 && !/[*?]/.test(pattern[pattern.length - 1])) specificity += 3;
+    
+    return specificity;
   }
 
   /**
@@ -48,7 +130,7 @@ export namespace Wildcard {
       .replace(/\?/g, ".");
 
     // Anchor the pattern to match the entire string
-    return new RegExp(`^${regexPattern}$`, "i");
+    return new RegExp(`^${regexPattern}$`);
   }
 
   /**
@@ -126,6 +208,88 @@ export namespace Wildcard {
     }
 
     return match(pattern, str); // Note: parameter order swap for OpenCode compatibility
+  }
+
+  /**
+   * Enhanced tool name pattern matching for configuration
+   * Supports both exact tool names and wildcard patterns with priority-based matching
+   * @param toolName - The tool name to match (e.g., "bash", "edit", "read")
+   * @param patterns - Array of patterns to test against
+   * @returns The best matching pattern with priority information or null if no match
+   */
+  export function matchToolName(toolName: string, patterns: string[]): string | null {
+    const matches = all(patterns, toolName);
+    return matches.length > 0 ? matches[0].pattern : null;
+  }
+
+  /**
+   * Enhanced tool name pattern matching with full result information
+   * @param toolName - The tool name to match
+   * @param patterns - Array of patterns to test against
+   * @returns The best matching result with priority and specificity or null if no match
+   */
+  export function matchToolNameWithResult(toolName: string, patterns: string[]): MatchResult | null {
+    const matches = all(patterns, toolName);
+    return matches.length > 0 ? matches[0] : null;
+  }
+
+  /**
+   * Filter tool names based on wildcard patterns
+   * @param toolNames - Array of tool names to filter
+   * @param includePatterns - Patterns for tools to include (empty array means include all)
+   * @param excludePatterns - Patterns for tools to exclude
+   * @returns Filtered array of tool names
+   */
+  export function filterToolNames(
+    toolNames: string[],
+    includePatterns: string[] = [],
+    excludePatterns: string[] = []
+  ): string[] {
+    let filtered = toolNames;
+
+    // Apply include patterns if specified
+    if (includePatterns.length > 0) {
+      filtered = filtered.filter(toolName => 
+        includePatterns.some(pattern => match(pattern, toolName))
+      );
+    }
+
+    // Apply exclude patterns
+    if (excludePatterns.length > 0) {
+      filtered = filtered.filter(toolName => 
+        !excludePatterns.some(pattern => match(pattern, toolName))
+      );
+    }
+
+    return filtered;
+  }
+
+  /**
+   * Get tool configuration priority for a given tool name
+   * Higher priority means more specific configuration should be applied
+   * @param toolName - The tool name
+   * @param configPatterns - Configuration patterns with their priorities
+   * @returns Priority score (higher = more specific)
+   */
+  export function getToolConfigPriority(
+    toolName: string,
+    configPatterns: Record<string, any>
+  ): number {
+    const patterns = Object.keys(configPatterns);
+    const matches = all(patterns, toolName);
+    return matches.length > 0 ? matches[0].priority : 0;
+  }
+
+  /**
+   * Enhanced command pattern matching with priority
+   * Used by permission system for accurate command matching
+   * @param command - The command to match
+   * @param patterns - Array of command patterns
+   * @returns The best matching pattern with its priority, or null if no match
+   */
+  export function matchCommand(command: string, patterns: string[]): MatchResult | null {
+    const matches = all(patterns, command);
+    return matches.length > 0 ? matches[0] : null;
   }
 
   /**

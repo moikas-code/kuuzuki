@@ -26,22 +26,51 @@ export namespace Config {
     // Load base configuration
     let result = await global();
 
-    // Merge environment variables
+    // Merge environment variables with enhanced permission support
     const envConfig = ConfigSchema.parseEnvironmentVariables();
     result = mergeDeep(result, envConfig);
-
-    // Override with custom config if provided
-    if (Flag.KUUZUKI_CONFIG) {
-      result = mergeDeep(result, await load(Flag.KUUZUKI_CONFIG));
-      log.debug("loaded custom config", { path: Flag.KUUZUKI_CONFIG });
+    
+    // Log environment variable usage
+    const envVarsLoaded = [];
+    if (process.env.OPENCODE_PERMISSION) {
+      envVarsLoaded.push("OPENCODE_PERMISSION");
+    }
+    if (process.env.OPENCODE) {
+      envVarsLoaded.push("OPENCODE");
+    }
+    if (process.env.OPENCODE_DISABLE_AUTOUPDATE) {
+      envVarsLoaded.push("OPENCODE_DISABLE_AUTOUPDATE");
+    }
+    if (envVarsLoaded.length > 0) {
+      log.info("Loaded OpenCode environment variables", { variables: envVarsLoaded });
     }
 
-    // Load project-specific configurations
-    for (const file of ["kuuzuki.jsonc", "kuuzuki.json"]) {
+    // Override with custom config if provided (enhanced discovery)
+    const customConfigPath = Flag.getConfigPath();
+    if (customConfigPath) {
+      result = mergeDeep(result, await load(customConfigPath));
+      log.debug("loaded custom config", { path: customConfigPath });
+    }
+
+    // Load project-specific configurations with enhanced discovery
+    const configFiles = [
+      "kuuzuki.jsonc", 
+      "kuuzuki.json",
+      // OpenCode compatibility
+      "opencode.jsonc",
+      "opencode.json",
+      ".opencode.jsonc", 
+      ".opencode.json",
+      // Additional config file support
+      "biome.jsonc"
+    ];
+    
+    for (const file of configFiles) {
       const found = await Filesystem.findUp(file, app.path.cwd, app.path.root);
       for (const resolved of found.toReversed()) {
         const projectConfig = await load(resolved);
         result = mergeDeep(result, projectConfig);
+        log.debug("loaded project config", { path: resolved });
       }
     }
 
@@ -717,7 +746,18 @@ export namespace Config {
         const resolvedPath = path.isAbsolute(filePath)
           ? filePath
           : path.resolve(configDir, filePath);
-        const fileContent = await Bun.file(resolvedPath).text();
+        const fileContent = await Bun.file(resolvedPath)
+          .text()
+          .catch((error) => {
+            const errMsg = `bad file reference: "${match}"`;
+            if (error.code === "ENOENT") {
+              throw new InvalidError(
+                { path: configPath, message: errMsg + ` ${resolvedPath} does not exist` },
+                { cause: error },
+              );
+            }
+            throw new InvalidError({ path: configPath, message: errMsg }, { cause: error });
+          });
         text = text.replace(match, JSON.stringify(fileContent));
       }
     }
@@ -788,7 +828,18 @@ export namespace Config {
         const resolvedPath = path.isAbsolute(filePath)
           ? filePath
           : path.resolve(configDir, filePath);
-        const fileContent = await Bun.file(resolvedPath).text();
+        const fileContent = await Bun.file(resolvedPath)
+          .text()
+          .catch((error) => {
+            const errMsg = `bad file reference: "${match}"`;
+            if (error.code === "ENOENT") {
+              throw new InvalidError(
+                { path: configPath, message: errMsg + ` ${resolvedPath} does not exist` },
+                { cause: error },
+              );
+            }
+            throw new InvalidError({ path: configPath, message: errMsg }, { cause: error });
+          });
         text = text.replace(match, JSON.stringify(fileContent));
       }
     }
@@ -833,6 +884,7 @@ export namespace Config {
     z.object({
       path: z.string(),
       issues: z.custom<z.ZodIssue[]>().optional(),
+      message: z.string().optional(),
     }),
   );
 

@@ -358,6 +358,31 @@ func (m *messagesComponent) renderView() tea.Cmd {
 					revertedMessageCount = 1
 					revertedToolCount = 0
 				}
+
+				// Show enhanced placeholder for pending assistant messages
+				if !reverted && casted.Time.Completed == 0 && len(message.Parts) == 0 {
+					placeholderText := "● ● ● Thinking..."
+					content = renderContentBlock(
+						m.app,
+						placeholderText,
+						width,
+						WithBorderColor(t.Accent()),
+						WithTextColor(t.Text()),
+					)
+					content = lipgloss.PlaceHorizontal(
+						m.width,
+						lipgloss.Center,
+						content,
+						styles.WhitespaceStyle(t.Background()),
+					)
+					if content != "" {
+						partCount++
+						lineCount += lipgloss.Height(content) + 1
+						blocks = append(blocks, content)
+					}
+					continue
+				}
+
 				hasTextPart := false
 				for partIndex, p := range message.Parts {
 					switch part := p.(type) {
@@ -1034,6 +1059,29 @@ func (m *messagesComponent) RedoLastMessage() (tea.Model, tea.Cmd) {
 		}
 		return app.MessageRevertedMsg{Session: *response, Message: revertedMessage}
 	}
+}
+
+func renderPendingPlaceholder(width int) string {
+	t := theme.CurrentTheme()
+
+	// Create animated dots
+	dots := "● ● ●"
+	dotsStyle := styles.NewStyle().
+		Foreground(t.Accent()).
+		Bold(true)
+
+	text := "Thinking..."
+	textStyle := styles.NewStyle().
+		Foreground(t.Text())
+
+	content := dotsStyle.Render(dots) + " " + textStyle.Render(text)
+
+	// Center the content
+	contentStyle := styles.NewStyle().
+		Width(width - 6).
+		AlignHorizontal(lipgloss.Center)
+
+	return contentStyle.Render(content)
 }
 
 func NewMessagesComponent(app *app.App) MessagesComponent {

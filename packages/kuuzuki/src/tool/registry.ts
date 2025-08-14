@@ -15,6 +15,8 @@ import { MemoryTool } from "./memory";
 import { PluginInfoTool } from "./plugin-info";
 import { SmartLearningAssistantTool } from "./smart-learning-assistant";
 import { IntelligentRuleOptimizerTool } from "./intelligent-rule-optimizer";
+import { isToolCompatible, getRecommendedBatchSize } from "../session/model-config";
+import { Wildcard } from "../util/wildcard";
 
 /**
  * Tool Registry - Internal Management System
@@ -47,11 +49,168 @@ export namespace ToolRegistry {
     TaskTool,
   ];
 
+  // Enhanced agent-specific tool configurations with wildcard pattern support
+  const AGENT_TOOL_CONFIG: Record<string, { 
+    allowed?: string[]; 
+    denied?: string[];
+    patterns?: {
+      include?: string[];
+      exclude?: string[];
+      priority?: "specificity" | "order" | "length";
+    };
+  }> = {
+    grounding: {
+      allowed: ["webfetch", "read", "grep", "bash", "memory"],
+      patterns: {
+        include: ["*fetch*", "read*", "*grep*", "bash*", "memory*"],
+        priority: "specificity"
+      }
+    },
+    "code-reviewer": {
+      allowed: ["read", "bash", "grep", "memory"],
+      patterns: {
+        include: ["read*", "bash*", "*grep*", "memory*"],
+        exclude: ["write*", "edit*"],
+        priority: "specificity"
+      }
+    },
+    documentation: {
+      allowed: ["read", "write", "edit", "glob", "grep", "memory"],
+      patterns: {
+        include: ["read*", "write*", "edit*", "*glob*", "*grep*", "memory*"],
+        priority: "specificity"
+      }
+    },
+    testing: {
+      allowed: ["read", "write", "edit", "bash", "grep", "glob"],
+      patterns: {
+        include: ["read*", "write*", "edit*", "bash*", "*grep*", "*glob*"],
+        exclude: ["webfetch*"],
+        priority: "specificity"
+      }
+    },
+    debugger: {
+      allowed: ["read", "bash", "grep", "glob", "memory"],
+      patterns: {
+        include: ["read*", "bash*", "*grep*", "*glob*", "memory*"],
+        exclude: ["write*", "edit*"],
+        priority: "specificity"
+      }
+    },
+    architect: {
+      allowed: ["read", "write", "grep", "glob", "memory", "todowrite"],
+      patterns: {
+        include: ["read*", "write*", "*grep*", "*glob*", "memory*", "todo*"],
+        priority: "specificity"
+      }
+    },
+    bugfinder: {
+      allowed: ["bash", "read", "write", "edit", "grep", "glob"],
+      patterns: {
+        include: ["bash*", "read*", "write*", "edit*", "*grep*", "*glob*"],
+        priority: "specificity"
+      }
+    },
+  };
+
+  /**
+   * Enhanced tool filtering with wildcard pattern support
+   * Supports both exact tool names and wildcard patterns for flexible configuration
+   */
+  function filterToolsForAgent(tools: any[], agentName?: string): any[] {
+    if (!agentName || !AGENT_TOOL_CONFIG[agentName]) {
+      return tools;
+    }
+
+    const config = AGENT_TOOL_CONFIG[agentName];
+    const toolIds = tools.map(tool => tool.id);
+    
+    // Use pattern-based filtering if patterns are configured
+    if (config.patterns) {
+      const includePatterns = config.patterns.include || [];
+      const excludePatterns = config.patterns.exclude || [];
+      
+      const filteredIds = Wildcard.filterToolNames(toolIds, includePatterns, excludePatterns);
+      return tools.filter(tool => filteredIds.includes(tool.id));
+    }
+    
+    // Fallback to legacy exact matching
+    if (config.allowed) {
+      return tools.filter(tool => config.allowed!.includes(tool.id));
+    }
+    
+    if (config.denied) {
+      return tools.filter(tool => !config.denied!.includes(tool.id));
+    }
+    
+    return tools;
+  }
+
+  /**
+   * Get tool configuration priority for a specific agent and tool
+   * Used for resolving conflicts when multiple configurations apply
+   */
+  export function getToolPriority(toolName: string, agentName?: string): number {
+    if (!agentName || !AGENT_TOOL_CONFIG[agentName]) {
+      return 0;
+    }
+
+    const config = AGENT_TOOL_CONFIG[agentName];
+    
+    // Check pattern-based configuration
+    if (config.patterns?.include) {
+      const configPatterns: Record<string, number> = {};
+      config.patterns.include.forEach((pattern, index) => {
+        configPatterns[pattern] = 100 - index; // Higher priority for earlier patterns
+      });
+      
+      return Wildcard.getToolConfigPriority(toolName, configPatterns);
+    }
+    
+    // Check exact match configuration
+    if (config.allowed?.includes(toolName)) {
+      return 50; // Medium priority for exact matches
+    }
+    
+    return 0;
+  }
+
+  /**
+   * Check if a tool is allowed for a specific agent using enhanced pattern matching
+   */
+  export function isToolAllowedForAgent(toolName: string, agentName?: string): boolean {
+    if (!agentName || !AGENT_TOOL_CONFIG[agentName]) {
+      return true; // Allow all tools if no agent-specific config
+    }
+
+    const config = AGENT_TOOL_CONFIG[agentName];
+    
+    // Check pattern-based configuration
+    if (config.patterns) {
+      const includePatterns = config.patterns.include || [];
+      const excludePatterns = config.patterns.exclude || [];
+      
+      const filteredTools = Wildcard.filterToolNames([toolName], includePatterns, excludePatterns);
+      return filteredTools.length > 0;
+    }
+    
+    // Fallback to legacy exact matching
+    if (config.allowed) {
+      return config.allowed.includes(toolName);
+    }
+    
+    if (config.denied) {
+      return !config.denied.includes(toolName);
+    }
+    
+    return true;
+  }
+
   export function ids() {
     return ALL.map((t) => t.id);
   }
 
-  export async function tools(providerID: string, _modelID: string) {
+  export async function tools(providerID: string, modelID: string, agentName?: string) {
     const result = await Promise.all(
       ALL.map(async (t) => ({
         id: t.id,
@@ -59,46 +218,98 @@ export namespace ToolRegistry {
       })),
     );
 
+    // Apply agent-specific tool filtering
+    let filteredResult = filterToolsForAgent(result, agentName);
+    
+    // Apply model-specific compatibility filtering
+    filteredResult = filteredResult.filter(tool => 
+      isToolCompatible(tool.id, modelID, providerID)
+    );
+
     if (providerID === "openai") {
-      return result.map((t) => ({
+      return filteredResult.map((t) => ({
         ...t,
         parameters: optionalToNullable(t.parameters),
       }));
     }
 
     if (providerID === "azure") {
-      return result.map((t) => ({
+      return filteredResult.map((t) => ({
         ...t,
         parameters: optionalToNullable(t.parameters),
       }));
     }
 
     if (providerID === "google") {
-      return result.map((t) => ({
+      return filteredResult.map((t) => ({
         ...t,
         parameters: sanitizeGeminiParameters(t.parameters),
       }));
     }
 
-    return result;
+    return filteredResult;
   }
 
   export function enabled(
-    _providerID: string,
+    providerID: string,
     modelID: string,
   ): Record<string, boolean> {
-    if (modelID.toLowerCase().includes("claude")) {
+    const model = modelID.toLowerCase();
+    const provider = providerID.toLowerCase();
+    
+    // Claude models - disable patch tool due to compatibility issues
+    if (model.includes("claude")) {
       return {
         patch: false,
       };
     }
-    if (modelID.toLowerCase().includes("qwen")) {
+    
+    // Qwen models - disable complex tools that may cause issues
+    if (model.includes("qwen")) {
       return {
         patch: false,
         todowrite: false,
         todoread: false,
+        task: false, // Disable task tool for qwen models
       };
     }
+    
+    // GPT-5 and Copilot models - enable all advanced tools
+    if (model.includes("gpt-5") || model.includes("copilot")) {
+      return {
+        // All tools enabled by default
+      };
+    }
+    
+    // O1 reasoning models - optimize for reasoning tasks
+    if (model.includes("o1") || model.includes("o3")) {
+      return {
+        // All tools enabled, optimized for reasoning
+      };
+    }
+    
+    // Google models optimizations (check provider first)
+    if (provider === "google" || model.includes("gemini")) {
+      return {
+        patch: false,
+        task: false, // Google models may have issues with complex task tool
+      };
+    }
+    
+    // OpenAI models general optimizations
+    if (provider === "openai") {
+      return {
+        // OpenAI models generally work well with all tools
+      };
+    }
+    
+    // Anthropic models optimizations
+    if (provider === "anthropic") {
+      return {
+        patch: false, // Anthropic models prefer direct edit operations
+      };
+    }
+    
     return {};
   }
 

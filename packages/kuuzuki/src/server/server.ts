@@ -328,10 +328,59 @@ export namespace Server {
           await Session.remove(c.req.valid("param").id);
           return c.json(true);
         },
+       )
+      .patch(
+        "/session/:id",
+        describeRoute({
+          description: "Update session properties",
+          operationId: "session.update",
+          responses: {
+            200: {
+              description: "Successfully updated session",
+              content: {
+                "application/json": {
+                  schema: resolver(Session.Info),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string(),
+          }),
+        ),
+        zValidator(
+          "json",
+          z.object({
+            title: z.string().min(1).max(200).optional(),
+          }),
+        ),
+        async (c) => {
+          const sessionID = c.req.valid("param").id;
+          const updates = c.req.valid("json");
+
+          // Validate that at least one field is being updated
+          if (updates.title === undefined) {
+            return c.json({ error: "At least one field must be provided for update" }, 400);
+          }
+
+          const updatedSession = await Session.update(sessionID, (session) => {
+            if (updates.title !== undefined) {
+              session.title = updates.title.trim();
+            }
+          });
+
+          if (!updatedSession) {
+            return c.json({ error: "Session not found" }, 404);
+          }
+
+          return c.json(updatedSession);
+        },
       )
       .post(
-        "/session/:id/init",
-        describeRoute({
+        "/session/:id/init",        describeRoute({
           description: "Analyze the app and create an AGENTS.md file",
           responses: {
             200: {
@@ -488,6 +537,39 @@ export namespace Server {
             modelID: body.modelID,
           });
           return c.json(true);
+        },
+      )
+      .post(
+        "/session/:id/shell",
+        describeRoute({
+          description: "Run a shell command",
+          operationId: "session.shell",
+          responses: {
+            200: {
+              description: "Created message",
+              content: {
+                "application/json": {
+                  schema: resolver(MessageV2.Info),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string().openapi({ description: "Session ID" }),
+          }),
+        ),
+        zValidator(
+          "json",
+          Session.ShellInput.omit({ sessionID: true }),
+        ),
+        async (c) => {
+          const sessionID = c.req.valid("param").id;
+          const body = c.req.valid("json");
+          const msg = await Session.shell({ ...body, sessionID });
+          return c.json(msg);
         },
       )
       .get(

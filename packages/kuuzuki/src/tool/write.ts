@@ -30,26 +30,27 @@ export const WriteTool = Tool.define("write", {
     const exists = await file.exists();
     if (exists) await FileTime.assert(ctx.sessionID, filepath);
 
-    // Check permissions using hybrid config format
+    // Check permissions using enhanced agent-aware system
     const config = await Config.get();
-    let needsPermission = false;
+    const agentName = ctx.extra?.agentName as string | undefined;
+    const permissionResult = Permission.checkPermission({
+      type: "write",
+      pattern: params.filePath,
+      agentName,
+      config,
+    });
 
-    if (config.permission) {
-      if (Array.isArray(config.permission)) {
-        // kuuzuki simple array format - edit operations not typically covered by command patterns
-        needsPermission = false;
-      } else if (
-        typeof config.permission === "object" &&
-        config.permission.edit
-      ) {
-        // OpenCode object format with edit permissions
-        needsPermission = config.permission.edit === "ask";
-      }
+    // Handle permission result
+    if (permissionResult === "deny") {
+      throw new Error(`File writing denied by permission configuration: ${params.filePath}`);
     }
+
+    const needsPermission = permissionResult === "ask";
 
     if (needsPermission) {
       await Permission.ask({
-        type: "edit",
+        type: "write",
+        agentName: ctx.extra?.agentName as string | undefined,
         sessionID: ctx.sessionID,
         messageID: ctx.messageID,
         callID: ctx.toolCallID,

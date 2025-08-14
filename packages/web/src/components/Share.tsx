@@ -57,6 +57,7 @@ export default function Share(props: {
   const [showScrollButton, setShowScrollButton] = createSignal(false)
   const [isButtonHovered, setIsButtonHovered] = createSignal(false)
   const [isNearBottom, setIsNearBottom] = createSignal(false)
+  const [showToolDetails, setShowToolDetails] = createSignal(true)
 
   const [store, setStore] = createStore<{
     info?: Session.Info
@@ -305,6 +306,16 @@ export default function Share(props: {
                 <span>v{store.info?.version}</span>
               </Show>
             </li>
+            <li title="Toggle tool details" data-slot="item">
+              <button 
+                type="button" 
+                onClick={() => setShowToolDetails(!showToolDetails())}
+                style={{ background: "none", border: "none", cursor: "pointer", display: "flex", "align-items": "center", gap: "4px" }}
+              >
+                <span style={{ "font-size": "12px" }}>Tools</span>
+                <Show when={showToolDetails()} fallback={"🔽"}>🔼</Show>
+              </button>
+            </li>
             {Object.values(data().models).length > 0 ? (
               <For each={Object.values(data().models)}>
                 {([provider, model]) => (
@@ -338,6 +349,9 @@ export default function Share(props: {
             <SuspenseList revealOrder="forwards">
               <For each={data().messages}>
                 {(msg, msgIndex) => {
+                  const isPending = createMemo(() => 
+                    msg.role === "assistant" && !msg.time.completed && msg.parts.length === 0
+                  )
                   const filteredParts = createMemo(() =>
                     msg.parts.filter((x, index) => {
                       if (x.type === "step-start" && index > 0) return false
@@ -348,12 +362,30 @@ export default function Share(props: {
                       if (x.type === "text" && !x.text) return false
                       if (x.type === "tool" && (x.state.status === "pending" || x.state.status === "running"))
                         return false
+                      if (x.type === "tool" && !showToolDetails()) return false
                       return true
                     })
                   )
 
                   return (
                     <Suspense>
+                      <Show when={isPending()}>
+                        <div data-section="part" data-part-type="placeholder">
+                          <div data-section="decoration">
+                            <span data-status="pending"></span>
+                          </div>
+                          <div data-section="content">
+                            <div data-component="assistant-placeholder">
+                              <div data-slot="dots">
+                                <span>●</span>
+                                <span>●</span>
+                                <span>●</span>
+                              </div>
+                              <span data-slot="text">Thinking...</span>
+                            </div>
+                          </div>
+                        </div>
+                      </Show>
                       <For each={filteredParts()}>
                         {(part, partIndex) => {
                           const last = createMemo(
@@ -510,6 +542,7 @@ export function fromV1(v1: Message.Info): MessageWithParts {
       modelID: v1.metadata.assistant!.modelID,
       providerID: v1.metadata.assistant!.providerID,
       system: v1.metadata.assistant!.system,
+      mode: "build",
       error: v1.metadata.error,
       parts: v1.parts.flatMap((part, index): MessageV2.Part[] => {
         const base = {

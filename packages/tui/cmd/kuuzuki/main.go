@@ -32,6 +32,8 @@ func main() {
 	var model *string = flag.String("model", "", "model to begin with")
 	var prompt *string = flag.String("prompt", "", "prompt to begin with")
 	var mode *string = flag.String("mode", "", "mode to begin with")
+	var command *string = flag.String("command", "", "command to run after starting")
+	var session *string = flag.String("session", "", "session ID to resume")
 	flag.Parse()
 
 	url := os.Getenv("KUUZUKI_SERVER")
@@ -96,9 +98,20 @@ func main() {
 	}()
 
 	// Create main context for the application
-	app_, err := app.New(ctx, version, appInfo, modes, httpClient, model, prompt, mode)
+	app_, err := app.New(ctx, version, appInfo, modes, httpClient, model, prompt, mode, session)
 	if err != nil {
 		panic(err)
+	}
+
+	// Store command line arguments for later use
+	if session != nil && *session != "" {
+		slog.Info("Session argument provided", "sessionID", *session)
+		// Session loading will be handled by the TUI after initialization
+	}
+
+	if command != nil && *command != "" {
+		slog.Info("Command argument provided", "command", *command)
+		// Command execution will be handled by the TUI after initialization
 	}
 
 	program := tea.NewProgram(

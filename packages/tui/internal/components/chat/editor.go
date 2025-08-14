@@ -464,7 +464,7 @@ func (m *editorComponent) Content() string {
 		BorderRight(true).
 		Render(textarea)
 
-	hint := base(m.getSubmitKeyText()) + muted(" send   ")
+	hint := base(m.getSubmitKeyText()) + muted(" send   ") + muted("!cmd") + muted(" shell")
 	if m.exitKeyInDebounce {
 		keyText := m.getExitKeyText()
 		hint = base(keyText+" again") + muted(" to exit")
@@ -552,6 +552,26 @@ func (m *editorComponent) Submit() (tea.Model, tea.Cmd) {
 	switch value {
 	case "exit", "quit", "q", ":q":
 		return m, tea.Quit
+	}
+
+	// Check for !shell command
+	if strings.HasPrefix(value, "!") && len(value) > 1 {
+		command := strings.TrimSpace(value[1:]) // Remove the ! prefix
+		if command != "" {
+			var cmds []tea.Cmd
+
+			// Clear the editor
+			updated, cmd := m.Clear()
+			m = updated.(*editorComponent)
+			cmds = append(cmds, cmd)
+
+			// Execute shell command
+			cmds = append(cmds, util.CmdHandler(app.ExecuteShellCommand{
+				SessionID: m.app.Session.ID,
+				Command:   command,
+			}))
+			return m, tea.Batch(cmds...)
+		}
 	}
 
 	if len(value) > 0 && value[len(value)-1] == '\\' {
@@ -841,6 +861,8 @@ func getMediaTypeFromExtension(ext string) string {
 		return "image/jpeg"
 	case ".png", ".jpeg", ".gif", ".webp":
 		return "image/" + ext[1:]
+	case ".svg":
+		return "image/svg+xml"
 	case ".pdf":
 		return "application/pdf"
 	default:

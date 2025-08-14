@@ -11,6 +11,10 @@ import PROMPT_ANTHROPIC from "./prompt/anthropic.txt"
 import PROMPT_BEAST from "./prompt/beast.txt"
 import PROMPT_GEMINI from "./prompt/gemini.txt"
 import PROMPT_ANTHROPIC_SPOOF from "./prompt/anthropic_spoof.txt"
+import PROMPT_GPT5_COPILOT from "./prompt/gpt5-copilot.txt"
+import PROMPT_QWEN from "./prompt/qwen.txt"
+import PROMPT_CLAUDE from "./prompt/claude.txt"
+import PROMPT_O1 from "./prompt/o1.txt"
 import PROMPT_SUMMARIZE from "./prompt/summarize.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 
@@ -19,9 +23,59 @@ export namespace SystemPrompt {
     if (providerID.includes("anthropic")) return [PROMPT_ANTHROPIC_SPOOF.trim()]
     return []
   }
+
+  export function getModelCapabilities(modelID: string) {
+    const model = modelID.toLowerCase()
+    
+    return {
+      reasoning: model.includes("o1") || model.includes("o3") || model.includes("reasoning"),
+      multimodal: model.includes("gpt-4") || model.includes("claude") || model.includes("gemini"),
+      coding: true, // All models support coding
+      autonomous: model.includes("gpt-") || model.includes("claude"),
+      efficiency: model.includes("gpt-5") || model.includes("copilot"),
+      multilingual: model.includes("qwen") || model.includes("gemini"),
+      safety: model.includes("claude") || model.includes("gemini")
+    }
+  }
   export function provider(modelID: string) {
-    if (modelID.includes("gpt-") || modelID.includes("o1") || modelID.includes("o3")) return [PROMPT_BEAST]
-    if (modelID.includes("gemini-")) return [PROMPT_GEMINI]
+    const model = modelID.toLowerCase()
+    
+    // GPT-5 and Copilot models - Advanced reasoning and efficiency
+    if (model.includes("gpt-5") || model.includes("copilot") || model.includes("gpt-4o-copilot")) {
+      return [PROMPT_GPT5_COPILOT]
+    }
+    
+    // O1 reasoning models - Deep analytical thinking
+    if (model.includes("o1") || model.includes("o3") || model.includes("reasoning")) {
+      return [PROMPT_O1]
+    }
+    
+    // GPT-4 models - Beast mode for complex tasks
+    if (model.includes("gpt-4") && !model.includes("copilot")) {
+      return [PROMPT_BEAST]
+    }
+    
+    // Other GPT models - Standard beast mode
+    if (model.includes("gpt-")) {
+      return [PROMPT_BEAST]
+    }
+    
+    // Gemini models - Google's optimization
+    if (model.includes("gemini") || model.includes("bard")) {
+      return [PROMPT_GEMINI]
+    }
+    
+    // Qwen models - Alibaba's optimization
+    if (model.includes("qwen") || model.includes("qwen2")) {
+      return [PROMPT_QWEN]
+    }
+    
+    // Claude models - Anthropic's optimization
+    if (model.includes("claude") || model.includes("sonnet") || model.includes("haiku") || model.includes("opus")) {
+      return [PROMPT_CLAUDE]
+    }
+    
+    // Default to Anthropic prompt for other models
     return [PROMPT_ANTHROPIC]
   }
 
