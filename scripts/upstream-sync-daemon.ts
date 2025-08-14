@@ -26,6 +26,7 @@ interface DaemonConfig {
   dryRun: boolean;
   notifyOnChanges: boolean;
   maxChangesPerRun: number;
+  pathMappings: Record<string, string>; // upstream path -> local path
   excludePatterns: string[];
   includePatterns: string[];
 }
@@ -61,12 +62,21 @@ const DEFAULT_CONFIG: DaemonConfig = {
   dryRun: false,
   notifyOnChanges: true,
   maxChangesPerRun: 5,
+  pathMappings: {
+    "packages/opencode/": "packages/kuuzuki/",
+    "packages/opencode-": "packages/kuuzuki-"
+  },
   excludePatterns: [
     "*.md",
     "docs/**",
     "*.lock",
     "package-lock.json",
-    ".github/**"
+    ".github/workflows/**",
+    "README*",
+    "CHANGELOG*",
+    "LICENSE*",
+    "version.txt",
+    "VERSION"
   ],
   includePatterns: [
     "packages/kuuzuki/**/*.ts",
@@ -333,6 +343,22 @@ Respond in JSON format:
     // Simple heuristic analysis
     const message = change.message.toLowerCase();
     
+    // Check for problematic commit types that should be skipped
+    const skipPatterns = [
+      /^release:/i,
+      /^version:/i,
+      /^v\d+\.\d+\.\d+/i,
+      /^bump version/i,
+      /^prepare release/i,
+      /^update version/i,
+      /^changelog/i,
+      /^merge pull request/i,
+      /^merge branch/i,
+      /^revert/i
+    ];
+
+    const shouldSkip = skipPatterns.some(pattern => pattern.test(change.message));
+    
     let type: "feature" | "bugfix" | "refactor" | "docs" | "test" | "chore" = "chore";
     if (message.includes("feat") || message.includes("add")) type = "feature";
     else if (message.includes("fix") || message.includes("bug")) type = "bugfix";
@@ -361,8 +387,34 @@ Respond in JSON format:
     let recommendation: "auto-merge" | "review" | "manual" | "skip" = "review";
     let confidence = 0.6;
 
+    // Skip problematic commit types first
+    if (shouldSkip) {
+      recommendation = "skip";
+      confidence = 0.95;
+      this.log(`🚫 Skipping problematic commit type: ${change.message}`);
+    }
+    // Skip commits that mostly affect files that don't exist in our fork (even with path translation)
+    else if (!isRelevant && change.files.length > 0) {
+      // Check if files exist in our fork (with path translation)
+      let existingFiles = 0;
+      for (const file of change.files) {
+        const translatedPath = this.translatePath(file);
+        try {
+          execSync(`git show ${this.config.localBranch}:${translatedPath}`, { stdio: "pipe" });
+          existingFiles++;
+        } catch {
+          // File doesn't exist even with translation
+        }
+      }
+      
+      if (existingFiles === 0) {
+        recommendation = "skip";
+        confidence = 0.9;
+        this.log(`🚫 Skipping - no files exist in our fork (even with path translation): ${change.files.join(", ")}`);
+      }
+    }
     // Special handling for bug fixes - they're usually important
-    if (type === "bugfix") {
+    else if (type === "bugfix") {
       if (risk === "low") {
         recommendation = "auto-merge";
         confidence = 0.85;
@@ -497,6 +549,160 @@ Respond in JSON format:
     }
   }
 
+  private async hasLikelyConflicts(change: UpstreamChange): Promise<boolean> {
+    try {
+      // Check if files exist in our fork structure
+      let missingFiles = 0;
+      let existingFiles = 0;
+      
+      for (const file of change.files) {
+        try {
+          // Check if file exists in our current branch
+          execSync(`git show ${this.config.localBranch}:${file}`, { stdio: "pipe" });
+          existingFiles++;
+          
+          // Check if file has been modified recently in our branch
+          const recentChanges = execSync(
+            `git log -10 --oneline --name-only ${this.config.localBranch} -- ${file}`,
+            { encoding: "utf8" }
+          );
+          
+          if (recentChanges.trim()) {
+            this.log(`⚠️  File ${file} has recent changes in ${this.config.localBranch}`);
+            return true;
+          }
+        } catch {
+          // File doesn't exist in our branch
+          missingFiles++;
+          this.log(`📁 File ${file} doesn't exist in our fork`);
+        }
+      }
+      
+      // If most files don't exist in our fork, this commit is probably not applicable
+      if (missingFiles > existingFiles) {
+        this.log(`⚠️  ${missingFiles}/${change.files.length} files don't exist in our fork - likely not applicable`);
+        return true;
+      }
+
+      // Check for package.json version conflicts (common in release commits)
+      if (change.files.includes("package.json")) {
+        try {
+          const upstreamPackage = execSync(`git show ${change.commit}:package.json`, { encoding: "utf8" });
+          const localPackage = execSync(`git show ${this.config.localBranch}:package.json`, { encoding: "utf8" });
+          
+          const upstreamVersion = JSON.parse(upstreamPackage).version;
+          const localVersion = JSON.parse(localPackage).version;
+          
+          if (upstreamVersion !== localVersion) {
+            this.log(`⚠️  Version conflict: upstream ${upstreamVersion} vs local ${localVersion}`);
+            return true;
+          }
+        } catch {
+          // Can't parse package.json, assume potential conflict
+          return true;
+        }
+      }
+
+      return false;
+    } catch (error) {
+      this.log(`⚠️  Error checking for conflicts: ${error}`);
+      return true; // If we can't check, assume there might be conflicts
+    }
+  }
+
+  private translatePath(upstreamPath: string): string {
+    for (const [from, to] of Object.entries(this.config.pathMappings)) {
+      if (upstreamPath.startsWith(from)) {
+        return upstreamPath.replace(from, to);
+      }
+    }
+    return upstreamPath;
+  }
+
+  private async smartCherryPick(change: UpstreamChange): Promise<boolean> {
+    try {
+      // First, try regular cherry-pick
+      try {
+        execSync(`git cherry-pick ${change.commit}`, { stdio: "pipe" });
+        this.log(`✅ Regular cherry-pick succeeded for ${change.commit.substring(0, 8)}`);
+        return true;
+      } catch (cherryPickError) {
+        this.log(`🔄 Regular cherry-pick failed, trying path translation...`);
+      }
+
+      // If regular cherry-pick fails, try manual application with path translation
+      const diff = execSync(`git show ${change.commit}`, { encoding: "utf8" });
+      
+      // Check if this looks like a path mismatch issue
+      const hasPathMismatch = change.files.some(file => 
+        Object.keys(this.config.pathMappings).some(upstreamPath => 
+          file.startsWith(upstreamPath)
+        )
+      );
+
+      if (!hasPathMismatch) {
+        // Not a path issue, let the error bubble up
+        throw new Error("Cherry-pick failed and no path translation needed");
+      }
+
+      this.log(`🔧 Applying changes with path translation...`);
+      
+      // Apply changes manually with path translation
+      for (const file of change.files) {
+        const translatedPath = this.translatePath(file);
+        
+        if (translatedPath !== file) {
+          this.log(`📁 Translating: ${file} → ${translatedPath}`);
+          
+          try {
+            // Get the file content from the upstream commit
+            const upstreamContent = execSync(
+              `git show ${change.commit}:${file}`,
+              { encoding: "utf8" }
+            );
+            
+            // Write to the translated path
+            const fs = await import("fs");
+            const path = await import("path");
+            
+            // Ensure directory exists
+            const dir = path.dirname(translatedPath);
+            if (!fs.existsSync(dir)) {
+              fs.mkdirSync(dir, { recursive: true });
+            }
+            
+            fs.writeFileSync(translatedPath, upstreamContent);
+            
+            // Stage the file
+            execSync(`git add ${translatedPath}`, { stdio: "pipe" });
+            
+          } catch (fileError) {
+            this.log(`⚠️  Failed to translate ${file}: ${fileError}`);
+            // Continue with other files
+          }
+        }
+      }
+      
+      // Check if we have any staged changes
+      const status = execSync(`git status --porcelain`, { encoding: "utf8" });
+      if (!status.trim()) {
+        this.log(`❌ No changes to commit after path translation`);
+        return false;
+      }
+      
+      // Create a commit with the translated changes
+      const commitMessage = `${change.message}\n\n(cherry picked from commit ${change.commit} with path translation)`;
+      execSync(`git commit -m "${commitMessage.replace(/"/g, '\\"')}"`, { stdio: "pipe" });
+      
+      this.log(`✅ Successfully applied with path translation`);
+      return true;
+      
+    } catch (error) {
+      this.log(`❌ Smart cherry-pick failed: ${error}`);
+      return false;
+    }
+  }
+
   private async integrateChange(change: UpstreamChange): Promise<boolean> {
     if (!change.analysis) return false;
 
@@ -543,13 +749,22 @@ Respond in JSON format:
         return true;
       }
 
+      // Pre-check for potential conflicts
+      if (await this.hasLikelyConflicts(change)) {
+        this.log(`⚠️  Potential conflicts detected for ${change.commit.substring(0, 8)}, creating review branch instead`);
+        return await this.createReviewBranch(change);
+      }
+
       // Create integration branch
       const branchName = `auto-integration-${change.commit.substring(0, 8)}`;
       execSync(`git checkout -b ${branchName}`, { stdio: "pipe" });
 
       try {
-        // Cherry-pick the commit
-        execSync(`git cherry-pick ${change.commit}`, { stdio: "pipe" });
+        // Try smart cherry-pick with path translation
+        const success = await this.smartCherryPick(change);
+        if (!success) {
+          throw new Error("Smart cherry-pick failed");
+        }
 
         // Run basic tests if available
         const testsPassed = await this.runTests();
@@ -610,7 +825,12 @@ Respond in JSON format:
       execSync(`git checkout -b ${branchName}`, { stdio: "pipe" });
       
       try {
-        execSync(`git cherry-pick ${change.commit}`, { stdio: "pipe" });
+        // Use smart cherry-pick for review branches too
+        const success = await this.smartCherryPick(change);
+        if (!success) {
+          throw new Error("Smart cherry-pick failed for review branch");
+        }
+        
         execSync(`git checkout ${this.config.localBranch}`, { stdio: "pipe" });
 
         this.log(`✅ Review branch created: ${branchName}`);
