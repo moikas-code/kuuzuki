@@ -2,11 +2,13 @@
   "upstreamRemote": "upstream",
   "upstreamBranch": "dev",
   "localBranch": "master",
-  "pollInterval": 30,
+  "pollInterval": 5,
   "autoMergeThreshold": 0.75,
   "dryRun": false,
   "notifyOnChanges": true,
   "maxChangesPerRun": 5,
+  "useWorktree": true,
+  "worktreePath": "../kuuzuki-daemon",
   "pathMappings": {
     "packages/opencode/": "packages/kuuzuki/",
     "packages/opencode-": "packages/kuuzuki-"

@@ -130,8 +130,8 @@ export const TuiCommand = cmd({
             const list = Session.list()
             const first = await list.next()
             await list.return()
-            if (first.done) return
-            return first.value?.id
+            if (first.done || !first.value) return
+            return first.value.id
           }
           if (args.session) {
             return args.session

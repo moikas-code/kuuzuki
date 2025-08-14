@@ -83,3 +83,4 @@ opencode-upstream-v0.4.2
 
 .upstream-sync.pid
 .upstream-sync-tracker.json
+../kuuzuki-daemon/

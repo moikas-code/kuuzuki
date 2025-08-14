@@ -453,7 +453,7 @@ async function handleProviderTest(providerId?: string) {
       }
     } else {
       // Test all providers
-      const availableProviders = Config.ApiKeys.getAvailableProviders()
+      const availableProviders = await Config.ApiKeys.getAvailableProviders()
 
       if (availableProviders.length === 0) {
         console.log(chalk.yellow("No API keys to test"))

@@ -54,6 +54,7 @@ import { ToolResolver } from "../tool/resolver";
 import { validateSessionID, validateMessageID } from "../util/id-validation";
 import { Plugin } from "../plugin";
 import { Permission } from "../permission";
+import { defer } from "../util/defer";
 
 export namespace Session {
   const log = Log.create({ service: "session" });
@@ -1474,6 +1475,11 @@ export namespace Session {
       sessionID: input.sessionID,
     };
     await updateMessage(assistantMsg);
+    await using _ = defer(async () => {
+      if (assistantMsg.time.completed) return
+      await Storage.remove(`session/message/${input.sessionID}/${assistantMsg.id}`)
+      await Bus.publish(MessageV2.Event.Removed, { sessionID: input.sessionID, messageID: assistantMsg.id })
+    });
     const tools: Record<string, AITool> = {};
 
     // Calculate estimated input tokens before creating processor

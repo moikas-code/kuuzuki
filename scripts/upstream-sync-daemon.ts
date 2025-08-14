@@ -29,6 +29,8 @@ interface DaemonConfig {
   pathMappings: Record<string, string>; // upstream path -> local path
   excludePatterns: string[];
   includePatterns: string[];
+  useWorktree: boolean; // Run daemon in isolated worktree
+  worktreePath: string; // Path to daemon worktree
 }
 
 interface UpstreamChange {
@@ -76,6 +78,8 @@ const DEFAULT_CONFIG: DaemonConfig = {
   dryRun: false,
   notifyOnChanges: true,
   maxChangesPerRun: 5,
+  useWorktree: true,
+  worktreePath: "../kuuzuki-daemon",
   pathMappings: {
     "packages/opencode/": "packages/kuuzuki/",
     "packages/opencode-": "packages/kuuzuki-"
@@ -142,6 +146,77 @@ class UpstreamSyncDaemon {
 
   private saveConfig(): void {
     writeFileSync(CONFIG_FILE, JSON.stringify(this.config, null, 2));
+  }
+
+  private async setupWorktree(): Promise<void> {
+    if (!this.config.useWorktree) {
+      return;
+    }
+
+    const worktreePath = this.config.worktreePath;
+    
+    // Check if worktree already exists
+    try {
+      const worktrees = execSync(`git worktree list`, { encoding: "utf8" });
+      if (worktrees.includes(worktreePath)) {
+        this.log(`✅ Worktree already exists: ${worktreePath}`);
+        return;
+      }
+    } catch (error) {
+      this.log(`⚠️  Error checking worktrees: ${error}`);
+    }
+
+    // Clean up any existing directory and worktree registration
+    try {
+      execSync(`git worktree prune`, { stdio: "pipe" });
+      execSync(`rm -rf ${worktreePath}`, { stdio: "pipe" });
+    } catch {
+      // Directory might not exist, that's fine
+    }
+
+    try {
+      // Create a dedicated daemon branch if it doesn't exist
+      const daemonBranch = `daemon-${this.config.localBranch}`;
+      
+      try {
+        // Try to create the daemon branch from the local branch
+        execSync(`git branch ${daemonBranch} ${this.config.localBranch}`, { stdio: "pipe" });
+        this.log(`✅ Created daemon branch: ${daemonBranch}`);
+      } catch {
+        // Branch might already exist, that's fine
+        this.log(`📝 Using existing daemon branch: ${daemonBranch}`);
+      }
+      
+      // Create worktree with the daemon branch
+      execSync(`git worktree add ${worktreePath} ${daemonBranch}`, { stdio: "pipe" });
+      this.log(`✅ Created daemon worktree: ${worktreePath}`);
+    } catch (error) {
+      this.log(`❌ Failed to create worktree: ${error}`);
+      throw error;
+    }
+  }
+
+  private cleanupWorktree(): void {
+    if (!this.config.useWorktree) {
+      return;
+    }
+
+    try {
+      const worktreePath = this.config.worktreePath;
+      execSync(`git worktree remove ${worktreePath} --force`, { stdio: "pipe" });
+      this.log(`🧹 Cleaned up daemon worktree: ${worktreePath}`);
+    } catch (error) {
+      this.log(`⚠️  Error cleaning up worktree: ${error}`);
+    }
+  }
+
+  private getWorkingDirectory(): string {
+    return this.config.useWorktree ? this.config.worktreePath : process.cwd();
+  }
+
+  private execInWorktree(command: string, options: any = {}): Buffer | string {
+    const cwd = this.getWorkingDirectory();
+    return execSync(command, { ...options, cwd });
   }
 
   private loadTracker(): CommitTracker {
@@ -211,7 +286,7 @@ class UpstreamSyncDaemon {
   private async fetchUpstream(): Promise<void> {
     try {
       this.log(`🔄 Fetching from ${this.config.upstreamRemote}...`);
-      execSync(`git fetch ${this.config.upstreamRemote}`, { stdio: "pipe" });
+      this.execInWorktree(`git fetch ${this.config.upstreamRemote}`, { stdio: "pipe" });
     } catch (error) {
       throw new Error(`Failed to fetch upstream: ${error}`);
     }
@@ -219,7 +294,7 @@ class UpstreamSyncDaemon {
 
   private async getNewCommits(): Promise<UpstreamChange[]> {
     try {
-      const logOutput = execSync(
+      const logOutput = this.execInWorktree(
         `git log --oneline --no-merges ${this.config.localBranch}..${this.config.upstreamRemote}/${this.config.upstreamBranch}`,
         { encoding: "utf8" }
       );
@@ -234,7 +309,7 @@ class UpstreamSyncDaemon {
         const message = messageParts.join(' ');
 
         // Get detailed commit info
-        const details = execSync(
+        const details = this.execInWorktree(
           `git show --stat --format="%an|%ad|%s" ${commit}`,
           { encoding: "utf8" }
         );
@@ -312,8 +387,8 @@ Respond in JSON format:
 }
       `.trim();
 
-      // Use kuuzuki to analyze the change
-      const kuuzukiProcess = spawn("bun", ["packages/kuuzuki/src/index.ts", "run"], {
+      // Use kuuzuki to analyze the change with Claude Sonnet 4
+      const kuuzukiProcess = spawn("bun", ["packages/kuuzuki/src/index.ts", "run", "--model", "anthropic/claude-sonnet-4-20250514"], {
         stdio: ["pipe", "pipe", "pipe"],
         cwd: process.cwd()
       });
@@ -525,9 +600,9 @@ Respond in JSON format:
   private matchesPattern(file: string, pattern: string): boolean {
     const regex = new RegExp(
       pattern
-        .replace(/\*\*/g, ".*")
-        .replace(/\*/g, "[^/]*")
-        .replace(/\./g, "\\.")
+        .replace(/\./g, "\\.")  // Escape dots first
+        .replace(/\*\*/g, ".*") // Replace ** with .* (any characters)
+        .replace(/\*/g, "[^/]*") // Replace * with [^/]* (any characters except /)
     );
     return regex.test(file);
   }
@@ -721,6 +796,77 @@ Respond in JSON format:
     return upstreamPath;
   }
 
+  private async manuallyApplyChanges(change: UpstreamChange): Promise<boolean> {
+    try {
+      const fs = await import("fs");
+      
+      for (const file of change.files) {
+        const translatedPath = this.translatePath(file);
+        
+        // Skip if file doesn't exist in our fork
+        if (!fs.existsSync(translatedPath)) {
+          this.log(`⚠️  File doesn't exist in our fork: ${translatedPath}`);
+          continue;
+        }
+        
+        // Get the diff for this specific file
+        const fileDiff = this.execInWorktree(
+          `git show ${change.commit} -- ${file}`,
+          { encoding: "utf8" }
+        ) as string;
+        
+        // Extract added and removed lines
+        const diffLines = fileDiff.split('\n');
+        const addedLines: string[] = [];
+        const removedLines: string[] = [];
+        
+        for (const line of diffLines) {
+          if (line.startsWith('+') && !line.startsWith('+++')) {
+            addedLines.push(line.substring(1));
+          } else if (line.startsWith('-') && !line.startsWith('---')) {
+            removedLines.push(line.substring(1));
+          }
+        }
+        
+        // Read current file content
+        const currentContent = fs.readFileSync(translatedPath, 'utf8');
+        let modifiedContent = currentContent;
+        
+        // Apply simple line replacements for small changes
+        if (addedLines.length <= 5 && removedLines.length <= 5) {
+          for (let i = 0; i < Math.min(addedLines.length, removedLines.length); i++) {
+            const oldLine = removedLines[i].trim();
+            const newLine = addedLines[i];
+            
+            if (oldLine && modifiedContent.includes(oldLine)) {
+              modifiedContent = modifiedContent.replace(oldLine, newLine);
+              this.log(`🔄 Replaced line in ${translatedPath}: "${oldLine}" → "${newLine}"`);
+            }
+          }
+          
+          // Handle pure additions
+          if (addedLines.length > removedLines.length) {
+            const additionalLines = addedLines.slice(removedLines.length);
+            // Try to add at the end of the file or after similar context
+            modifiedContent += '\n' + additionalLines.join('\n');
+            this.log(`➕ Added ${additionalLines.length} lines to ${translatedPath}`);
+          }
+        }
+        
+        // Write back if content changed
+        if (modifiedContent !== currentContent) {
+          fs.writeFileSync(translatedPath, modifiedContent);
+          this.log(`✅ Manually applied changes to ${translatedPath}`);
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      this.log(`❌ Manual application failed: ${error}`);
+      return false;
+    }
+  }
+
   private async smartCherryPick(change: UpstreamChange): Promise<boolean> {
     try {
       // First, try regular cherry-pick
@@ -773,31 +919,59 @@ Respond in JSON format:
       const tempPatchFile = `/tmp/translated-patch-${Date.now()}.patch`;
       fs.writeFileSync(tempPatchFile, translatedPatch);
       
+      let patchApplied = false;
+      
       try {
-        // Apply the patch
-        execSync(`git apply ${tempPatchFile}`, { stdio: "pipe" });
+        // Try 1: Standard patch application
+        this.execInWorktree(`git apply ${tempPatchFile}`, { stdio: "pipe" });
+        this.log(`✅ Applied patch with standard git apply`);
+        patchApplied = true;
+      } catch (standardError) {
+        this.log(`⚠️  Standard patch failed: ${standardError}`);
         
-        // Stage all changed files
-        for (const file of change.files) {
-          const translatedPath = this.translatePath(file);
-          if (translatedPath !== file) {
-            this.log(`📁 Translated: ${file} → ${translatedPath}`);
-            try {
-              execSync(`git add ${translatedPath}`, { stdio: "pipe" });
-            } catch (addError) {
-              this.log(`⚠️  Failed to stage ${translatedPath}: ${addError}`);
+        try {
+          // Try 2: 3-way merge patch application
+          this.execInWorktree(`git apply --3way ${tempPatchFile}`, { stdio: "pipe" });
+          this.log(`✅ Applied patch with 3-way merge`);
+          patchApplied = true;
+        } catch (threewayError) {
+          this.log(`⚠️  3-way patch failed: ${threewayError}`);
+          
+          try {
+            // Try 3: Ignore whitespace and context
+            this.execInWorktree(`git apply --ignore-whitespace --ignore-space-change ${tempPatchFile}`, { stdio: "pipe" });
+            this.log(`✅ Applied patch ignoring whitespace`);
+            patchApplied = true;
+          } catch (whitespaceError) {
+            this.log(`⚠️  Whitespace-tolerant patch failed: ${whitespaceError}`);
+            
+            // Try 4: Manual application for small changes
+            if (change.files.length <= 2 && (change.additions + change.deletions) <= 20) {
+              this.log(`🔧 Attempting manual application for small change...`);
+              patchApplied = await this.manuallyApplyChanges(change);
             }
           }
         }
-        
-        // Clean up temp file
-        fs.unlinkSync(tempPatchFile);
-        
-      } catch (patchError) {
-        // Clean up temp file
-        fs.unlinkSync(tempPatchFile);
-        this.log(`⚠️  Patch application failed: ${patchError}`);
-        throw new Error(`Failed to apply translated patch: ${patchError}`);
+      }
+      
+      // Clean up temp file
+      fs.unlinkSync(tempPatchFile);
+      
+      if (!patchApplied) {
+        throw new Error(`Failed to apply translated patch after trying multiple strategies`);
+      }
+      
+      // Stage all changed files
+      for (const file of change.files) {
+        const translatedPath = this.translatePath(file);
+        if (translatedPath !== file) {
+          this.log(`📁 Translated: ${file} → ${translatedPath}`);
+          try {
+            this.execInWorktree(`git add ${translatedPath}`, { stdio: "pipe" });
+          } catch (addError) {
+            this.log(`⚠️  Failed to stage ${translatedPath}: ${addError}`);
+          }
+        }
       }
       
       // Check if we have any staged changes
@@ -945,6 +1119,14 @@ Respond in JSON format:
         return true;
       }
 
+      // Check if branch already exists and delete it
+      try {
+        execSync(`git branch -D ${branchName}`, { stdio: "pipe" });
+        this.log(`🧹 Deleted existing branch: ${branchName}`);
+      } catch {
+        // Branch doesn't exist, which is fine
+      }
+
       execSync(`git checkout -b ${branchName}`, { stdio: "pipe" });
       
       try {
@@ -1074,6 +1256,16 @@ Respond in JSON format:
       return;
     }
 
+    // Setup worktree if enabled
+    if (this.config.useWorktree) {
+      try {
+        await this.setupWorktree();
+      } catch (error) {
+        console.log("❌ Worktree setup failed");
+        return;
+      }
+    }
+
     // Validate git setup
     if (!(await this.checkGitSetup())) {
       console.log("❌ Git setup validation failed");
@@ -1088,6 +1280,7 @@ Respond in JSON format:
     this.log(`   Local: ${this.config.localBranch}`);
     this.log(`   Interval: ${this.config.pollInterval} minutes`);
     this.log(`   Dry run: ${this.config.dryRun}`);
+    this.log(`   Worktree: ${this.config.useWorktree ? this.config.worktreePath : 'disabled'}`);
 
     // Initial sync
     await this.syncCycle();
@@ -1117,6 +1310,11 @@ Respond in JSON format:
 
     if (existsSync(PID_FILE)) {
       unlinkSync(PID_FILE);
+    }
+
+    // Cleanup worktree if enabled
+    if (this.config.useWorktree) {
+      this.cleanupWorktree();
     }
 
     this.log(`🛑 Upstream sync daemon stopped`);
@@ -1194,6 +1392,27 @@ Respond in JSON format:
     console.log("✅ Configuration updated");
     console.log(JSON.stringify(this.config, null, 2));
   }
+
+  public cleanup(): void {
+    // Remove failed commits from tracker so they can be retried
+    const failedCommits = Object.entries(this.tracker.processedCommits)
+      .filter(([_, commit]) => commit.status === "failed")
+      .map(([id, _]) => id);
+    
+    if (failedCommits.length === 0) {
+      console.log("✅ No failed commits to clean up");
+      return;
+    }
+
+    failedCommits.forEach(commitId => {
+      delete this.tracker.processedCommits[commitId];
+    });
+
+    this.saveTracker();
+    console.log(`✅ Cleaned up ${failedCommits.length} failed commits:`);
+    failedCommits.forEach(id => console.log(`   - ${id.substring(0, 8)}`));
+    console.log("These commits will be retried on next sync cycle");
+  }
 }
 
 // CLI Interface
@@ -1215,6 +1434,9 @@ async function main() {
       const configOptions = JSON.parse(process.argv[3] || "{}");
       daemon.configure(configOptions);
       break;
+    case "cleanup":
+      daemon.cleanup();
+      break;
     default:
       console.log(`
 🤖 Kuuzuki Upstream Sync Daemon
@@ -1227,6 +1449,7 @@ Commands:
   stop                     Stop the daemon  
   status                   Check daemon status
   config <json>            Update configuration
+  cleanup                  Reset failed commits for retry
 
 Examples:
   bun scripts/upstream-sync-daemon.ts start
