@@ -1,0 +1,1 @@
+ML-powered learning assistant that analyzes user behavior patterns, generates adaptive rule suggestions, predicts user needs, clusters behaviors for optimization, and provides intelligent insights based on usage history and context.

@@ -1,0 +1,1 @@
+Automatically generates new rules by analyzing code patterns, user feedback, and common issues across projects. Uses machine learning to identify recurring patterns, suggests rule improvements, and creates contextual rules with appropriate categories and documentation links. Learns from user interactions to continuously improve rule quality and relevance.

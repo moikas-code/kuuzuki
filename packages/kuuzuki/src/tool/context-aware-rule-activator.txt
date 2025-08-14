@@ -1,0 +1,1 @@
+Dynamically activates and deactivates rules based on current project context, file types, and development phase. Analyzes codebase patterns, active tools, and session history to intelligently suggest which rules should be active, preventing rule conflicts and optimizing agent behavior for specific tasks and environments.

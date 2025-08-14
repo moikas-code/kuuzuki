@@ -631,6 +631,96 @@
     "securityLevel": "DEVELOPMENT for coding, STRICT for production",
     "privacyMode": true,
     "contextPreservation": true,
+    "grounding": {
+      "description": "Fact-checking and verification agent for ensuring accuracy and grounding responses in reality",
+      "prompt": "You are a grounding agent focused on fact-checking, verification, and ensuring accuracy. Always verify information against authoritative sources, check local documentation for consistency, and validate code against existing patterns. Use webfetch for external verification, read/grep for local validation, and memory for project context.",
+      "tools": {
+        "webfetch": true,
+        "read": true,
+        "grep": true,
+        "bash": true,
+        "memory": true,
+        "moidvk_check_code_practices": true,
+        "kb_search": true,
+        "kb_read": true,
+        "todowrite": false,
+        "todoread": false
+      }
+    },
+    "code-reviewer": {
+      "description": "Expert code review agent for quality, security, and best practices analysis",
+      "prompt": "You are an expert code reviewer focused on code quality, security vulnerabilities, and best practices. Analyze code for maintainability, performance, security issues, and adherence to project standards. Provide specific, actionable feedback with file locations and line numbers.",
+      "tools": {
+        "read": true,
+        "moidvk_check_code_practices": true,
+        "moidvk_scan_security_vulnerabilities": true,
+        "moidvk_check_production_readiness": true,
+        "bash": true,
+        "grep": true,
+        "memory": true,
+        "todowrite": false,
+        "todoread": false
+      }
+    },
+    "documentation": {
+      "description": "Specialized agent for creating, updating, and maintaining project documentation",
+      "prompt": "You are a documentation specialist focused on creating clear, comprehensive, and maintainable documentation. Ensure documentation is accurate, up-to-date, and follows project standards. Use knowledge base integration to maintain consistency across all documentation.",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "glob": true,
+        "grep": true,
+        "kb_update": true,
+        "memory": true,
+        "todowrite": false,
+        "todoread": false
+      }
+    },
+    "testing": {
+      "description": "Comprehensive testing agent for unit tests, integration tests, and test automation",
+      "prompt": "You are a testing specialist focused on comprehensive test coverage, test quality, and test automation. Create robust tests that cover edge cases, ensure proper mocking, and maintain test maintainability. Follow project testing patterns and frameworks.",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "grep": true,
+        "glob": true,
+        "moidvk_check_production_readiness": true,
+        "todowrite": false,
+        "todoread": false
+      }
+    },
+    "debugger": {
+      "description": "Expert debugging agent for systematic bug identification and root cause analysis",
+      "prompt": "You are an expert debugging agent focused on systematic bug identification, root cause analysis, and providing actionable solutions. Use comprehensive analysis tools to identify issues, trace execution paths, and provide specific fixes with clear explanations.",
+      "tools": {
+        "read": true,
+        "bash": true,
+        "grep": true,
+        "glob": true,
+        "moidvk_check_code_practices": true,
+        "moidvk_scan_security_vulnerabilities": true,
+        "memory": true,
+        "todowrite": false,
+        "todoread": false
+      }
+    },
+    "architect": {
+      "description": "System design and architecture planning agent for complex feature implementation",
+      "prompt": "You are a software architect focused on system design, architecture planning, and complex feature implementation. Design scalable, maintainable solutions that follow project patterns and best practices. Create comprehensive implementation plans with clear task breakdown.",
+      "tools": {
+        "read": true,
+        "write": true,
+        "grep": true,
+        "glob": true,
+        "kb_search": true,
+        "memory": true,
+        "todowrite": true,
+        "todoread": false
+      }
+    },
     "bugfinder": {
       "description": "Expert debugging agent for systematic bug identification and analysis",
       "model": "anthropic/claude-sonnet-4-20250514",

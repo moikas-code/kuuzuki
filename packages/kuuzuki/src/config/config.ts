@@ -73,6 +73,21 @@ export namespace Config {
             servers: Object.keys(agentrcConfig.mcp.servers || {}),
           });
         }
+
+        // Merge agent configuration from .agentrc
+        if (agentrcConfig.agent) {
+          // Extract individual agent definitions from the agent config
+          const { preferredTools, disabledTools, maxFileSize, ignorePatterns, contextFiles, taskExecution, securityLevel, privacyMode, contextPreservation, ...agents } = agentrcConfig.agent;
+          
+          // Merge the individual agents
+          if (Object.keys(agents).length > 0) {
+            result.agent = mergeDeep(result.agent || {}, agents);
+            log.info("Merged agent definitions from .agentrc", {
+              path: agentrcPath,
+              agents: Object.keys(agents),
+            });
+          }
+        }
       } catch (error) {
         log.warn("Failed to load .agentrc file", { path: agentrcPath, error });
         // Continue loading other configs even if one .agentrc fails

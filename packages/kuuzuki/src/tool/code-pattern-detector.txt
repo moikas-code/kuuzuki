@@ -1,0 +1,1 @@
+Detects and analyzes code patterns, anti-patterns, and architectural decisions across the codebase. Identifies recurring structures, naming conventions, and design patterns to suggest appropriate rules and best practices. Provides pattern-based insights for code quality improvement and consistency enforcement.

@@ -1,0 +1,1 @@
+Intelligent rule optimization tool that analyzes rule effectiveness, detects conflicts, suggests improvements, and automatically optimizes rule sets using AI-powered analysis and performance metrics.

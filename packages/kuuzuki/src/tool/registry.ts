@@ -13,6 +13,8 @@ import { WebFetchTool } from "./webfetch";
 import { WriteTool } from "./write";
 import { MemoryTool } from "./memory";
 import { PluginInfoTool } from "./plugin-info";
+import { SmartLearningAssistantTool } from "./smart-learning-assistant";
+import { IntelligentRuleOptimizerTool } from "./intelligent-rule-optimizer";
 
 /**
  * Tool Registry - Internal Management System
@@ -32,11 +34,13 @@ export namespace ToolRegistry {
     WebFetchTool,
     GlobTool,
     GrepTool,
+    IntelligentRuleOptimizerTool,
     ListTool,
     MemoryTool,
     PatchTool,
     PluginInfoTool,
     ReadTool,
+    SmartLearningAssistantTool,
     WriteTool,
     TodoWriteTool,
     TodoReadTool,

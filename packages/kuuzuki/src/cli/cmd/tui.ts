@@ -40,7 +40,7 @@ function spawnAsync(command: string, args: string[], options: any = {}) {
 
       proc.on("exit", (code) => {
         resolve({
-          exited: code,
+          exitCode: code,
           stdout: stdout,
           stderr: stderr,
         });

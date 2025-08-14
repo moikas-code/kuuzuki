@@ -37,6 +37,50 @@ export interface RuleUsage {
   effectiveness?: number;
 }
 
+// Smart AI Tools interfaces
+export interface CodePattern {
+  id: string;
+  patternType: "function" | "class" | "import" | "variable" | "structure";
+  pattern: string; // The actual pattern (e.g., function signature, import statement)
+  filePath: string;
+  language: string;
+  frequency: number;
+  lastSeen: string;
+  confidence: number; // 0-1 confidence score
+  metadata: string; // JSON string with additional pattern data
+}
+
+export interface PatternRule {
+  id: string;
+  patternId: string;
+  ruleId: string;
+  confidence: number;
+  createdAt: string;
+  validatedBy?: string; // User who validated this pattern-rule connection
+}
+
+export interface LearningFeedback {
+  id: number;
+  ruleId: string;
+  sessionId: string;
+  feedbackType: "positive" | "negative" | "correction";
+  originalSuggestion: string;
+  userCorrection?: string;
+  timestamp: string;
+  context: string; // JSON string with context data
+}
+
+export interface RuleOptimization {
+  id: string;
+  ruleId: string;
+  optimizationType: "consolidate" | "split" | "deprecate" | "enhance";
+  suggestion: string;
+  confidence: number;
+  createdAt: string;
+  appliedAt?: string;
+  status: "pending" | "applied" | "rejected";
+}
+
 export class MemoryStorage {
   protected db: Database;
   private static instance: MemoryStorage | null = null;
@@ -142,6 +186,62 @@ export class MemoryStorage {
       )
     `);
 
+    // Create Smart AI Tools tables
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS code_patterns (
+        id TEXT PRIMARY KEY,
+        patternType TEXT NOT NULL CHECK (patternType IN ('function', 'class', 'import', 'variable', 'structure')),
+        pattern TEXT NOT NULL,
+        filePath TEXT NOT NULL,
+        language TEXT NOT NULL,
+        frequency INTEGER DEFAULT 1,
+        lastSeen TEXT NOT NULL,
+        confidence REAL DEFAULT 0.5,
+        metadata TEXT DEFAULT '{}'
+      )
+    `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS pattern_rules (
+        id TEXT PRIMARY KEY,
+        patternId TEXT NOT NULL,
+        ruleId TEXT NOT NULL,
+        confidence REAL DEFAULT 0.5,
+        createdAt TEXT NOT NULL,
+        validatedBy TEXT,
+        FOREIGN KEY (patternId) REFERENCES code_patterns (id) ON DELETE CASCADE,
+        FOREIGN KEY (ruleId) REFERENCES rules (id) ON DELETE CASCADE
+      )
+    `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS learning_feedback (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ruleId TEXT NOT NULL,
+        sessionId TEXT NOT NULL,
+        feedbackType TEXT NOT NULL CHECK (feedbackType IN ('positive', 'negative', 'correction')),
+        originalSuggestion TEXT NOT NULL,
+        userCorrection TEXT,
+        timestamp TEXT NOT NULL,
+        context TEXT DEFAULT '{}',
+        FOREIGN KEY (ruleId) REFERENCES rules (id) ON DELETE CASCADE
+      )
+    `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS rule_optimizations (
+        id TEXT PRIMARY KEY,
+        ruleId TEXT NOT NULL,
+        optimizationType TEXT NOT NULL CHECK (optimizationType IN ('consolidate', 'split', 'deprecate', 'enhance')),
+        suggestion TEXT NOT NULL,
+        confidence REAL DEFAULT 0.5,
+        createdAt TEXT NOT NULL,
+        appliedAt TEXT,
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'applied', 'rejected')),
+        FOREIGN KEY (ruleId) REFERENCES rules (id) ON DELETE CASCADE
+      )
+    `);
+
     // Create indexes for performance
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_rules_category ON rules (category);
@@ -150,6 +250,19 @@ export class MemoryStorage {
       CREATE INDEX IF NOT EXISTS idx_usage_ruleId ON rule_usage (ruleId);
       CREATE INDEX IF NOT EXISTS idx_usage_sessionId ON rule_usage (sessionId);
       CREATE INDEX IF NOT EXISTS idx_usage_timestamp ON rule_usage (timestamp);
+      
+      -- Smart AI Tools indexes
+      CREATE INDEX IF NOT EXISTS idx_patterns_type ON code_patterns (patternType);
+      CREATE INDEX IF NOT EXISTS idx_patterns_language ON code_patterns (language);
+      CREATE INDEX IF NOT EXISTS idx_patterns_frequency ON code_patterns (frequency);
+      CREATE INDEX IF NOT EXISTS idx_patterns_confidence ON code_patterns (confidence);
+      CREATE INDEX IF NOT EXISTS idx_pattern_rules_pattern ON pattern_rules (patternId);
+      CREATE INDEX IF NOT EXISTS idx_pattern_rules_rule ON pattern_rules (ruleId);
+      CREATE INDEX IF NOT EXISTS idx_feedback_rule ON learning_feedback (ruleId);
+      CREATE INDEX IF NOT EXISTS idx_feedback_session ON learning_feedback (sessionId);
+      CREATE INDEX IF NOT EXISTS idx_feedback_type ON learning_feedback (feedbackType);
+      CREATE INDEX IF NOT EXISTS idx_optimizations_rule ON rule_optimizations (ruleId);
+      CREATE INDEX IF NOT EXISTS idx_optimizations_status ON rule_optimizations (status);
     `);
   }
 
@@ -296,6 +409,83 @@ export class MemoryStorage {
       ORDER BY createdAt ASC
     `);
     return stmt.all(cutoffDate) as RuleRecord[];
+  }
+
+  public getAllRules(): RuleRecord[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM rules 
+      ORDER BY category, usageCount DESC, lastUsed DESC
+    `);
+    return stmt.all() as RuleRecord[];
+  }
+
+  // Public method for context history operations
+  public storeContextHistory(timestamp: string, context: any, activatedRules: string[], analysis: any): void {
+    // First ensure the context_history table exists
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS context_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL,
+        context_data TEXT NOT NULL,
+        activated_rules TEXT NOT NULL,
+        analysis_data TEXT,
+        effectiveness REAL DEFAULT 0.5,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    const stmt = this.db.prepare(`
+      INSERT INTO context_history (timestamp, context_data, activated_rules, analysis_data)
+      VALUES (?, ?, ?, ?)
+    `);
+    
+    stmt.run(
+      timestamp,
+      JSON.stringify(context),
+      JSON.stringify(activatedRules),
+      JSON.stringify(analysis)
+    );
+  }
+
+  public getContextHistory(limit: number = 20): Array<{
+    timestamp: string;
+    context: any;
+    activatedRules: string[];
+    effectiveness: number;
+  }> {
+    // First ensure the context_history table exists
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS context_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL,
+        context_data TEXT NOT NULL,
+        activated_rules TEXT NOT NULL,
+        analysis_data TEXT,
+        effectiveness REAL DEFAULT 0.5,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    const stmt = this.db.prepare(`
+      SELECT timestamp, context_data, activated_rules, effectiveness
+      FROM context_history 
+      ORDER BY timestamp DESC 
+      LIMIT ?
+    `);
+
+    const rows = stmt.all(limit) as Array<{
+      timestamp: string;
+      context_data: string;
+      activated_rules: string;
+      effectiveness: number;
+    }>;
+
+    return rows.map((row) => ({
+      timestamp: row.timestamp,
+      context: JSON.parse(row.context_data),
+      activatedRules: JSON.parse(row.activated_rules),
+      effectiveness: row.effectiveness || 0.5
+    }));
   }
 
   // Session context methods
@@ -497,6 +687,305 @@ export class MemoryStorage {
 
   public close(): void {
     this.db.close();
+  }
+
+  // Smart AI Tools methods
+  
+  // Code Pattern Management
+  public addCodePattern(pattern: Omit<CodePattern, "frequency" | "lastSeen">): void {
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO code_patterns 
+      (id, patternType, pattern, filePath, language, frequency, lastSeen, confidence, metadata)
+      VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
+    `);
+
+    stmt.run(
+      pattern.id,
+      pattern.patternType,
+      pattern.pattern,
+      pattern.filePath,
+      pattern.language,
+      new Date().toISOString(),
+      pattern.confidence,
+      pattern.metadata,
+    );
+  }
+
+  public updatePatternFrequency(patternId: string): void {
+    const stmt = this.db.prepare(`
+      UPDATE code_patterns 
+      SET frequency = frequency + 1, lastSeen = ?
+      WHERE id = ?
+    `);
+    stmt.run(new Date().toISOString(), patternId);
+  }
+
+  public getCodePatterns(
+    language?: string,
+    patternType?: string,
+    minConfidence?: number,
+  ): CodePattern[] {
+    let query = "SELECT * FROM code_patterns WHERE 1=1";
+    const params: any[] = [];
+
+    if (language) {
+      query += " AND language = ?";
+      params.push(language);
+    }
+
+    if (patternType) {
+      query += " AND patternType = ?";
+      params.push(patternType);
+    }
+
+    if (minConfidence !== undefined) {
+      query += " AND confidence >= ?";
+      params.push(minConfidence);
+    }
+
+    query += " ORDER BY frequency DESC, confidence DESC";
+
+    const stmt = this.db.prepare(query);
+    return stmt.all(...params) as CodePattern[];
+  }
+
+  public getPatternsByFile(filePath: string): CodePattern[] {
+    const stmt = this.db.prepare(
+      "SELECT * FROM code_patterns WHERE filePath = ? ORDER BY frequency DESC",
+    );
+    return stmt.all(filePath) as CodePattern[];
+  }
+
+  // Pattern-Rule Associations
+  public linkPatternToRule(
+    patternId: string,
+    ruleId: string,
+    confidence: number,
+    validatedBy?: string,
+  ): void {
+    const id = `${patternId}-${ruleId}`;
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO pattern_rules 
+      (id, patternId, ruleId, confidence, createdAt, validatedBy)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      id,
+      patternId,
+      ruleId,
+      confidence,
+      new Date().toISOString(),
+      validatedBy || null,
+    );
+  }
+
+  public getPatternRules(patternId: string): PatternRule[] {
+    const stmt = this.db.prepare(
+      "SELECT * FROM pattern_rules WHERE patternId = ? ORDER BY confidence DESC",
+    );
+    return stmt.all(patternId) as PatternRule[];
+  }
+
+  public getRulePatterns(ruleId: string): PatternRule[] {
+    const stmt = this.db.prepare(
+      "SELECT * FROM pattern_rules WHERE ruleId = ? ORDER BY confidence DESC",
+    );
+    return stmt.all(ruleId) as PatternRule[];
+  }
+
+  // Learning Feedback
+  public recordLearningFeedback(feedback: Omit<LearningFeedback, "id" | "timestamp">): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO learning_feedback 
+      (ruleId, sessionId, feedbackType, originalSuggestion, userCorrection, timestamp, context)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      feedback.ruleId,
+      feedback.sessionId,
+      feedback.feedbackType,
+      feedback.originalSuggestion,
+      feedback.userCorrection || null,
+      new Date().toISOString(),
+      feedback.context,
+    );
+  }
+
+  public getLearningFeedback(
+    ruleId?: string,
+    sessionId?: string,
+    limit: number = 50,
+  ): LearningFeedback[] {
+    let query = "SELECT * FROM learning_feedback WHERE 1=1";
+    const params: any[] = [];
+
+    if (ruleId) {
+      query += " AND ruleId = ?";
+      params.push(ruleId);
+    }
+
+    if (sessionId) {
+      query += " AND sessionId = ?";
+      params.push(sessionId);
+    }
+
+    query += " ORDER BY timestamp DESC LIMIT ?";
+    params.push(limit);
+
+    const stmt = this.db.prepare(query);
+    return stmt.all(...params) as LearningFeedback[];
+  }
+
+  // Rule Optimizations
+  public addRuleOptimization(optimization: Omit<RuleOptimization, "createdAt" | "status">): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO rule_optimizations 
+      (id, ruleId, optimizationType, suggestion, confidence, createdAt, status)
+      VALUES (?, ?, ?, ?, ?, ?, 'pending')
+    `);
+
+    stmt.run(
+      optimization.id,
+      optimization.ruleId,
+      optimization.optimizationType,
+      optimization.suggestion,
+      optimization.confidence,
+      new Date().toISOString(),
+    );
+  }
+
+  public getRuleOptimizations(
+    ruleId?: string,
+    status?: string,
+    limit: number = 50,
+  ): RuleOptimization[] {
+    let query = "SELECT * FROM rule_optimizations WHERE 1=1";
+    const params: any[] = [];
+
+    if (ruleId) {
+      query += " AND ruleId = ?";
+      params.push(ruleId);
+    }
+
+    if (status) {
+      query += " AND status = ?";
+      params.push(status);
+    }
+
+    query += " ORDER BY confidence DESC, createdAt DESC LIMIT ?";
+    params.push(limit);
+
+    const stmt = this.db.prepare(query);
+    return stmt.all(...params) as RuleOptimization[];
+  }
+
+  public updateOptimizationStatus(
+    optimizationId: string,
+    status: "applied" | "rejected",
+  ): boolean {
+    const stmt = this.db.prepare(`
+      UPDATE rule_optimizations 
+      SET status = ?, appliedAt = ?
+      WHERE id = ?
+    `);
+    const result = stmt.run(
+      status,
+      status === "applied" ? new Date().toISOString() : null,
+      optimizationId,
+    );
+    return result.changes > 0;
+  }
+
+  // Smart Analytics
+  public getPatternAnalytics(): {
+    totalPatterns: number;
+    patternsByLanguage: Record<string, number>;
+    patternsByType: Record<string, number>;
+    topPatterns: Array<{ id: string; pattern: string; frequency: number }>;
+  } {
+    const totalPatterns = this.db
+      .prepare("SELECT COUNT(*) as count FROM code_patterns")
+      .get() as { count: number };
+
+    const patternsByLanguage = this.db
+      .prepare("SELECT language, COUNT(*) as count FROM code_patterns GROUP BY language")
+      .all() as Array<{ language: string; count: number }>;
+
+    const patternsByType = this.db
+      .prepare("SELECT patternType, COUNT(*) as count FROM code_patterns GROUP BY patternType")
+      .all() as Array<{ patternType: string; count: number }>;
+
+    const topPatterns = this.db
+      .prepare(`
+        SELECT id, pattern, frequency 
+        FROM code_patterns 
+        ORDER BY frequency DESC 
+        LIMIT 10
+      `)
+      .all() as Array<{ id: string; pattern: string; frequency: number }>;
+
+    return {
+      totalPatterns: totalPatterns.count,
+      patternsByLanguage: patternsByLanguage.reduce(
+        (acc, { language, count }) => {
+          acc[language] = count;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+      patternsByType: patternsByType.reduce(
+        (acc, { patternType, count }) => {
+          acc[patternType] = count;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+      topPatterns,
+    };
+  }
+
+  public getLearningAnalytics(): {
+    totalFeedback: number;
+    feedbackByType: Record<string, number>;
+    improvementRate: number;
+    topCorrectedRules: Array<{ ruleId: string; corrections: number }>;
+  } {
+    const totalFeedback = this.db
+      .prepare("SELECT COUNT(*) as count FROM learning_feedback")
+      .get() as { count: number };
+
+    const feedbackByType = this.db
+      .prepare("SELECT feedbackType, COUNT(*) as count FROM learning_feedback GROUP BY feedbackType")
+      .all() as Array<{ feedbackType: string; count: number }>;
+
+    const positiveCount = feedbackByType.find(f => f.feedbackType === 'positive')?.count || 0;
+    const improvementRate = totalFeedback.count > 0 ? positiveCount / totalFeedback.count : 0;
+
+    const topCorrectedRules = this.db
+      .prepare(`
+        SELECT ruleId, COUNT(*) as corrections 
+        FROM learning_feedback 
+        WHERE feedbackType = 'correction'
+        GROUP BY ruleId 
+        ORDER BY corrections DESC 
+        LIMIT 5
+      `)
+      .all() as Array<{ ruleId: string; corrections: number }>;
+
+    return {
+      totalFeedback: totalFeedback.count,
+      feedbackByType: feedbackByType.reduce(
+        (acc, { feedbackType, count }) => {
+          acc[feedbackType] = count;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+      improvementRate,
+      topCorrectedRules,
+    };
   }
 
   // Migration from .agentrc

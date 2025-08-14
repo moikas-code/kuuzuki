@@ -1,0 +1,1 @@
+Intelligently links rules to relevant documentation files with semantic matching and automatic validation. Scans documentation directories, analyzes content for relevance to rules, and maintains up-to-date links with confidence scoring. Supports multiple documentation formats and provides suggestions for improving rule-documentation relationships.

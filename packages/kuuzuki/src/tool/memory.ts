@@ -145,6 +145,9 @@ export const MemoryTool = Tool.define("memory", {
       "cleanup",
       "export-db",
       "import-db",
+      "get-rule-analytics",
+      "suggest-improvements",
+      "optimize-rules",
     ]),
     rule: z
       .string()
@@ -231,6 +234,12 @@ export const MemoryTool = Tool.define("memory", {
           return await exportDatabase(ctx);
         case "import-db":
           return await importDatabase(params);
+        case "get-rule-analytics":
+          return await getRuleAnalytics(agentrc, params);
+        case "suggest-improvements":
+          return await suggestImprovements(agentrc, params, ctx);
+        case "optimize-rules":
+          return await optimizeRules(agentrcPath, agentrc, params, ctx);
         default:
           throw new Error(`Unknown action: ${params.action}`);
       }
@@ -1987,5 +1996,259 @@ async function importDatabase(
       importedSessions,
     },
     output: output.trim(),
+  };
+}
+
+// Learning feedback system functions
+async function getRuleAnalytics(
+  agentrc: AgentRc,
+  params: any
+): Promise<{ title: string; metadata: any; output: string }> {
+  const rules = ensureStructuredRules(agentrc);
+  const analytics = [];
+
+  for (const [category, categoryRules] of Object.entries(rules)) {
+    for (const rule of categoryRules) {
+      if (!params.ruleId || rule.id === params.ruleId) {
+        analytics.push({
+          id: rule.id,
+          category,
+          text: rule.text,
+          usageCount: rule.usageCount || 0,
+          effectivenessScore: rule.analytics?.effectivenessScore || 0,
+          timesApplied: rule.analytics?.timesApplied || 0,
+          timesIgnored: rule.analytics?.timesIgnored || 0,
+          feedbackCount: rule.analytics?.userFeedback?.length || 0,
+          averageRating: rule.analytics?.userFeedback?.length 
+            ? rule.analytics.userFeedback.reduce((sum, f) => sum + f.rating, 0) / rule.analytics.userFeedback.length
+            : 0,
+          lastUsed: rule.lastUsed,
+          createdAt: rule.createdAt
+        });
+      }
+    }
+  }
+
+  let output = `## Rule Analytics\n\n`;
+  if (params.ruleId) {
+    const rule = analytics[0];
+    if (!rule) {
+      throw new Error(`Rule not found: ${params.ruleId}`);
+    }
+    output += `**Rule**: ${rule.text}\n`;
+    output += `**Category**: ${rule.category}\n`;
+    output += `**Usage Count**: ${rule.usageCount}\n`;
+    output += `**Effectiveness Score**: ${(rule.effectivenessScore * 100).toFixed(1)}%\n`;
+    output += `**Times Applied**: ${rule.timesApplied}\n`;
+    output += `**Times Ignored**: ${rule.timesIgnored}\n`;
+    output += `**Feedback Count**: ${rule.feedbackCount}\n`;
+    output += `**Average Rating**: ${rule.averageRating.toFixed(1)}/5\n`;
+  } else {
+    output += `**Total Rules**: ${analytics.length}\n`;
+    output += `**Average Effectiveness**: ${(analytics.reduce((sum, r) => sum + r.effectivenessScore, 0) / analytics.length * 100).toFixed(1)}%\n`;
+    output += `**Most Used**: ${analytics.sort((a, b) => b.usageCount - a.usageCount)[0]?.text || 'None'}\n`;
+    output += `**Highest Rated**: ${analytics.sort((a, b) => b.averageRating - a.averageRating)[0]?.text || 'None'}\n\n`;
+    
+    output += `### Top 5 Rules by Usage\n`;
+    analytics.sort((a, b) => b.usageCount - a.usageCount).slice(0, 5).forEach((rule, i) => {
+      output += `${i + 1}. ${rule.text} (${rule.usageCount} uses)\n`;
+    });
+  }
+
+  return {
+    title: "Rule Analytics",
+    metadata: { analytics, ruleId: params.ruleId },
+    output: output.trim()
+  };
+}
+
+async function suggestImprovements(
+  agentrc: AgentRc,
+  params: any,
+  ctx: Tool.Context
+): Promise<{ title: string; metadata: any; output: string }> {
+  const rules = ensureStructuredRules(agentrc);
+  const suggestions = [];
+
+  for (const [category, categoryRules] of Object.entries(rules)) {
+    for (const rule of categoryRules) {
+      const analytics = rule.analytics || { timesApplied: 0, timesIgnored: 0, effectivenessScore: 0, userFeedback: [] };
+      
+      // Low effectiveness rules
+      if (analytics.effectivenessScore < 0.3 && analytics.userFeedback.length > 2) {
+        suggestions.push({
+          type: "low_effectiveness",
+          ruleId: rule.id,
+          rule: rule.text,
+          issue: "Low effectiveness score",
+          suggestion: "Consider revising or removing this rule",
+          priority: "high"
+        });
+      }
+
+      // Unused rules
+      if (rule.usageCount === 0 && rule.createdAt && 
+          new Date().getTime() - new Date(rule.createdAt).getTime() > 30 * 24 * 60 * 60 * 1000) {
+        suggestions.push({
+          type: "unused",
+          ruleId: rule.id,
+          rule: rule.text,
+          issue: "Rule hasn't been used in 30+ days",
+          suggestion: "Consider moving to deprecated category",
+          priority: "medium"
+        });
+      }
+
+      // Conflicting feedback
+      if (analytics.userFeedback.length > 3) {
+        const ratings = analytics.userFeedback.map(f => f.rating);
+        const variance = ratings.reduce((sum, rating) => sum + Math.pow(rating - analytics.effectivenessScore * 5, 2), 0) / ratings.length;
+        if (variance > 2) {
+          suggestions.push({
+            type: "conflicting_feedback",
+            ruleId: rule.id,
+            rule: rule.text,
+            issue: "Inconsistent user feedback",
+            suggestion: "Review and clarify rule wording",
+            priority: "medium"
+          });
+        }
+      }
+
+      // Overly broad rules
+      if (rule.text.length < 20 && rule.category === "critical") {
+        suggestions.push({
+          type: "too_broad",
+          ruleId: rule.id,
+          rule: rule.text,
+          issue: "Rule may be too broad or vague",
+          suggestion: "Add more specific context or examples",
+          priority: "low"
+        });
+      }
+    }
+  }
+
+  let output = `## Rule Improvement Suggestions\n\n`;
+  if (suggestions.length === 0) {
+    output += "No improvement suggestions found. Your rules are well-optimized!\n";
+  } else {
+    const highPriority = suggestions.filter(s => s.priority === "high");
+    const mediumPriority = suggestions.filter(s => s.priority === "medium");
+    const lowPriority = suggestions.filter(s => s.priority === "low");
+
+    if (highPriority.length > 0) {
+      output += `### High Priority (${highPriority.length})\n`;
+      highPriority.forEach(s => {
+        output += `- **${s.rule}**\n  Issue: ${s.issue}\n  Suggestion: ${s.suggestion}\n\n`;
+      });
+    }
+
+    if (mediumPriority.length > 0) {
+      output += `### Medium Priority (${mediumPriority.length})\n`;
+      mediumPriority.forEach(s => {
+        output += `- **${s.rule}**\n  Issue: ${s.issue}\n  Suggestion: ${s.suggestion}\n\n`;
+      });
+    }
+
+    if (lowPriority.length > 0) {
+      output += `### Low Priority (${lowPriority.length})\n`;
+      lowPriority.forEach(s => {
+        output += `- **${s.rule}**\n  Issue: ${s.issue}\n  Suggestion: ${s.suggestion}\n\n`;
+      });
+    }
+  }
+
+  return {
+    title: "Rule Improvement Suggestions",
+    metadata: { suggestions, totalSuggestions: suggestions.length },
+    output: output.trim()
+  };
+}
+
+async function optimizeRules(
+  agentrcPath: string,
+  agentrc: AgentRc,
+  params: any,
+  ctx: Tool.Context
+): Promise<{ title: string; metadata: any; output: string }> {
+  const rules = ensureStructuredRules(agentrc);
+  const optimizations = [];
+  let optimizedCount = 0;
+
+  for (const [category, categoryRules] of Object.entries(rules)) {
+    for (let i = categoryRules.length - 1; i >= 0; i--) {
+      const rule = categoryRules[i];
+      const analytics = rule.analytics || { timesApplied: 0, timesIgnored: 0, effectivenessScore: 0, userFeedback: [] };
+      
+      // Auto-remove rules with very low effectiveness and negative feedback
+      if (analytics.effectivenessScore < 0.2 && analytics.userFeedback.length > 3 &&
+          analytics.userFeedback.every(f => f.rating <= 2)) {
+        optimizations.push({
+          action: "removed",
+          rule: rule.text,
+          reason: "Consistently low effectiveness and negative feedback"
+        });
+        categoryRules.splice(i, 1);
+        optimizedCount++;
+        continue;
+      }
+
+      // Move unused rules to deprecated
+      if (rule.usageCount === 0 && rule.createdAt && 
+          new Date().getTime() - new Date(rule.createdAt).getTime() > 60 * 24 * 60 * 60 * 1000 &&
+          category !== "deprecated") {
+        optimizations.push({
+          action: "deprecated",
+          rule: rule.text,
+          reason: "Unused for 60+ days"
+        });
+        categoryRules.splice(i, 1);
+        if (!rules.deprecated) rules.deprecated = [];
+        rules.deprecated.push({ ...rule, category: "deprecated" as const });
+        optimizedCount++;
+        continue;
+      }
+
+      // Promote highly effective preferred rules to critical
+      if (category === "preferred" && analytics.effectivenessScore > 0.8 && 
+          analytics.userFeedback.length > 5 && 
+          analytics.userFeedback.every(f => f.rating >= 4)) {
+        optimizations.push({
+          action: "promoted",
+          rule: rule.text,
+          reason: "Consistently high effectiveness and positive feedback"
+        });
+        categoryRules.splice(i, 1);
+        if (!rules.critical) rules.critical = [];
+        rules.critical.push({ ...rule, category: "critical" as const });
+        optimizedCount++;
+        continue;
+      }
+    }
+  }
+
+  // Save optimized rules if any changes were made
+  if (optimizedCount > 0) {
+    agentrc.rules = rules;
+    await writeAgentRc(agentrcPath, agentrc, ctx);
+  }
+
+  let output = `## Rule Optimization Complete\n\n`;
+  output += `**Rules Optimized**: ${optimizedCount}\n\n`;
+  
+  if (optimizations.length > 0) {
+    output += `### Changes Made\n`;
+    optimizations.forEach(opt => {
+      output += `- **${opt.action.toUpperCase()}**: ${opt.rule}\n  Reason: ${opt.reason}\n\n`;
+    });
+  } else {
+    output += "No optimizations needed. Your rules are already well-organized!\n";
+  }
+
+  return {
+    title: "Rule Optimization",
+    metadata: { optimizations, optimizedCount },
+    output: output.trim()
   };
 }
