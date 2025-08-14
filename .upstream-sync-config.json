@@ -7,6 +7,10 @@
   "dryRun": false,
   "notifyOnChanges": true,
   "maxChangesPerRun": 5,
+  "pathMappings": {
+    "packages/opencode/": "packages/kuuzuki/",
+    "packages/opencode-": "packages/kuuzuki-"
+  },
   "excludePatterns": [
     "*.md",
     "docs/**",
@@ -15,26 +19,23 @@
     ".github/workflows/**",
     "README*",
     "CHANGELOG*",
-    "LICENSE*"
+    "LICENSE*",
+    "cloud/**",
+    "sdks/**",
+    "packages/web/**",
+    "packages/sdk/**",
+    "packages/function/**",
+    "packages/plugin/**",
+    "**/package.json"
   ],
   "includePatterns": [
-    "src/**/*.ts",
-    "src/**/*.js",
-    "packages/**/*.ts",
-    "packages/**/*.js",
-    "*.sh",
-    "*.bash",
-    "*.fish",
-    "*.zsh",
-    "scripts/**/*",
-    "bin/**/*",
-    "*.json",
-    "*.yaml",
-    "*.yml",
-    "*.toml",
-    "Dockerfile*",
-    "docker-compose*",
-    ".github/**/*.yml",
-    ".github/**/*.yaml"
+    "packages/opencode/src/**/*.ts",
+    "packages/opencode/src/**/*.js",
+    "packages/opencode/src/**/*.txt",
+    "packages/tui/**/*.go",
+    "packages/tui/**/*.ts",
+    "packages/tui/**/*.js",
+    "packages/opencode/bin/**/*",
+    "packages/opencode/scripts/**/*"
   ]
 }

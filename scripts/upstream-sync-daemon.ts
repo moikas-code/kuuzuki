@@ -49,9 +49,23 @@ interface UpstreamChange {
   };
 }
 
+interface ProcessedCommit {
+  commit: string;
+  processedAt: string;
+  status: "skipped" | "auto-merged" | "review-created" | "manual-required" | "failed" | "already-implemented";
+  reason: string;
+  branch?: string; // For review branches
+}
+
+interface CommitTracker {
+  lastProcessedCommit?: string;
+  processedCommits: Record<string, ProcessedCommit>;
+}
+
 const CONFIG_FILE = ".upstream-sync-config.json";
 const PID_FILE = ".upstream-sync.pid";
 const LOG_FILE = ".upstream-sync.log";
+const TRACKER_FILE = ".upstream-sync-tracker.json";
 
 const DEFAULT_CONFIG: DaemonConfig = {
   upstreamRemote: "upstream",
@@ -105,11 +119,13 @@ const DEFAULT_CONFIG: DaemonConfig = {
 
 class UpstreamSyncDaemon {
   private config: DaemonConfig;
+  private tracker: CommitTracker;
   private isRunning = false;
   private intervalId?: NodeJS.Timeout;
 
   constructor() {
     this.config = this.loadConfig();
+    this.tracker = this.loadTracker();
   }
 
   private loadConfig(): DaemonConfig {
@@ -126,6 +142,38 @@ class UpstreamSyncDaemon {
 
   private saveConfig(): void {
     writeFileSync(CONFIG_FILE, JSON.stringify(this.config, null, 2));
+  }
+
+  private loadTracker(): CommitTracker {
+    if (existsSync(TRACKER_FILE)) {
+      try {
+        const trackerData = readFileSync(TRACKER_FILE, "utf8");
+        return JSON.parse(trackerData);
+      } catch (error) {
+        this.log(`Error loading tracker: ${error}. Starting fresh.`);
+      }
+    }
+    return { processedCommits: {} };
+  }
+
+  private saveTracker(): void {
+    writeFileSync(TRACKER_FILE, JSON.stringify(this.tracker, null, 2));
+  }
+
+  private markCommitProcessed(commit: string, status: ProcessedCommit["status"], reason: string, branch?: string): void {
+    this.tracker.processedCommits[commit] = {
+      commit,
+      processedAt: new Date().toISOString(),
+      status,
+      reason,
+      branch
+    };
+    this.tracker.lastProcessedCommit = commit;
+    this.saveTracker();
+  }
+
+  private isCommitProcessed(commit: string): boolean {
+    return commit in this.tracker.processedCommits;
   }
 
   private log(message: string): void {
@@ -372,17 +420,21 @@ Respond in JSON format:
     else if (change.files.length > 2 || change.additions + change.deletions > 20) risk = "medium";
 
     // Check if files match our include/exclude patterns
-    const isRelevant = change.files.some(file => 
+    const relevantFiles = change.files.filter(file => 
       this.config.includePatterns.some(pattern => 
         this.matchesPattern(file, pattern)
       )
     );
 
-    const hasExcluded = change.files.some(file =>
+    const excludedFiles = change.files.filter(file =>
       this.config.excludePatterns.some(pattern =>
         this.matchesPattern(file, pattern)
       )
     );
+
+    const isRelevant = relevantFiles.length > 0;
+    const hasExcluded = excludedFiles.length > 0;
+    const excludedRatio = excludedFiles.length / change.files.length;
 
     let recommendation: "auto-merge" | "review" | "manual" | "skip" = "review";
     let confidence = 0.6;
@@ -392,6 +444,12 @@ Respond in JSON format:
       recommendation = "skip";
       confidence = 0.95;
       this.log(`🚫 Skipping problematic commit type: ${change.message}`);
+    }
+    // Skip commits that are mostly excluded files (>80% excluded)
+    else if (excludedRatio > 0.8) {
+      recommendation = "skip";
+      confidence = 0.9;
+      this.log(`🚫 Skipping commit with mostly excluded files: ${excludedFiles.length}/${change.files.length} files excluded`);
     }
     // Skip commits that mostly affect files that don't exist in our fork (even with path translation)
     else if (!isRelevant && change.files.length > 0) {
@@ -459,7 +517,7 @@ Respond in JSON format:
     // Log the decision reasoning
     this.log(`📊 Analysis for ${change.commit.substring(0, 8)}: ${type}/${risk} → ${recommendation} (${Math.round(confidence * 100)}%)`);
     this.log(`   Files: ${change.files.join(", ")}`);
-    this.log(`   Relevant: ${isRelevant}, Excluded: ${hasExcluded}`);
+    this.log(`   Relevant: ${relevantFiles.length}/${change.files.length}, Excluded: ${excludedFiles.length}/${change.files.length} (${Math.round(excludedRatio * 100)}%)`);
 
     return analysis;
   }
@@ -540,6 +598,50 @@ Respond in JSON format:
       if (authorCommits.includes(change.message.substring(0, 20))) {
         this.log(`🔍 Similar recent commit by ${change.author} found`);
         return true;
+      }
+
+      // Method 5: Check if specific code changes are already present (diff-based)
+      if (change.files.length > 0 && change.files.length <= 3) { // Only for small changes
+        try {
+          const diff = execSync(`git show ${change.commit} --format=format:`, { encoding: "utf8" });
+          
+          // Extract added lines (lines starting with +)
+          const addedLines = diff.split('\n')
+            .filter(line => line.startsWith('+') && !line.startsWith('+++'))
+            .map(line => line.substring(1).trim())
+            .filter(line => line.length > 5); // Ignore very short lines
+          
+          if (addedLines.length > 0) {
+            let foundChanges = 0;
+            
+            for (const file of change.files) {
+              const translatedPath = this.translatePath(file);
+              try {
+                const currentContent = execSync(
+                  `git show ${this.config.localBranch}:${translatedPath}`,
+                  { encoding: "utf8" }
+                );
+                
+                // Check if the added lines are present in our file
+                for (const addedLine of addedLines) {
+                  if (currentContent.includes(addedLine)) {
+                    foundChanges++;
+                  }
+                }
+              } catch {
+                // File doesn't exist, skip
+              }
+            }
+            
+            // If we found most of the added lines, consider it implemented
+            if (foundChanges >= addedLines.length * 0.8) {
+              this.log(`🔍 Specific changes already present in translated files (${foundChanges}/${addedLines.length} lines found)`);
+              return true;
+            }
+          }
+        } catch (diffError) {
+          this.log(`⚠️  Error analyzing diff for implementation check: ${diffError}`);
+        }
       }
 
       return false;
@@ -628,6 +730,15 @@ Respond in JSON format:
         return true;
       } catch (cherryPickError) {
         this.log(`🔄 Regular cherry-pick failed, trying path translation...`);
+        
+        // Clean up the failed cherry-pick state
+        try {
+          execSync(`git cherry-pick --abort`, { stdio: "pipe" });
+          this.log(`🧹 Cleaned up failed cherry-pick state`);
+        } catch (abortError) {
+          // If abort fails, the cherry-pick might not have been in progress
+          this.log(`⚠️  Cherry-pick abort failed (might not be in progress): ${abortError}`);
+        }
       }
 
       // If regular cherry-pick fails, try manual application with path translation
@@ -647,40 +758,46 @@ Respond in JSON format:
 
       this.log(`🔧 Applying changes with path translation...`);
       
-      // Apply changes manually with path translation
-      for (const file of change.files) {
-        const translatedPath = this.translatePath(file);
+      // Get the patch and translate paths in it
+      const patch = execSync(`git show ${change.commit} --format=format:`, { encoding: "utf8" });
+      
+      // Translate paths in the patch
+      let translatedPatch = patch;
+      for (const [upstreamPath, localPath] of Object.entries(this.config.pathMappings)) {
+        const regex = new RegExp(upstreamPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+        translatedPatch = translatedPatch.replace(regex, localPath);
+      }
+      
+      // Apply the translated patch
+      const fs = await import("fs");
+      const tempPatchFile = `/tmp/translated-patch-${Date.now()}.patch`;
+      fs.writeFileSync(tempPatchFile, translatedPatch);
+      
+      try {
+        // Apply the patch
+        execSync(`git apply ${tempPatchFile}`, { stdio: "pipe" });
         
-        if (translatedPath !== file) {
-          this.log(`📁 Translating: ${file} → ${translatedPath}`);
-          
-          try {
-            // Get the file content from the upstream commit
-            const upstreamContent = execSync(
-              `git show ${change.commit}:${file}`,
-              { encoding: "utf8" }
-            );
-            
-            // Write to the translated path
-            const fs = await import("fs");
-            const path = await import("path");
-            
-            // Ensure directory exists
-            const dir = path.dirname(translatedPath);
-            if (!fs.existsSync(dir)) {
-              fs.mkdirSync(dir, { recursive: true });
+        // Stage all changed files
+        for (const file of change.files) {
+          const translatedPath = this.translatePath(file);
+          if (translatedPath !== file) {
+            this.log(`📁 Translated: ${file} → ${translatedPath}`);
+            try {
+              execSync(`git add ${translatedPath}`, { stdio: "pipe" });
+            } catch (addError) {
+              this.log(`⚠️  Failed to stage ${translatedPath}: ${addError}`);
             }
-            
-            fs.writeFileSync(translatedPath, upstreamContent);
-            
-            // Stage the file
-            execSync(`git add ${translatedPath}`, { stdio: "pipe" });
-            
-          } catch (fileError) {
-            this.log(`⚠️  Failed to translate ${file}: ${fileError}`);
-            // Continue with other files
           }
         }
+        
+        // Clean up temp file
+        fs.unlinkSync(tempPatchFile);
+        
+      } catch (patchError) {
+        // Clean up temp file
+        fs.unlinkSync(tempPatchFile);
+        this.log(`⚠️  Patch application failed: ${patchError}`);
+        throw new Error(`Failed to apply translated patch: ${patchError}`);
       }
       
       // Check if we have any staged changes
@@ -709,6 +826,7 @@ Respond in JSON format:
     // Check if this change is already implemented
     if (await this.isChangeAlreadyImplemented(change)) {
       this.log(`✅ Already implemented ${change.commit.substring(0, 8)}: ${change.message}`);
+      this.markCommitProcessed(change.commit, "already-implemented", "Change already exists in codebase");
       return true;
     }
 
@@ -716,11 +834,13 @@ Respond in JSON format:
 
     if (recommendation === "skip") {
       this.log(`⏭️  Skipping ${change.commit.substring(0, 8)}: ${change.message}`);
+      this.markCommitProcessed(change.commit, "skipped", change.analysis.summary);
       return true;
     }
 
     if (recommendation === "manual") {
       this.log(`⚠️  Manual review required for ${change.commit.substring(0, 8)}: ${change.message}`);
+      this.markCommitProcessed(change.commit, "manual-required", "Requires manual intervention");
       return false;
     }
 
@@ -776,12 +896,14 @@ Respond in JSON format:
           execSync(`git branch -d ${branchName}`, { stdio: "pipe" });
 
           this.log(`✅ Successfully integrated ${change.commit.substring(0, 8)}`);
+          this.markCommitProcessed(change.commit, "auto-merged", "Successfully auto-integrated");
           return true;
         } else {
           // Cleanup failed integration
           execSync(`git checkout ${this.config.localBranch}`, { stdio: "pipe" });
           execSync(`git branch -D ${branchName}`, { stdio: "pipe" });
           this.log(`❌ Integration failed tests for ${change.commit.substring(0, 8)}`);
+          this.markCommitProcessed(change.commit, "failed", "Integration failed tests");
           return false;
         }
       } catch (cherryPickError) {
@@ -804,6 +926,7 @@ Respond in JSON format:
         }
         
         this.log(`❌ Cherry-pick failed for ${change.commit.substring(0, 8)}: ${cherryPickError}`);
+        this.markCommitProcessed(change.commit, "failed", `Cherry-pick failed: ${cherryPickError}`);
         return false;
       }
     } catch (error) {
@@ -857,6 +980,7 @@ Respond in JSON format:
         }
         
         this.log(`❌ Cherry-pick failed for review branch ${branchName}: ${cherryPickError}`);
+        this.markCommitProcessed(change.commit, "failed", `Review branch creation failed: ${cherryPickError}`);
         return false;
       }
     } catch (error) {
@@ -901,6 +1025,14 @@ Respond in JSON format:
       let failed = 0;
 
       for (const commit of newCommits) {
+        // Skip already processed commits
+        if (this.isCommitProcessed(commit.commit)) {
+          const processed = this.tracker.processedCommits[commit.commit];
+          this.log(`⏭️  Skipping already processed commit ${commit.commit.substring(0, 8)}: ${processed.status} (${processed.reason})`);
+          skipped++;
+          continue;
+        }
+
         const analyzedCommit = await this.analyzeChangeWithKuuzuki(commit);
         const success = await this.integrateChange(analyzedCommit);
 
@@ -997,8 +1129,62 @@ Respond in JSON format:
       console.log(`✅ Daemon is running (PID: ${pid})`);
       console.log(`📁 Config: ${CONFIG_FILE}`);
       console.log(`📝 Log: ${LOG_FILE}`);
+      console.log(`📊 Tracker: ${TRACKER_FILE}`);
     } else {
       console.log("❌ Daemon is not running");
+    }
+
+    // Show tracking statistics
+    if (existsSync(TRACKER_FILE)) {
+      const tracker = this.loadTracker();
+      const commits = Object.values(tracker.processedCommits);
+      
+      console.log(`\n📈 Commit Processing Statistics:`);
+      console.log(`   Total processed: ${commits.length}`);
+      console.log(`   Last processed: ${tracker.lastProcessedCommit?.substring(0, 8) || 'none'}`);
+      
+      const statusCounts = commits.reduce((acc, commit) => {
+        acc[commit.status] = (acc[commit.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      Object.entries(statusCounts).forEach(([status, count]) => {
+        const emoji = {
+          'skipped': '⏭️',
+          'auto-merged': '✅',
+          'review-created': '👀',
+          'manual-required': '⚠️',
+          'failed': '❌',
+          'already-implemented': '🔄'
+        }[status] || '📝';
+        console.log(`   ${emoji} ${status}: ${count}`);
+      });
+
+      // Show recent commits
+      const recent = commits
+        .sort((a, b) => new Date(b.processedAt).getTime() - new Date(a.processedAt).getTime())
+        .slice(0, 5);
+      
+      if (recent.length > 0) {
+        console.log(`\n🕒 Recent commits:`);
+        recent.forEach(commit => {
+          const emoji = {
+            'skipped': '⏭️',
+            'auto-merged': '✅',
+            'review-created': '👀',
+            'manual-required': '⚠️',
+            'failed': '❌',
+            'already-implemented': '🔄'
+          }[commit.status] || '📝';
+          const date = new Date(commit.processedAt).toLocaleString();
+          console.log(`   ${emoji} ${commit.commit.substring(0, 8)} (${commit.status}) - ${date}`);
+          if (commit.branch) {
+            console.log(`      Branch: ${commit.branch}`);
+          }
+        });
+      }
+    } else {
+      console.log(`\n📈 No tracking data found`);
     }
   }
 

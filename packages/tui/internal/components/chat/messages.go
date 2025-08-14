@@ -1076,10 +1076,10 @@ func renderPendingPlaceholder(width int) string {
 
 	content := dotsStyle.Render(dots) + " " + textStyle.Render(text)
 
-	// Center the content
+	// Left-align the content to use full width
 	contentStyle := styles.NewStyle().
 		Width(width - 6).
-		AlignHorizontal(lipgloss.Center)
+		AlignHorizontal(lipgloss.Left)
 
 	return contentStyle.Render(content)
 }
