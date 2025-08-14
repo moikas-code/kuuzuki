@@ -352,7 +352,7 @@ class UpstreamSyncDaemon {
 
         // Get detailed commit info
         const details = this.execInWorktree(
-          `git show --stat --format="%an|%ad|%s" ${commit}`,
+          `git show --stat=1000 --format="%an|%ad|%s" ${commit}`,
           { encoding: "utf8" },
         ) as string;
 
@@ -504,14 +504,15 @@ Respond in JSON format:
         kuuzukiProcess.stdin?.write(analysisPrompt);
         kuuzukiProcess.stdin?.end();
 
-        // Timeout after 30 seconds
+        // Timeout after 10 seconds for faster processing
         setTimeout(() => {
           kuuzukiProcess.kill();
+          this.log(`⏱️  Kuuzuki analysis timeout, using fallback`);
           resolve({
             ...change,
             analysis: this.createFallbackAnalysis(change),
           });
-        }, 30000);
+        }, 10000);
       });
     } catch (error) {
       this.log(`Error analyzing with kuuzuki: ${error}`);
@@ -1754,6 +1755,64 @@ Respond in JSON format:
     failedCommits.forEach((id) => console.log(`   - ${id.substring(0, 8)}`));
     console.log("These commits will be retried on next sync cycle");
   }
+
+  public resetToCommit(commitHash: string): void {
+    try {
+      // Validate commit exists
+      execSync(`git rev-parse --verify ${commitHash}`, { stdio: "pipe" });
+      
+      // Get commit info for display
+      const commitInfo = execSync(`git show --oneline --no-patch ${commitHash}`, { encoding: "utf8" }) as string;
+      const shortHash = commitHash.substring(0, 8);
+      
+      console.log(`🔄 Resetting daemon to start from commit ${shortHash}`);
+      console.log(`📝 Commit: ${commitInfo.trim()}`);
+      
+      // Clear all processed commits that come after this commit chronologically
+      const allCommits = execSync(
+        `git log --oneline --no-merges ${this.config.localBranch}..${this.config.upstreamRemote}/${this.config.upstreamBranch}`,
+        { encoding: "utf8" }
+      ) as string;
+      
+      const commitList = allCommits.trim().split('\n').map(line => line.split(' ')[0]);
+      const targetIndex = commitList.findIndex(commit => commit.startsWith(shortHash));
+      
+      if (targetIndex === -1) {
+        console.log(`❌ Error: Commit ${shortHash} not found in upstream commits`);
+        console.log(`Available commits: ${commitList.slice(0, 10).join(', ')}...`);
+        return;
+      }
+      
+      // Clear the tracker and set the new starting point
+      // We want to process FROM this commit, so we set lastProcessedCommit to the previous one
+      const newTracker: CommitTracker = {
+        processedCommits: {},
+        lastProcessedCommit: targetIndex < commitList.length - 1 ? commitList[targetIndex + 1] : undefined
+      };
+      
+      // If there are commits before our target, mark them as processed
+      const commitsToSkip = commitList.slice(targetIndex + 1);
+      commitsToSkip.forEach(commit => {
+        newTracker.processedCommits[commit] = {
+          commit,
+          processedAt: new Date().toISOString(),
+          status: "skipped",
+          reason: `Skipped during reset to ${shortHash}`
+        };
+      });
+      
+      this.tracker = newTracker;
+      this.saveTracker();
+      
+      console.log(`✅ Reset complete! Daemon will start processing from ${shortHash}`);
+      console.log(`📊 Marked ${commitsToSkip.length} older commits as skipped`);
+      console.log(`🚀 Run 'bun run scripts/upstream-sync-daemon.ts start' to begin processing`);
+      
+    } catch (error) {
+      console.log(`❌ Error resetting to commit ${commitHash}: ${error}`);
+      console.log(`💡 Make sure the commit hash is valid and exists in upstream/${this.config.upstreamBranch}`);
+    }
+  }
 }
 
 // CLI Interface
@@ -1778,6 +1837,15 @@ async function main() {
     case "cleanup":
       daemon.cleanup();
       break;
+    case "reset":
+      const startCommit = process.argv[3];
+      if (!startCommit) {
+        console.log("❌ Error: Please provide a commit hash");
+        console.log("Usage: bun scripts/upstream-sync-daemon.ts reset <commit-hash>");
+        process.exit(1);
+      }
+      daemon.resetToCommit(startCommit);
+      break;
     default:
       console.log(`
 🤖 Kuuzuki Upstream Sync Daemon
@@ -1791,9 +1859,11 @@ Commands:
   status                   Check daemon status
   config <json>            Update configuration
   cleanup                  Reset failed commits for retry
+  reset <commit>           Reset to start from specific commit
 
 Examples:
   bun scripts/upstream-sync-daemon.ts start
+  bun scripts/upstream-sync-daemon.ts reset 7bbc6436
   bun scripts/upstream-sync-daemon.ts config '{"pollInterval": 15, "dryRun": true}'
   bun scripts/upstream-sync-daemon.ts stop
 
