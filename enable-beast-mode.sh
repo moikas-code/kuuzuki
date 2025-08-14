@@ -1,3 +1,12 @@
+#!/bin/bash
+
+# Enable Beast Mode for Upstream Sync Daemon
+# This enables aggressive processing with higher thresholds and batch sizes
+
+echo "🦁 Enabling Beast Mode for upstream sync daemon..."
+
+# Update configuration to enable beast mode
+cat > .upstream-sync-config.json << 'EOF'
 {
   "upstreamRemote": "upstream",
   "upstreamBranch": "dev",
@@ -44,3 +53,12 @@
     "packages/opencode/scripts/**/*"
   ]
 }
+EOF
+
+echo "✅ Beast Mode enabled!"
+echo "   🦁 Max changes per run: 20 (vs 5 normal)"
+echo "   🎯 Auto-merge threshold: 85% (vs 75% normal)"
+echo "   ⚡ Processing: Chronological (oldest → newest)"
+echo ""
+echo "Start the daemon with: bun run scripts/upstream-sync-daemon.ts start"
+echo "Check status with: bun run scripts/upstream-sync-daemon.ts status"
