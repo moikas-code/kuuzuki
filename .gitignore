@@ -80,3 +80,5 @@ dist-tsc/
 .kuuzuki/
 
 opencode-upstream-v0.4.2
+
+.upstream-sync.pid

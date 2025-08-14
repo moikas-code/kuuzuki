@@ -422,8 +422,89 @@ Respond in JSON format:
     return regex.test(file);
   }
 
+  private async isChangeAlreadyImplemented(change: UpstreamChange): Promise<boolean> {
+    try {
+      // Method 1: Check if commit exists in local branch (direct cherry-pick)
+      try {
+        execSync(`git merge-base --is-ancestor ${change.commit} ${this.config.localBranch}`, { stdio: "pipe" });
+        this.log(`🔍 Commit ${change.commit.substring(0, 8)} already exists in ${this.config.localBranch}`);
+        return true;
+      } catch {
+        // Commit doesn't exist directly, continue with content checks
+      }
+
+      // Method 2: Check if the commit message already exists (manual implementation)
+      const logOutput = execSync(
+        `git log --oneline --grep="${change.message.replace(/"/g, '\\"')}" ${this.config.localBranch}`,
+        { encoding: "utf8" }
+      );
+      if (logOutput.trim()) {
+        this.log(`🔍 Similar commit message found in ${this.config.localBranch}: ${change.message}`);
+        return true;
+      }
+
+      // Method 3: Check if the file changes are already present (content-based)
+      if (change.files.length > 0 && change.files.length <= 5) { // Only check for small changes
+        let allChangesPresent = true;
+        
+        for (const file of change.files) {
+          try {
+            // Get the file content from the upstream commit
+            const upstreamContent = execSync(
+              `git show ${change.commit}:${file}`,
+              { encoding: "utf8" }
+            );
+            
+            // Get the current file content
+            const currentContent = execSync(
+              `git show ${this.config.localBranch}:${file}`,
+              { encoding: "utf8" }
+            );
+            
+            // If contents are identical, this change is already present
+            if (upstreamContent !== currentContent) {
+              allChangesPresent = false;
+              break;
+            }
+          } catch {
+            // File doesn't exist or can't be compared, assume not implemented
+            allChangesPresent = false;
+            break;
+          }
+        }
+        
+        if (allChangesPresent) {
+          this.log(`🔍 File contents already match upstream for ${change.commit.substring(0, 8)}`);
+          return true;
+        }
+      }
+
+      // Method 4: Check for similar recent commits by author and timeframe
+      const authorCommits = execSync(
+        `git log --oneline --author="${change.author}" --since="1 week ago" ${this.config.localBranch}`,
+        { encoding: "utf8" }
+      );
+      
+      if (authorCommits.includes(change.message.substring(0, 20))) {
+        this.log(`🔍 Similar recent commit by ${change.author} found`);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      this.log(`⚠️  Error checking if change is implemented: ${error}`);
+      return false; // If we can't check, assume it's not implemented
+    }
+  }
+
   private async integrateChange(change: UpstreamChange): Promise<boolean> {
     if (!change.analysis) return false;
+
+    // Check if this change is already implemented
+    if (await this.isChangeAlreadyImplemented(change)) {
+      this.log(`✅ Already implemented ${change.commit.substring(0, 8)}: ${change.message}`);
+      return true;
+    }
 
     const { recommendation, confidence } = change.analysis;
 
@@ -490,9 +571,23 @@ Respond in JSON format:
         }
       } catch (cherryPickError) {
         // Cleanup failed cherry-pick
-        execSync(`git cherry-pick --abort`, { stdio: "pipe" });
-        execSync(`git checkout ${this.config.localBranch}`, { stdio: "pipe" });
-        execSync(`git branch -D ${branchName}`, { stdio: "pipe" });
+        try {
+          // Only abort if there's an active cherry-pick
+          const status = execSync(`git status`, { encoding: "utf8" });
+          if (status.includes("cherry-pick")) {
+            execSync(`git cherry-pick --abort`, { stdio: "pipe" });
+          }
+        } catch (abortError) {
+          // Cherry-pick abort failed or not needed, continue cleanup
+        }
+        
+        try {
+          execSync(`git checkout ${this.config.localBranch}`, { stdio: "pipe" });
+          execSync(`git branch -D ${branchName}`, { stdio: "pipe" });
+        } catch (cleanupError) {
+          this.log(`⚠️  Cleanup warning: ${cleanupError}`);
+        }
+        
         this.log(`❌ Cherry-pick failed for ${change.commit.substring(0, 8)}: ${cherryPickError}`);
         return false;
       }
@@ -513,14 +608,37 @@ Respond in JSON format:
       }
 
       execSync(`git checkout -b ${branchName}`, { stdio: "pipe" });
-      execSync(`git cherry-pick ${change.commit}`, { stdio: "pipe" });
-      execSync(`git checkout ${this.config.localBranch}`, { stdio: "pipe" });
-
-      this.log(`✅ Review branch created: ${branchName}`);
-      this.log(`   To review: git checkout ${branchName}`);
-      this.log(`   To integrate: git checkout ${this.config.localBranch} && git merge ${branchName}`);
       
-      return true;
+      try {
+        execSync(`git cherry-pick ${change.commit}`, { stdio: "pipe" });
+        execSync(`git checkout ${this.config.localBranch}`, { stdio: "pipe" });
+
+        this.log(`✅ Review branch created: ${branchName}`);
+        this.log(`   To review: git checkout ${branchName}`);
+        this.log(`   To integrate: git checkout ${this.config.localBranch} && git merge ${branchName}`);
+        
+        return true;
+      } catch (cherryPickError) {
+        // Cleanup failed cherry-pick for review branch
+        try {
+          const status = execSync(`git status`, { encoding: "utf8" });
+          if (status.includes("cherry-pick")) {
+            execSync(`git cherry-pick --abort`, { stdio: "pipe" });
+          }
+        } catch (abortError) {
+          // Continue cleanup
+        }
+        
+        try {
+          execSync(`git checkout ${this.config.localBranch}`, { stdio: "pipe" });
+          execSync(`git branch -D ${branchName}`, { stdio: "pipe" });
+        } catch (cleanupError) {
+          this.log(`⚠️  Review branch cleanup warning: ${cleanupError}`);
+        }
+        
+        this.log(`❌ Cherry-pick failed for review branch ${branchName}: ${cherryPickError}`);
+        return false;
+      }
     } catch (error) {
       this.log(`❌ Failed to create review branch: ${error}`);
       return false;

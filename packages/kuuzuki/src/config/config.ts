@@ -1002,22 +1002,32 @@ export namespace Config {
 
   // API Key Management Integration
   export namespace ApiKeys {
-    const apiKeyManager = ApiKeyManager.getInstance();
+    let apiKeyManagerPromise: Promise<ApiKeyManager.ApiKeyManager> | null = null;
+    
+    async function getManager(): Promise<ApiKeyManager.ApiKeyManager> {
+      if (!apiKeyManagerPromise) {
+        apiKeyManagerPromise = ApiKeyManager.getInstance();
+      }
+      return apiKeyManagerPromise;
+    }
 
     export async function store(
       providerId: string,
       apiKey: string,
       useKeychain = true,
     ): Promise<void> {
-      return apiKeyManager.storeKey(providerId, apiKey, useKeychain);
+      const manager = await getManager();
+      return manager.storeKey(providerId, apiKey, useKeychain);
     }
 
     export async function get(providerId: string): Promise<string | null> {
-      return apiKeyManager.getKey(providerId);
+      const manager = await getManager();
+      return manager.getKey(providerId);
     }
 
     export async function remove(providerId: string): Promise<void> {
-      return apiKeyManager.removeKey(providerId);
+      const manager = await getManager();
+      return manager.removeKey(providerId);
     }
 
     export async function list(): Promise<
@@ -1031,14 +1041,16 @@ export namespace Config {
         lastHealthCheck?: number;
       }>
     > {
-      return apiKeyManager.listKeys();
+      const manager = await getManager();
+      return manager.listKeys();
     }
 
     export async function validate(
       providerId: string,
       apiKey?: string,
     ): Promise<boolean> {
-      return apiKeyManager.validateKey(providerId, apiKey);
+      const manager = await getManager();
+      return manager.validateKey(providerId, apiKey);
     }
 
     export async function healthCheck(providerId: string): Promise<{
@@ -1046,7 +1058,8 @@ export namespace Config {
       error?: string;
       responseTime?: number;
     }> {
-      return apiKeyManager.healthCheck(providerId);
+      const manager = await getManager();
+      return manager.healthCheck(providerId);
     }
 
     export async function healthCheckAll(): Promise<
@@ -1059,22 +1072,26 @@ export namespace Config {
         }
       >
     > {
-      return apiKeyManager.healthCheckAll();
+      const manager = await getManager();
+      return manager.healthCheckAll();
     }
 
-    export function hasKey(providerId: string): boolean {
-      return apiKeyManager.hasKey(providerId);
+    export async function hasKey(providerId: string): Promise<boolean> {
+      const manager = await getManager();
+      return manager.hasKey(providerId);
     }
 
-    export function getAvailableProviders(): string[] {
-      return apiKeyManager.getAvailableProviders();
+    export async function getAvailableProviders(): Promise<string[]> {
+      const manager = await getManager();
+      return manager.getAvailableProviders();
     }
 
     export async function detectAndStore(
       apiKey: string,
       useKeychain = true,
     ): Promise<string | null> {
-      return apiKeyManager.detectAndStoreKey(apiKey, useKeychain);
+      const manager = await getManager();
+      return manager.detectAndStoreKey(apiKey, useKeychain);
     }
   }
 }

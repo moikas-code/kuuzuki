@@ -481,6 +481,60 @@ func renderToolDetails(
 
 			body += "```"
 			body = util.ToMarkdown(body, width, backgroundColor)
+		case "shell":
+			// Handle !cmd shell syntax with real-time streaming output
+			command := toolInputMap["command"].(string)
+
+			// Determine if command is still running
+			isRunning := toolCall.State.Status == opencode.ToolPartStateStatusRunning
+
+			// Build command header with status indicator
+			commandHeader := fmt.Sprintf("$ %s", command)
+			if isRunning {
+				commandHeader += " ⚡ Running..."
+			} else if toolCall.State.Status == opencode.ToolPartStateStatusCompleted {
+				if metadata != nil {
+					if exitCode, ok := metadata["exitCode"].(float64); ok {
+						if exitCode == 0 {
+							commandHeader += " ✓ Completed"
+						} else {
+							commandHeader += fmt.Sprintf(" ✗ Exit code %d", int(exitCode))
+						}
+					}
+				}
+			} else if toolCall.State.Status == opencode.ToolPartStateStatusError {
+				commandHeader += " ✗ Error"
+			}
+
+			body = fmt.Sprintf("```console\n%s\n", commandHeader)
+
+			// Display real-time output from metadata
+			if metadata != nil {
+				if output, ok := metadata["output"].(string); ok && output != "" {
+					// Strip ANSI codes for clean display
+					cleanOutput := ansi.Strip(output)
+					body += cleanOutput
+
+					// Add cursor indicator for running commands
+					if isRunning && !strings.HasSuffix(cleanOutput, "\n") {
+						body += "█"
+					}
+				} else if isRunning {
+					// Show cursor when waiting for output
+					body += "█"
+				}
+			}
+
+			// Add final output if completed
+			if toolCall.State.Output != "" && !isRunning {
+				cleanOutput := ansi.Strip(toolCall.State.Output)
+				if metadata == nil || metadata["output"] == nil {
+					body += cleanOutput
+				}
+			}
+
+			body += "```"
+			body = util.ToMarkdown(body, width, backgroundColor)
 		case "webfetch":
 			if format, ok := toolInputMap["format"].(string); ok && result != nil {
 				body = *result

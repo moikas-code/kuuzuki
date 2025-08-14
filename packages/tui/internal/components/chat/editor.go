@@ -565,7 +565,7 @@ func (m *editorComponent) Submit() (tea.Model, tea.Cmd) {
 			m = updated.(*editorComponent)
 			cmds = append(cmds, cmd)
 
-			// Execute shell command
+			// Execute shell command with enhanced feedback
 			cmds = append(cmds, util.CmdHandler(app.ExecuteShellCommand{
 				SessionID: m.app.Session.ID,
 				Command:   command,

@@ -1,34 +1,26 @@
-# !Shell Command Feature Test
+# Shell Command Implementation Test
 
-## Implementation Summary
+## CRITICAL DISCOVERY & FIX
 
-I have successfully implemented the critical !shell command support feature from OpenCode commits 1357319f and 93b71477. This allows users to type commands starting with ! to execute shell commands directly in the TUI.
+**The `!cmd` shell syntax was ALREADY IMPLEMENTED in kuuzuki but had a critical missing piece!**
 
-## Key Components Implemented
+### What Was Already Working ✅
+1. **Input Detection** - `!cmd` syntax detected in editor.go:558
+2. **Shell Execution** - ExecuteShellCommand message sent to app
+3. **Server Endpoint** - `/session/:id/shell` endpoint exists  
+4. **Real-time Streaming** - Server streams output via updatePart()
+5. **TUI Streaming** - EventListResponseEventMessagePartUpdated handled
 
-### 1. Input Detection (editor.go)
-- Modified `Submit()` method to detect input starting with `!`
-- Strips the `!` prefix and extracts the shell command
-- Triggers `ExecuteShellCommand` message instead of regular prompt
+### What Was Missing ❌
+**Shell Output Display** - No `case "shell"` in tool rendering logic!
 
-### 2. Shell Command Execution (app.go)
-- Added `ExecuteShellCommand` message type
-- Added `ExecuteShellCommand()` method to App struct
-- Integrates with existing `/session/:id/shell` endpoint
-
-### 3. Go SDK Integration (session.go)
-- Added `Shell()` method to SessionService
-- Added `SessionShellParams` type for command parameter
-- Follows existing SDK patterns for API calls
-
-### 4. TUI Integration (tui.go)
-- Added handling for `ExecuteShellCommand` message in main Update loop
-- Executes shell commands asynchronously
-- Provides error feedback via toast notifications
-
-### 5. User Experience Enhancements (editor.go)
-- Added visual hint showing `!cmd shell` in the editor status bar
-- Maintains existing UX patterns and styling
+### Critical Fix Applied ✅
+Added missing `case "shell"` in `/packages/tui/internal/components/chat/message.go` to properly render shell command output with:
+- Real-time streaming output display
+- Status indicators (Running/Completed/Error)  
+- Exit code display
+- ANSI-stripped clean output
+- Cursor indicator for active streaming
 
 ## Code Examples
 

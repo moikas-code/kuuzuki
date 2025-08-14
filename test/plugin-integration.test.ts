@@ -75,33 +75,62 @@ describe("Plugin Integration", () => {
     await App.provide({ cwd: process.cwd() }, async () => {
       let hookCalled = false;
 
-      // Mock the plugin state to include a test plugin
-      const originalState = (Plugin as any).state;
-      (Plugin as any).state = async () => ({
-        plugins: [
-          {
-            name: "test",
-            hooks: {
-              "chat.message": async (input: any, output: any) => {
-                hookCalled = true;
-                output.testProcessed = true;
-              },
-            },
-            path: "test",
-          },
-        ],
-      });
+      // Create a test plugin configuration
+      const testConfig = {
+        plugin: ["./test/test-plugin.js"],
+        version: "1.0.0",
+        schema: "https://kuuzuki.com/config.json",
+        providers: [],
+        mcpServers: [],
+        codeStyle: { importStyle: "esm" },
+        tools: { database: "sqlite" },
+        rules: [],
+      };
+
+      // Mock the Config.get to return our test configuration
+      const originalConfigGet = Config.get;
+      (Config as any).get = async () => testConfig;
+
+      // Create a temporary test plugin file
+      const testPluginContent = `
+export default async function testPlugin({ client, app, $ }) {
+  return {
+    "event": async (input) => {
+      // Handle general events
+      console.log("Event received:", input.event?.type);
+    },
+    "chat.message": async (input, output) => {
+      output.testProcessed = true;
+      // Plugin hooks should modify the output object by reference
+      // The trigger function will return the same output object
+    }
+  };
+}
+`;
+
+      await Bun.write("./test/test-plugin.js", testPluginContent);
 
       try {
+        // Initialize plugin system with our test config
+        Plugin.init();
+
+        // Wait a bit for plugin system to fully initialize
+        await new Promise(resolve => setTimeout(resolve, 100));
+
         const input = {};
         const output: any = { message: { id: "test" }, parts: [] };
 
         const result = await Plugin.trigger("chat.message", input, output);
 
-        expect(hookCalled).toBe(true);
         expect(result.testProcessed).toBe(true);
       } finally {
-        (Plugin as any).state = originalState;
+        // Clean up
+        (Config as any).get = originalConfigGet;
+        try {
+          await Bun.$`rm -f ./test/test-plugin.js`;
+        } catch (e) {
+          // Ignore cleanup errors
+        }
       }
 
       return true;

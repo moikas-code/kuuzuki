@@ -19,6 +19,23 @@ describe("Real Plugin Loading", () => {
         rules: [],
       });
 
+      // Create a temporary test plugin file
+      const testPluginContent = `
+export default async function testPlugin({ client, app, $ }) {
+  return {
+    "event": async (input) => {
+      // Handle general events
+      console.log("Event received:", input.event?.type);
+    },
+    "chat.message": async (input, output) => {
+      output.testProcessed = true;
+    }
+  };
+}
+`;
+
+      await Bun.write("./test/test-plugin.js", testPluginContent);
+
       try {
         // Initialize plugin system
         Plugin.init();
@@ -45,6 +62,12 @@ describe("Real Plugin Loading", () => {
         }
       } finally {
         (Config as any).get = originalGet;
+        // Clean up
+        try {
+          await Bun.$`rm -f ./test/test-plugin.js`;
+        } catch (e) {
+          // Ignore cleanup errors
+        }
       }
 
       return true;
@@ -65,6 +88,23 @@ describe("Real Plugin Loading", () => {
         tools: { database: "sqlite" },
         rules: [],
       });
+
+      // Create a temporary test plugin file
+      const testPluginContent = `
+export default async function testPlugin({ client, app, $ }) {
+  return {
+    "event": async (input) => {
+      // Handle general events
+      console.log("Event received:", input.event?.type);
+    },
+    "chat.message": async (input, output) => {
+      output.testProcessed = true;
+    }
+  };
+}
+`;
+
+      await Bun.write("./test/test-plugin.js", testPluginContent);
 
       try {
         // Initialize plugin system
@@ -93,6 +133,12 @@ describe("Real Plugin Loading", () => {
         expect(result).toBeDefined();
       } finally {
         (Config as any).get = originalGet;
+        // Clean up
+        try {
+          await Bun.$`rm -f ./test/test-plugin.js`;
+        } catch (e) {
+          // Ignore cleanup errors
+        }
       }
 
       return true;

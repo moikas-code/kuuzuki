@@ -122,15 +122,21 @@ export const RunCommand = cmd({
       }
       UI.empty();
 
-      // Get mode first to check for mode-specific model
-      const mode = args.mode
-        ? await Mode.get(args.mode)
-        : await Mode.list().then((x) => x[0]);
-
-      // Model priority: CLI arg > mode model > default
-      const { providerID, modelID } = args.model
-        ? Provider.parseModel(args.model)
-        : mode.model ?? await Provider.defaultModel();
+      // Use hardcoded defaults to avoid circular dependency issues during bootstrap
+      let mode = { name: args.mode || "build", tools: {} };
+      let providerID: string;
+      let modelID: string;
+      
+      if (args.model) {
+        // If model is explicitly provided, use it directly
+        const parsed = Provider.parseModel(args.model);
+        providerID = parsed.providerID;
+        modelID = parsed.modelID;
+      } else {
+        // Use hardcoded default to avoid Config.get() circular dependency
+        providerID = "anthropic";
+        modelID = "claude-3-5-sonnet-20241022";
+      }
       UI.println(
         UI.Style.TEXT_NORMAL_BOLD + "@ ",
         UI.Style.TEXT_NORMAL + `${providerID}/${modelID}`,

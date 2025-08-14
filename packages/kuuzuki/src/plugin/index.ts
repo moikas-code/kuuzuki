@@ -253,13 +253,11 @@ export namespace Plugin {
 
       for (const plugin of plugins) {
         try {
-          // Extract the hook function using the path
-          let hookFn: Function | undefined;
+          // Extract the hook function using the full hook name first
+          let hookFn: Function | undefined = (plugin.hooks as any)[hookName];
 
-          if (path.length === 1) {
-            hookFn = (plugin.hooks as any)[path[0]];
-          } else {
-            // For nested paths, use pathOr with proper typing
+          // If not found, try nested path approach for backward compatibility
+          if (!hookFn && path.length > 1) {
             hookFn = pathOr(plugin.hooks as any, path as any, undefined) as
               | Function
               | undefined;

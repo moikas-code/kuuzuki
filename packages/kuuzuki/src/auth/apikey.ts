@@ -136,14 +136,20 @@ export namespace ApiKeyManager {
   export class ApiKeyManager {
     private keys: Map<string, StoredApiKey> = new Map()
     private keychain: KeychainAdapter | null = null
+    private initPromise: Promise<void>
 
     constructor() {
-      this.init()
+      this.initPromise = this.init()
     }
 
     private async init(): Promise<void> {
       this.keychain = await initKeychain()
       await this.loadKeys()
+    }
+
+    // Ensure initialization is complete before any operations
+    public async ensureInitialized(): Promise<void> {
+      await this.initPromise
     }
 
     private async loadKeys(): Promise<void> {
@@ -193,6 +199,7 @@ export namespace ApiKeyManager {
     }
 
     async storeKey(providerId: string, apiKey: string, useKeychain = true): Promise<void> {
+      await this.ensureInitialized()
       if (!Providers.validateProviderKey(providerId, apiKey)) {
         throw new InvalidApiKeyError({ providerId })
       }
@@ -232,6 +239,7 @@ export namespace ApiKeyManager {
     }
 
     async getKey(providerId: string): Promise<string | null> {
+      await this.ensureInitialized()
       const stored = this.keys.get(providerId)
       if (!stored) return null
 
@@ -247,6 +255,7 @@ export namespace ApiKeyManager {
     }
 
     async removeKey(providerId: string): Promise<void> {
+      await this.ensureInitialized()
       const stored = this.keys.get(providerId)
       if (!stored) return
 
@@ -286,6 +295,7 @@ export namespace ApiKeyManager {
         lastHealthCheck?: number
       }>
     > {
+      await this.ensureInitialized()
       const result = []
       for (const [providerId, stored] of this.keys.entries()) {
         result.push({
@@ -302,6 +312,7 @@ export namespace ApiKeyManager {
     }
 
     async validateKey(providerId: string, apiKey?: string): Promise<boolean> {
+      await this.ensureInitialized()
       const key = apiKey || (await this.getKey(providerId))
       if (!key) return false
       return Providers.validateProviderKey(providerId, key)
@@ -312,6 +323,7 @@ export namespace ApiKeyManager {
       error?: string
       responseTime?: number
     }> {
+      await this.ensureInitialized()
       const key = await this.getKey(providerId)
       if (!key) {
         return { success: false, error: "No API key found" }
@@ -345,6 +357,7 @@ export namespace ApiKeyManager {
         }
       >
     > {
+      await this.ensureInitialized()
       const results: Record<string, any> = {}
       const promises = Array.from(this.keys.keys()).map(async (providerId) => {
         results[providerId] = await this.healthCheck(providerId)
@@ -355,14 +368,19 @@ export namespace ApiKeyManager {
     }
 
     hasKey(providerId: string): boolean {
+      // Note: This is a synchronous method, but we can't await here
+      // The caller should ensure initialization is complete
       return this.keys.has(providerId)
     }
 
     getAvailableProviders(): string[] {
+      // Note: This is a synchronous method, but we can't await here
+      // The caller should ensure initialization is complete
       return Array.from(this.keys.keys())
     }
 
     async detectAndStoreKey(apiKey: string, useKeychain = true): Promise<string | null> {
+      await this.ensureInitialized()
       const providerId = Providers.detectProvider(apiKey)
       if (!providerId) return null
 
@@ -387,8 +405,27 @@ export namespace ApiKeyManager {
 
   // Singleton instance
   let instance: ApiKeyManager | null = null
+  let instancePromise: Promise<ApiKeyManager> | null = null
 
-  export function getInstance(): ApiKeyManager {
+  export async function getInstance(): Promise<ApiKeyManager> {
+    if (instance) {
+      return instance
+    }
+    
+    if (!instancePromise) {
+      instancePromise = (async () => {
+        const manager = new ApiKeyManager()
+        await manager.ensureInitialized()
+        instance = manager
+        return manager
+      })()
+    }
+    
+    return instancePromise
+  }
+
+  // Legacy sync method for backward compatibility - will be removed
+  export function getInstanceSync(): ApiKeyManager {
     if (!instance) {
       instance = new ApiKeyManager()
     }

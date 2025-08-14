@@ -168,21 +168,21 @@ func New(
 	slog.Debug("Loaded config", "config", configInfo)
 
 	app := &App{
-		Info:          appInfo,
-		Agents:        agents,
-		Version:       version,
-		StatePath:     appStatePath,
-		Config:        configInfo,
-		State:         appState,
-		Client:        httpClient,
-		AgentIndex:    agentIndex,
-		Agent:         agent,
-		Session:       &opencode.Session{},
-		Messages:      []Message{},
-		Commands:      commands.LoadFromConfig(configInfo),
-		InitialModel:  initialModel,
-		InitialPrompt: initialPrompt,
-		InitialAgent:  initialAgent,
+		Info:           appInfo,
+		Agents:         agents,
+		Version:        version,
+		StatePath:      appStatePath,
+		Config:         configInfo,
+		State:          appState,
+		Client:         httpClient,
+		AgentIndex:     agentIndex,
+		Agent:          agent,
+		Session:        &opencode.Session{},
+		Messages:       []Message{},
+		Commands:       commands.LoadFromConfig(configInfo),
+		InitialModel:   initialModel,
+		InitialPrompt:  initialPrompt,
+		InitialAgent:   initialAgent,
 		InitialSession: initialSession,
 	}
 
@@ -358,14 +358,14 @@ func (a *App) InitializeProvider() tea.Cmd {
 	}
 
 	// Priority 3: Current agent's preferred model
-	if initialProvider == nil && a.Agent().Model.ModelID != "" {
+	if initialProvider == nil && a.Agent.Model.ModelID != "" {
 		for _, provider := range providers {
-			if provider.ID == a.Agent().Model.ProviderID {
+			if provider.ID == a.Agent.Model.ProviderID {
 				for _, model := range provider.Models {
-					if model.ID == a.Agent().Model.ModelID {
+					if model.ID == a.Agent.Model.ModelID {
 						initialProvider = &provider
 						initialModel = &model
-						slog.Debug("Selected model from current agent", "provider", provider.ID, "model", model.ID, "agent", a.Agent().Name)
+						slog.Debug("Selected model from current agent", "provider", provider.ID, "model", model.ID, "agent", a.Agent.Name)
 						break
 					}
 				}
@@ -375,7 +375,7 @@ func (a *App) InitializeProvider() tea.Cmd {
 			}
 		}
 		if initialProvider == nil {
-			slog.Debug("Agent model not found", "provider", a.Agent().Model.ProviderID, "model", a.Agent().Model.ModelID, "agent", a.Agent().Name)
+			slog.Debug("Agent model not found", "provider", a.Agent.Model.ProviderID, "model", a.Agent.Model.ModelID, "agent", a.Agent.Name)
 		}
 	}
 
@@ -399,13 +399,13 @@ func (a *App) InitializeProvider() tea.Cmd {
 					slog.Error("Failed to list sessions for initial session", "error", err)
 					return nil
 				}
-				
+
 				for _, session := range sessions {
 					if session.ID == *a.InitialSession {
-						return SessionSelectedMsg{Session: &session}
+						return SessionSelectedMsg(&session)
 					}
 				}
-				
+
 				slog.Warn("Initial session not found", "sessionID", *a.InitialSession)
 				return nil
 			}

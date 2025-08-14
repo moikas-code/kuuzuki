@@ -35,6 +35,7 @@
     "check": "./run.sh check"
   },
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "packages/sdk/js"
   ]
 }
