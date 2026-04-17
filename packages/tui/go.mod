@@ -1,6 +1,6 @@
 module github.com/sst/opencode
 
-go 1.24.0
+go 1.25.0
 
 replace github.com/sst/opencode-sdk-go => ../sdk/go
 
@@ -20,7 +20,7 @@ require (
 	github.com/muesli/termenv v0.16.0
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3
 	github.com/sst/opencode-sdk-go v0.0.0-00010101000000-000000000000
-	golang.org/x/image v0.28.0
+	golang.org/x/image v0.38.0
 	rsc.io/qr v0.2.0
 )
 
@@ -57,8 +57,8 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/vmware-labs/yaml-jsonpath v0.3.2 // indirect
-	golang.org/x/mod v0.25.0 // indirect
-	golang.org/x/tools v0.34.0 // indirect
+	golang.org/x/mod v0.33.0 // indirect
+	golang.org/x/tools v0.42.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
@@ -84,11 +84,11 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
 	github.com/yuin/goldmark-emoji v1.0.5 // indirect
-	golang.org/x/net v0.41.0 // indirect
-	golang.org/x/sync v0.15.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/term v0.32.0 // indirect
-	golang.org/x/text v0.26.0
+	golang.org/x/net v0.50.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/term v0.40.0 // indirect
+	golang.org/x/text v0.35.0
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
